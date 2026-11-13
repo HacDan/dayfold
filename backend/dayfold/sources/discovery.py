@@ -1,0 +1,102 @@
+"""Find feeds for a site: <link rel=alternate>, common paths and sitemaps."""
+
+from __future__ import annotations
+
+import re
+from urllib.parse import urljoin, urlparse
+
+import feedparser
+from lxml import html as lxml_html
+
+from .. import net
+
+COMMON_PATHS = [
+    "/feed", "/feed/", "/rss", "/rss.xml", "/feed.xml", "/atom.xml", "/index.xml",
+    "/feeds/posts/default", "/blog/feed", "/news/rss.xml", "/rss/feed.xml", "/RSS",
+]
+
+
+def _is_feed(url: str) -> int:
+    try:
+        resp = net.fetch(url)
+    except net.FetchError:
+        return 0
+    parsed = feedparser.parse(resp.content)
+    return len(parsed.entries)
+
+
+def discover_feeds(base_url: str, log: list[str]) -> list[tuple[str, int]]:
+    found: list[tuple[str, int]] = []
+    seen: set[str] = set()
+
+    def consider(url: str, why: str) -> None:
+        if url in seen:
+            return
+        seen.add(url)
+        n = _is_feed(url)
+        if n:
+            log.append(f"Feed encontrado via {why}: {url} ({n} itens).")
+            found.append((url, n))
+
+    try:
+        page = net.fetch(base_url)
+        root = lxml_html.fromstring(page.content)
+        for link in root.xpath('//link[@rel="alternate"]'):
+            t = (link.get("type") or "").lower()
+            if "rss" in t or "atom" in t:
+                consider(urljoin(page.url, link.get("href", "")), "<link rel=alternate>")
+        for a in root.xpath("//a[@href]"):
+            href = a.get("href", "")
+            if re.search(r"(rss|atom|feed)(\.xml)?/?$", href, re.IGNORECASE):
+                consider(urljoin(page.url, href), "link na página")
+                if len(seen) > 12:
+                    break
+    except (net.FetchError, ValueError) as exc:
+        log.append(f"Página inicial não lida: {exc}")
+
+    if not found:
+        p = urlparse(base_url)
+        origin = f"{p.scheme}://{p.netloc}"
+        prefix = p.path.rstrip("/")
+        for path in COMMON_PATHS:
+            if prefix:
+                consider(origin + prefix + path, "caminho comum")
+            consider(origin + path, "caminho comum")
+            if found:
+                break
+    found.sort(key=lambda x: -x[1])
+    return found
+
+
+def sitemap_urls(base_url: str, log: list[str]) -> list[str]:
+    """Return sitemap URLs declared in robots.txt (used as a hint for the AI)."""
+    p = urlparse(base_url)
+    try:
+        robots = net.fetch(f"{p.scheme}://{p.netloc}/robots.txt").text
+    except net.FetchError:
+        return []
+    maps = re.findall(r"(?im)^sitemap:\s*(\S+)", robots)
+    if maps:
+        log.append(f"Sitemaps no robots.txt: {', '.join(maps[:3])}")
+    return maps[:5]
+
+
+def trimmed_html(url: str, limit: int = 14000) -> str:
+    """Compact HTML sample for the AI: no scripts, styles, svg or attributes noise."""
+    page = net.fetch(url, check_robots=True)
+    root = lxml_html.fromstring(page.content)
+    for bad in root.xpath("//script|//style|//noscript|//svg|//iframe|//head/*[not(self::title)]"
+                          "|//footer|//form|//comment()"):
+        bad.drop_tree()
+    keep = {"class", "id", "href", "datetime", "itemprop", "rel"}
+    for el in root.iter():
+        if not isinstance(el.tag, str):
+            continue
+        for attr in list(el.attrib):
+            if attr not in keep:
+                del el.attrib[attr]
+        if el.get("class"):
+            el.set("class", " ".join(el.get("class", "").split()[:3]))
+    text = lxml_html.tostring(root, encoding="unicode")
+    text = re.sub(r"\s+", " ", text)
+    return text[:limit]

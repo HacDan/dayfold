@@ -1,0 +1,44 @@
+[project]
+name = "dayfold"
+version = "0.1.0"
+description = "Self-hosted daily newspaper for e-readers (EPUB + KOReader)"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy>=2.0.36",
+    "pydantic>=2.9",
+    "httpx>=0.27",
+    "feedparser>=6.0.11",
+    "trafilatura>=2.0",
+    "lxml>=5.3",
+    "cssselect>=1.2",
+    "ebooklib>=0.18",
+    "pillow>=11.0",
+    "jinja2>=3.1",
+    "apscheduler>=3.10,<4",
+    "itsdangerous>=2.2",
+]
+
+[project.optional-dependencies]
+browser = ["playwright>=1.48"]
+
+[project.scripts]
+dayfold = "dayfold.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8.3", "ruff>=0.7"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dayfold"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
