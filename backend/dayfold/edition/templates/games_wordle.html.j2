@@ -1,0 +1,11 @@
+<div class="game">
+{% if first %}<div class="section-head"><p class="kicker">{{ ed.title }}</p><h1>{{ L.games }}</h1></div>{% endif %}
+<h2>{{ g.title }}</h2>
+<p class="help">{{ help }}</p>
+<div class="tiles">{% for i in range(g.puzzle.length) %}<span class="tile absent">?</span>{% endfor %}</div>
+<p class="play"><a href="dayfold://game/{{ g.index }}">▶ {{ L.play_koreader }}</a></p>
+<p class="meta">{{ L.wordle_pocket }}</p>
+<p class="pocket">{% for p in g.puzzle.pocket %}<a href="wordle_{{ g.index }}_{{ loop.index0 }}.xhtml">{{ p.word }}</a> {% endfor %}</p>
+<p class="help">{{ L.wordle_legend }}</p>
+<p class="back"><a href="solutions.xhtml#s{{ g.index }}">{{ L.see_solution }}</a></p>
+</div>

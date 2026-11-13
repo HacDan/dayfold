@@ -1,0 +1,18 @@
+{% import "macros.j2" as m %}
+<div class="masthead">
+  <span class="ears">{{ ed.year_label }} · {{ ed.number_label }} · {{ L.daily }}</span>
+  <h1 class="name">{{ ed.title }}</h1>
+  {% if ed.tagline %}<p class="tagline">{{ ed.tagline }}</p>{% endif %}
+</div>
+<p class="dateline">{{ ed.long_date }}</p>
+{% if headline %}{{ m.article(headline, L, headline=True) }}{% endif %}
+<div class="index">
+  <h3>{{ L.in_this_edition }}</h3>
+  {% for sec in sections %}
+    <p class="sec"><a href="{{ sec.file }}">{{ sec.name }}</a></p>
+    {% for a in sec.articles %}<p class="item"><a href="{{ sec.file }}#a{{ a.id }}">{{ a.title }}</a></p>{% endfor %}
+  {% endfor %}
+  {% if has_charge %}<p class="sec"><a href="charge.xhtml">{{ L.charge }}</a></p>{% endif %}
+  {% if games %}<p class="sec"><a href="{{ games[0].file }}">{{ L.games }}</a></p>
+    {% for g in games %}<p class="item"><a href="{{ g.file }}">{{ g.title }}</a></p>{% endfor %}{% endif %}
+</div>

@@ -1,0 +1,127 @@
+/* Dayfold edition stylesheet. Sizes in em so the reader font size still works. */
+@font-face { font-family: "DF Masthead"; src: url("../fonts/{{ masthead_file }}"); }
+@font-face { font-family: "DF Display"; font-weight: bold; src: url("../fonts/PlayfairDisplay-Bold.ttf"); }
+@font-face { font-family: "DF Display"; font-weight: 900; src: url("../fonts/PlayfairDisplay-Black.ttf"); }
+@font-face { font-family: "DF Display"; font-style: italic; src: url("../fonts/PlayfairDisplay-Italic.ttf"); }
+@font-face { font-family: "DF Text"; src: url("../fonts/Literata-Regular.ttf"); }
+@font-face { font-family: "DF Text"; font-weight: bold; src: url("../fonts/Literata-Bold.ttf"); }
+@font-face { font-family: "DF Text"; font-style: italic; src: url("../fonts/Literata-Italic.ttf"); }
+@font-face { font-family: "DF Caps"; src: url("../fonts/OldStandard-Regular.ttf"); }
+@font-face { font-family: "DF Caps"; font-weight: bold; src: url("../fonts/OldStandard-Bold.ttf"); }
+@font-face { font-family: "DF Caps"; font-style: italic; src: url("../fonts/OldStandard-Italic.ttf"); }
+
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "DF Text", Georgia, serif;
+  font-size: {{ t.body }}em;
+  line-height: {{ t.line_height }};
+  color: #000;
+  background: #fff;
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+p { margin: 0 0 0.55em 0; text-indent: 1.2em; orphans: 2; widows: 2; }
+p.noindent, .lead p:first-child { text-indent: 0; }
+a { color: #000; text-decoration: underline; }
+h1, h2, h3 { font-family: "DF Display", Georgia, serif; font-weight: bold; text-align: left;
+  hyphens: none; -webkit-hyphens: none; page-break-after: avoid; }
+hr { border: 0; border-top: 1px solid #000; margin: 0.8em 0; }
+hr.double { border-top: 3px double #000; }
+hr.thick { border-top: 3px solid #000; }
+
+/* masthead */
+.masthead { text-align: center; margin: 0 0 0.3em 0; }
+.masthead .ears { font-family: "DF Caps", serif; font-size: 0.7em; letter-spacing: 0.08em;
+  text-transform: uppercase; display: block; text-align: center; }
+.masthead .name { font-family: "DF Masthead", "DF Display", serif; font-weight: normal;
+  font-size: {{ t.masthead }}em; line-height: 1.05; margin: 0.1em 0 0 0; text-align: center; }
+.masthead .tagline { font-style: italic; font-size: 0.85em; margin: 0.1em 0 0.3em 0;
+  text-indent: 0; text-align: center; }
+.dateline { font-family: "DF Caps", serif; font-weight: bold; text-transform: uppercase;
+  font-size: 0.72em; letter-spacing: 0.05em; text-align: center; border-top: 3px solid #000;
+  border-bottom: 1px solid #000; padding: 0.35em 0; margin: 0 0 1em 0; text-indent: 0; }
+
+/* section openers */
+.section-head { text-align: center; margin: 0 0 1em 0; page-break-before: always; }
+.section-head .kicker { font-family: "DF Caps", serif; font-size: 0.75em; letter-spacing: 0.15em;
+  text-transform: uppercase; text-indent: 0; text-align: center; margin: 0; }
+.section-head h1 { font-family: "DF Display", serif; font-weight: 900; font-size: {{ t.title * 1.35 }}em;
+  margin: 0.1em 0 0.2em 0; text-align: center; border-top: 3px solid #000;
+  border-bottom: 1px solid #000; padding: 0.2em 0; }
+
+/* articles */
+.article { margin: 0 0 1.2em 0; }
+.article + .article { border-top: 1px solid #000; padding-top: 0.9em; }
+.article .kicker { font-family: "DF Caps", serif; font-size: 0.7em; letter-spacing: 0.12em;
+  text-transform: uppercase; margin: 0 0 0.2em 0; text-indent: 0; text-align: left; }
+.article h2 { font-size: {{ t.title }}em; line-height: 1.15; margin: 0 0 0.3em 0; }
+.article.headline h2 { font-weight: 900; font-size: {{ t.headline }}em; line-height: 1.08; }
+.article .deck { font-family: "DF Text", serif; font-style: italic; font-size: {{ t.subtitle }}em;
+  line-height: 1.35; margin: 0 0 0.5em 0; text-indent: 0; text-align: left; }
+.byline { font-family: "DF Caps", serif; font-size: 0.72em; letter-spacing: 0.04em;
+  text-transform: uppercase; margin: 0 0 0.8em 0; text-indent: 0; text-align: left;
+  border-bottom: 1px solid #000; padding-bottom: 0.4em; }
+.byline .who { font-weight: bold; }
+.figure { margin: 0.4em 0 0.8em 0; text-align: center; page-break-inside: avoid; }
+.figure img { max-width: 100%; max-height: 18em; }
+.figure .credit { font-family: "DF Caps", serif; font-size: 0.65em; text-align: right;
+  text-indent: 0; margin: 0.2em 0 0 0; }
+.excerpt-note, .source-link { font-family: "DF Caps", serif; font-size: 0.72em; text-indent: 0;
+  text-align: left; margin: 0.5em 0 0 0; word-break: break-all; }
+.dropcap:first-letter { font-family: "DF Display", serif; font-weight: 900; font-size: 3.1em;
+  float: left; line-height: 0.85; margin: 0.05em 0.08em 0 0; }
+
+/* front page index */
+.index { margin: 1em 0 0 0; border-top: 3px double #000; padding-top: 0.5em; }
+.index h3 { font-family: "DF Caps", serif; font-size: 0.8em; letter-spacing: 0.15em;
+  text-transform: uppercase; text-align: center; margin: 0 0 0.5em 0; }
+.index .sec { font-family: "DF Caps", serif; font-weight: bold; font-size: 0.72em;
+  letter-spacing: 0.1em; text-transform: uppercase; margin: 0.6em 0 0.1em 0; text-indent: 0; }
+.index p.item { text-indent: 0; margin: 0 0 0.25em 0; text-align: left; font-family: "DF Display", serif;
+  font-weight: bold; line-height: 1.25; }
+
+/* charge */
+.charge { text-align: center; }
+.charge img { max-width: 100%; max-height: 26em; border: 1px solid #000; }
+.charge .caption { font-style: italic; text-align: center; text-indent: 0; margin: 0.6em 0 0.2em 0; }
+.charge .credit { font-family: "DF Caps", serif; font-size: 0.65em; text-align: center; text-indent: 0; }
+
+/* games */
+.game h2 { text-align: center; font-weight: 900; font-size: {{ t.title * 1.2 }}em; margin: 0 0 0.2em 0; }
+.game .help { font-style: italic; text-indent: 0; text-align: center; font-size: 0.9em; }
+.game .meta { font-family: "DF Caps", serif; font-size: 0.7em; text-transform: uppercase;
+  letter-spacing: 0.1em; text-align: center; text-indent: 0; }
+.play { text-align: center; text-indent: 0; margin: 0.8em 0; font-family: "DF Caps", serif;
+  font-weight: bold; font-size: 0.85em; }
+.play a { border: 2px solid #000; padding: 0.25em 0.8em; text-decoration: none; }
+table.sudoku { border-collapse: collapse; margin: 0.6em auto; border: 3px solid #000; }
+table.sudoku td { width: 1.9em; height: 1.9em; border: 1px solid #777; text-align: center;
+  vertical-align: middle; font-family: "DF Text", serif; font-size: 1.05em; font-weight: bold;
+  padding: 0; text-indent: 0; }
+table.sudoku td.br { border-right: 3px solid #000; }
+table.sudoku td.bb { border-bottom: 3px solid #000; }
+table.sudoku td.sol { font-weight: normal; color: #555; }
+table.wordsearch { border-collapse: collapse; margin: 0.6em auto; border: 2px solid #000; }
+table.wordsearch td { width: 1.45em; height: 1.45em; text-align: center; vertical-align: middle;
+  font-family: "DF Caps", monospace; font-size: 0.95em; padding: 0; text-indent: 0; }
+table.wordsearch td.hit { background: #000; color: #fff; font-weight: bold; }
+.wordlist { text-align: center; text-indent: 0; font-family: "DF Caps", serif; font-size: 0.85em;
+  letter-spacing: 0.06em; line-height: 1.8; }
+.tiles { text-align: center; text-indent: 0; margin: 0.3em 0; }
+.tile { display: inline-block; width: 1.7em; height: 1.7em; line-height: 1.7em; margin: 0 0.08em;
+  border: 2px solid #000; font-family: "DF Display", serif; font-weight: 900; text-align: center; }
+.tile.correct { background: #000; color: #fff; }
+.tile.present { background: #aaa; color: #000; border-style: double; border-width: 4px; }
+.tile.absent { background: #fff; color: #000; border-color: #888; }
+.pocket { text-align: center; text-indent: 0; line-height: 2.4; font-family: "DF Caps", serif;
+  font-weight: bold; letter-spacing: 0.12em; }
+.pocket a { border: 1px solid #000; padding: 0.15em 0.4em; margin: 0 0.15em; text-decoration: none; }
+.back { text-align: center; text-indent: 0; font-family: "DF Caps", serif; font-size: 0.8em; margin-top: 1em; }
+
+/* colophon */
+.colophon p { text-indent: 0; font-size: 0.85em; text-align: left; }
+.colophon .src { margin: 0 0 0.5em 0; }
+.end { text-align: center; margin-top: 3em; }
+.end .fin { font-family: "DF Masthead", serif; font-size: 2.2em; text-align: center; text-indent: 0; }
+.pb { page-break-before: always; }

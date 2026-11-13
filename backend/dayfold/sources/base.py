@@ -95,7 +95,13 @@ def strip_author(author: str | None) -> str | None:
     if not a:
         return None
     a = re.sub(r"^(por|by)\s+", "", a, flags=re.IGNORECASE)
-    a = re.sub(r"\s*\([^)]*@[^)]*\)", "", a)  # 'noreply@blogger.com (Name)' style
+    a = re.sub(r"^(da|do|de|das|dos)\s+(?=[A-ZÁÉÍÓÚÂÊÔÃÕÇ])", "", a)
+    m = re.fullmatch(r"\S+@\S+\s*\(([^)]+)\)", a)  # 'noreply@blogger.com (Name)'
+    if m:
+        a = m.group(1).strip()
+    a = re.sub(r"\s*\([^)]*@[^)]*\)", "", a)  # 'Name (email@x)'
+    if a.lower() in {"unknown", "admin", "editor", "hq web team"}:
+        return None
     if "@" in a and " " not in a:
         return None
     return a[:200]

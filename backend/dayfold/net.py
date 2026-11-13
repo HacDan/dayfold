@@ -53,7 +53,8 @@ def _throttle(url: str) -> None:
     _last_hit[host] = time.monotonic()
 
 
-def fetch(url: str, *, http: httpx.Client | None = None, check_robots: bool = False) -> Fetched:
+def fetch(url: str, *, http: httpx.Client | None = None, check_robots: bool = False,
+          max_bytes: int = MAX_BYTES) -> Fetched:
     if check_robots and not allowed_by_robots(url):
         raise FetchError(f"robots.txt não permite {url}")
     _throttle(url)
@@ -65,8 +66,8 @@ def fetch(url: str, *, http: httpx.Client | None = None, check_robots: bool = Fa
             size = 0
             for chunk in resp.iter_bytes():
                 size += len(chunk)
-                if size > MAX_BYTES:
-                    raise FetchError(f"resposta maior que {MAX_BYTES // 1024 // 1024} MB: {url}")
+                if size > max_bytes:
+                    raise FetchError(f"resposta maior que {max_bytes // 1024 // 1024} MB: {url}")
                 chunks.append(chunk)
             if resp.status_code >= 400:
                 raise FetchError(f"HTTP {resp.status_code} em {url}")

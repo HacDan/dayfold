@@ -1,0 +1,9 @@
+<div class="section-head">
+  <p class="kicker">{{ L.charge_kicker }}</p>
+  <h1>{{ L.charge }}</h1>
+</div>
+<div class="charge">
+  <img src="{{ charge.image }}" alt="{{ charge.caption or '' }}"/>
+  {% if charge.caption %}<p class="caption">{{ charge.caption }}</p>{% endif %}
+  <p class="credit">{{ L.charge_credit }}</p>
+</div>

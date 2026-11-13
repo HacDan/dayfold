@@ -1,0 +1,9 @@
+<div class="colophon">
+<div class="section-head"><p class="kicker">{{ ed.title }}</p><h1>{{ L.colophon }}</h1></div>
+<p>{{ ed.title }} · {{ ed.number_label }} · {{ ed.long_date }}</p>
+<p>{{ L.curated_ai if curated_by == 'ai' else L.curated_rules }} {{ L.generated }} {{ generated_at }}.</p>
+<h3>{{ L.sources }}</h3>
+{% for s in sources %}<p class="src"><b>{{ s.name }}</b> | {{ L.license }}: {{ s.license }}{% if s.license_url %} (<a href="{{ s.license_url }}">{{ s.license_url }}</a>){% endif %}</p>{% endfor %}
+<p>{{ L.free_software }}</p>
+<div class="end"><p class="fin">{{ ed.title }}</p><p class="noindent" style="text-align:center">{{ L.end_note }}</p></div>
+</div>

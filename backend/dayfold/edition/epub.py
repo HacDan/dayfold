@@ -1,0 +1,205 @@
+"""EPUB assembly with EbookLib and Jinja2 templates."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from ebooklib import epub
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+from ..config import FONTS_DIR, TEMPLATES_DIR
+from ..settings import MASTHEAD_FONTS
+from .i18n import LABELS
+
+env = Environment(
+    loader=FileSystemLoader(TEMPLATES_DIR),
+    autoescape=select_autoescape(["j2"], default_for_string=True, default=True),
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
+
+TEXT_FONTS = [
+    "PlayfairDisplay-Bold.ttf", "PlayfairDisplay-Black.ttf", "PlayfairDisplay-Italic.ttf",
+    "Literata-Regular.ttf", "Literata-Bold.ttf", "Literata-Italic.ttf",
+    "OldStandard-Regular.ttf", "OldStandard-Bold.ttf", "OldStandard-Italic.ttf",
+]
+
+
+@dataclass
+class EditionDoc:
+    identifier: str
+    lang: str
+    title: str
+    tagline: str
+    long_date: str
+    short_date: str
+    iso_date: str
+    number_label: str
+    year_label: str
+    masthead_font: str
+    typography: dict
+    cover_path: Path
+    headline: dict | None
+    sections: list[dict]
+    games: list[dict] = field(default_factory=list)
+    charge: dict | None = None
+    closing_order: list[str] = field(default_factory=lambda: ["news", "charge", "games"])
+    sources: list[dict] = field(default_factory=list)
+    curated_by: str = "rules"
+    generated_at: str = ""
+
+
+def _page(uid: str, file_name: str, title: str, body: str, lang: str, css: epub.EpubItem) -> epub.EpubHtml:
+    item = epub.EpubHtml(uid=uid, file_name=file_name, title=title, lang=lang)
+    item.content = f"<html><head><title>{title}</title></head><body>{body}</body></html>"
+    item.add_item(css)
+    return item
+
+
+def _font_media(name: str) -> str:
+    return "font/otf" if name.endswith(".otf") else "font/ttf"
+
+
+def build_epub(doc: EditionDoc, dest: Path) -> Path:
+    L = LABELS[doc.lang]
+    book = epub.EpubBook()
+    book.set_identifier(doc.identifier)
+    book.set_title(doc.title)
+    book.set_language(doc.lang)
+    book.add_author(doc.title)
+    book.add_metadata("DC", "date", doc.iso_date)
+    book.add_metadata("DC", "publisher", "Dayfold")
+    book.add_metadata("DC", "description", f"{doc.title} | {doc.long_date} | {doc.number_label}")
+    book.add_metadata(None, "meta", "", {"name": "dayfold:edition", "content": doc.identifier})
+    book.set_cover("images/cover.png", Path(doc.cover_path).read_bytes(), create_page=True)
+    cover_page = book.get_item_with_id("cover")
+    if cover_page is not None:
+        cover_page.is_linear = True  # the reader starts at the front page cover
+
+    masthead_file = MASTHEAD_FONTS[doc.masthead_font]["file"]
+    for name in {*TEXT_FONTS, masthead_file}:
+        book.add_item(epub.EpubItem(uid=f"font-{name}", file_name=f"fonts/{name}",
+                                    media_type=_font_media(name),
+                                    content=(FONTS_DIR / name).read_bytes()))
+    css_text = env.get_template("style.css.j2").render(t=doc.typography, masthead_file=masthead_file)
+    css = epub.EpubItem(uid="style", file_name="style/edition.css", media_type="text/css",
+                        content=css_text.encode())
+    book.add_item(css)
+
+    # images referenced by articles and the cartoon
+    def add_image(local: str | Path, name: str) -> str:
+        data = Path(local).read_bytes()
+        mt = "image/png" if name.endswith(".png") else "image/jpeg"
+        book.add_item(epub.EpubItem(uid=f"img-{name}", file_name=f"images/{name}", media_type=mt,
+                                    content=data))
+        return f"images/{name}"
+
+    for a in ([doc.headline] if doc.headline else []) + [a for s in doc.sections for a in s["articles"]]:
+        if a.get("image_path"):
+            a["image"] = add_image(a["image_path"], Path(a["image_path"]).name)
+
+    ed = {
+        "title": doc.title, "tagline": doc.tagline, "long_date": doc.long_date,
+        "short_date": doc.short_date, "number_label": doc.number_label,
+        "year_label": doc.year_label,
+    }
+    spine: list = ["cover"]
+    toc: list = []
+    nonlinear: list = []
+
+    for i, g in enumerate(doc.games):
+        g["index"] = i
+        g["file"] = f"game_{i}.xhtml"
+
+    front = _page("front", "front.xhtml", L["front_page"], env.get_template("front.html.j2").render(
+        ed=ed, L=L, headline=doc.headline, sections=doc.sections, games=doc.games,
+        has_charge=bool(doc.charge)), doc.lang, css)
+    book.add_item(front)
+    spine.append(front)
+    toc.append(front)
+
+    def add_news() -> None:
+        for s in doc.sections:
+            page = _page(f"sec-{s['slug']}", s["file"], s["name"],
+                         env.get_template("section.html.j2").render(ed=ed, L=L, sec=s), doc.lang, css)
+            book.add_item(page)
+            spine.append(page)
+            toc.append(page)
+
+    def add_charge() -> None:
+        if not doc.charge:
+            return
+        charge = dict(doc.charge)
+        charge["image"] = add_image(charge["image_path"], "charge.png")
+        page = _page("charge", "charge.xhtml", L["charge"],
+                     env.get_template("charge.html.j2").render(L=L, charge=charge), doc.lang, css)
+        book.add_item(page)
+        spine.append(page)
+        toc.append(page)
+
+    def add_games() -> None:
+        if not doc.games:
+            return
+        pages = []
+        for g in doc.games:
+            first = g["index"] == 0
+            if g["kind"] == "sudoku":
+                body = env.get_template("games_sudoku.html.j2").render(ed=ed, L=L, g=g, first=first)
+            elif g["kind"] == "wordle":
+                help_ = L["wordle_help"].format(n=g["puzzle"]["length"], a=g["puzzle"]["attempts"])
+                body = env.get_template("games_wordle.html.j2").render(ed=ed, L=L, g=g, first=first,
+                                                                       help=help_)
+                for j, guess in enumerate(g["puzzle"]["pocket"]):
+                    gp = _page(f"wordle-{g['index']}-{j}", f"wordle_{g['index']}_{j}.xhtml", guess["word"],
+                               env.get_template("wordle_guess.html.j2").render(L=L, g=g, guess=guess),
+                               doc.lang, css)
+                    book.add_item(gp)
+                    nonlinear.append(gp)
+            else:
+                help_ = L["wordsearch_help"].format(theme=g["puzzle"]["theme"])
+                body = env.get_template("games_wordsearch.html.j2").render(ed=ed, L=L, g=g, first=first,
+                                                                           help=help_)
+            page = _page(f"game-{g['index']}", g["file"], g["title"], body, doc.lang, css)
+            book.add_item(page)
+            spine.append(page)
+            pages.append(page)
+        toc.append((epub.Section(L["games"], href=pages[0].file_name), pages))
+
+    for part in doc.closing_order:
+        {"news": add_news, "charge": add_charge, "games": add_games}[part]()
+
+    colophon = _page("colophon", "colophon.xhtml", L["colophon"], env.get_template("colophon.html.j2").render(
+        ed=ed, L=L, sources=doc.sources, curated_by=doc.curated_by, generated_at=doc.generated_at),
+        doc.lang, css)
+    book.add_item(colophon)
+    spine.append(colophon)
+    toc.append(colophon)
+
+    if doc.games:
+        for g in doc.games:
+            g["hits"] = set()
+            if g["kind"] == "wordsearch":
+                for p in g["solution"]["placements"]:
+                    (r0, c0), (r1, c1) = p["start"], p["end"]
+                    n = len(p["word"])
+                    dr = (r1 - r0) // max(1, n - 1)
+                    dc = (c1 - c0) // max(1, n - 1)
+                    for k in range(n):
+                        g["hits"].add((r0 + dr * k, c0 + dc * k))
+        sol = _page("solutions", "solutions.xhtml", L["solutions"],
+                    env.get_template("solutions.html.j2").render(L=L, games=doc.games), doc.lang, css)
+        book.add_item(sol)
+        spine.append(sol)
+        toc.append(sol)
+
+    for p in nonlinear:
+        spine.append((p.id, "no"))
+
+    book.toc = toc
+    book.add_item(epub.EpubNcx())
+    book.add_item(epub.EpubNav())
+    book.spine = spine
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    epub.write_epub(str(dest), book, {"epub3_pages": False})
+    return dest

@@ -64,7 +64,7 @@ def _keyword_hits(text: str, keywords: list[str]) -> int:
 def candidates(session: Session, cur: CurationSettings, log: Callable[[str], None]) -> list[Candidate]:
     since = utcnow() - timedelta(hours=cur.max_age_hours)
     used = select(EditionArticle.article_id).join(Edition).where(
-        Edition.status == EditionStatus.READY
+        Edition.status.in_([EditionStatus.READY, "ARCHIVED"])
     )
     rows = list(session.scalars(
         select(Article).where(

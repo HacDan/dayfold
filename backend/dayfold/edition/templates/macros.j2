@@ -1,0 +1,19 @@
+{% macro article(a, L, headline=False, dropcap=True) -%}
+<div class="article{% if headline %} headline{% endif %}" id="a{{ a.id }}">
+  <p class="kicker">{{ a.section_name }}</p>
+  <h2>{{ a.title }}</h2>
+  {% if a.subtitle %}<p class="deck">{{ a.subtitle }}</p>{% endif %}
+  <p class="byline">{% if a.author %}{{ L.by }} <span class="who">{{ a.author }}</span><br/>{% endif %}{{ a.date_label }}<br/>{{ L.source }}: {{ a.provider }}</p>
+  {% if a.image %}<div class="figure"><img src="{{ a.image }}" alt=""/>{% if a.provider %}<p class="credit">{{ a.provider }}</p>{% endif %}</div>{% endif %}
+  {% if a.paragraphs %}
+    {% for p in a.paragraphs %}<p{% if loop.first %} class="noindent{% if dropcap %} dropcap{% endif %}"{% endif %}>{{ p }}</p>
+    {% endfor %}
+    <p class="source-link">{{ L.read_more }}: <a href="{{ a.url }}">{{ a.url_short }}</a></p>
+  {% elif a.excerpt %}
+    <p class="noindent">{{ a.excerpt }}</p>
+    <p class="excerpt-note">{{ L.excerpt_note }}: <a href="{{ a.url }}">{{ a.url_short }}</a></p>
+  {% else %}
+    <p class="excerpt-note">{{ L.metadata_note }}: <a href="{{ a.url }}">{{ a.url_short }}</a></p>
+  {% endif %}
+</div>
+{%- endmacro %}

@@ -1,0 +1,12 @@
+<div class="game{% if first %} section-head-off{% endif %}">
+{% if first %}<div class="section-head"><p class="kicker">{{ ed.title }}</p><h1>{{ L.games }}</h1></div>{% else %}<div class="pb"></div>{% endif %}
+<h2>{{ g.title }}</h2>
+<p class="meta">{{ L.difficulty[g.puzzle.difficulty] }} · {{ g.puzzle.clues }} {{ L.clues }}</p>
+<p class="help">{{ L.sudoku_help }}</p>
+<table class="sudoku">
+{% for r in range(9) %}<tr>{% for c in range(9) %}{% set v = g.puzzle.grid[r*9+c] %}<td class="{% if c in (2,5) %}br {% endif %}{% if r in (2,5) %}bb{% endif %}">{{ v if v else '' }}</td>{% endfor %}</tr>
+{% endfor %}
+</table>
+<p class="play"><a href="dayfold://game/{{ g.index }}">▶ {{ L.play_koreader }}</a></p>
+<p class="back"><a href="solutions.xhtml#s{{ g.index }}">{{ L.see_solution }}</a></p>
+</div>

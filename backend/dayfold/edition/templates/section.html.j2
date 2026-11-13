@@ -1,0 +1,6 @@
+{% import "macros.j2" as m %}
+<div class="section-head">
+  <p class="kicker">{{ ed.title }} · {{ ed.short_date }}</p>
+  <h1>{{ sec.name }}</h1>
+</div>
+{% for a in sec.articles %}{{ m.article(a, L, dropcap=loop.first) }}{% endfor %}

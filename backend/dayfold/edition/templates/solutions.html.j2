@@ -1,0 +1,20 @@
+<div class="section-head"><p class="kicker">{{ L.games }}</p><h1>{{ L.solutions }}</h1></div>
+{% for g in games %}
+<div class="game{% if not loop.first %} pb{% endif %}" id="s{{ g.index }}">
+<h2>{{ g.title }}</h2>
+{% if g.kind == 'sudoku' %}
+<table class="sudoku">
+{% for r in range(9) %}<tr>{% for c in range(9) %}{% set i = r*9+c %}<td class="{% if c in (2,5) %}br {% endif %}{% if r in (2,5) %}bb {% endif %}{% if not g.puzzle.grid[i] %}sol{% endif %}">{{ g.solution.grid[i] }}</td>{% endfor %}</tr>
+{% endfor %}
+</table>
+{% elif g.kind == 'wordle' %}
+<div class="tiles">{% for ch in g.solution.answer %}<span class="tile correct">{{ ch }}</span>{% endfor %}</div>
+{% elif g.kind == 'wordsearch' %}
+<table class="wordsearch">
+{% for row in g.puzzle.rows %}{% set r = loop.index0 %}<tr>{% for ch in row %}<td{% if (r, loop.index0) in g.hits %} class="hit"{% endif %}>{{ ch }}</td>{% endfor %}</tr>
+{% endfor %}
+</table>
+{% endif %}
+<p class="back"><a href="{{ g.file }}">← {{ L.back }}</a></p>
+</div>
+{% endfor %}

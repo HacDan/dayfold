@@ -1,0 +1,12 @@
+<div class="game">
+{% if first %}<div class="section-head"><p class="kicker">{{ ed.title }}</p><h1>{{ L.games }}</h1></div>{% endif %}
+<h2>{{ g.title }}</h2>
+<p class="help">{{ help }}</p>
+<table class="wordsearch">
+{% for row in g.puzzle.rows %}<tr>{% for ch in row %}<td>{{ ch }}</td>{% endfor %}</tr>
+{% endfor %}
+</table>
+<p class="wordlist">{{ g.puzzle.words | join(' · ') }}</p>
+<p class="play"><a href="dayfold://game/{{ g.index }}">▶ {{ L.play_koreader }}</a></p>
+<p class="back"><a href="solutions.xhtml#s{{ g.index }}">{{ L.see_solution }}</a></p>
+</div>
