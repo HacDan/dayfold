@@ -1,0 +1,14 @@
+services:
+  dayfold:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "8422:8422"
+    volumes:
+      - dayfold-data:/data
+    environment:
+      - DAYFOLD_PASSWORD=${DAYFOLD_PASSWORD:-}
+    restart: unless-stopped
+volumes:
+  dayfold-data:

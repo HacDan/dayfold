@@ -1,0 +1,46 @@
+from dayfold.models import UsageMode
+from dayfold.pipeline.collect import apply_usage, normalize_url
+from dayfold.settings import NewspaperSettings, Typography
+from dayfold.sources.base import ScrapedItem, html_to_paragraphs, strip_author
+
+BODY = "\n\n".join(f"Parágrafo {i} com bastante texto para a matéria de teste." for i in range(20))
+
+
+def item():
+    return ScrapedItem(url="https://x.org/a", title="Título", subtitle="Sub", body=BODY, image_url="https://x.org/i.jpg")
+
+
+def test_metadata_only_keeps_no_text():
+    d = apply_usage(item(), UsageMode.METADATA_ONLY, 30)
+    assert d["body"] is None and d["excerpt"] is None and d["image_url"] is None
+
+
+def test_excerpt_mode_drops_body_and_limits_words():
+    d = apply_usage(item(), UsageMode.EXCERPT_AND_LINK, 30)
+    assert d["body"] is None
+    assert len(d["excerpt"].split()) <= 31
+    assert d["image_url"] is None
+
+
+def test_full_mode_keeps_body():
+    d = apply_usage(item(), UsageMode.FULL_CONTENT_ALLOWED, 30)
+    assert d["body"].startswith("Parágrafo 0")
+
+
+def test_typography_is_clamped():
+    t = Typography(body=9, headline=0.1)
+    assert t.body == 1.25 and t.headline == 1.5
+
+
+def test_closing_order_validation():
+    import pytest
+
+    with pytest.raises(ValueError):
+        NewspaperSettings(closing_order=["news", "news", "games"])
+
+
+def test_helpers():
+    assert normalize_url("https://www.X.org/a/?utm_source=t&id=2") == "https://x.org/a?id=2"
+    assert strip_author("noreply@blogger.com (Python Insider)") == "Python Insider"
+    assert strip_author("Por da Agência Senado") == "Agência Senado"
+    assert html_to_paragraphs("<p>Um</p><script>x</script><p>Dois</p>") == "Um\n\nDois"

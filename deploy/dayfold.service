@@ -1,0 +1,17 @@
+[Unit]
+Description=Dayfold daily newspaper server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@REPO@/backend
+EnvironmentFile=-%h/.config/dayfold/env
+ExecStart=@REPO@/backend/.venv/bin/dayfold serve
+Restart=on-failure
+RestartSec=5
+# The scraper workers and AI CLIs run as this user.
+Nice=5
+
+[Install]
+WantedBy=default.target
