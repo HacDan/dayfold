@@ -1,0 +1,88 @@
+import { useNavigate, useParams } from "react-router-dom";
+import { del, get, fmtDateTime, USAGE_LABEL, type EditionSummary, type Job } from "../api";
+import { GamePreview } from "../components/games";
+import { Loading, SectionTitle, Stamp, useAction, useLoad } from "../components/ui";
+
+type Detail = EditionSummary & {
+  articles: {
+    id: number; position: number; section: string; section_name: string; priority: number; is_headline: boolean;
+    score: number; title: string; subtitle: string | null; author: string | null; published_at: string | null;
+    provider: string; url: string; usage_mode: string; has_body: boolean;
+  }[];
+  games: { kind: string; title: string; puzzle: Record<string, unknown>; solution: Record<string, unknown> }[];
+  charge: { mode: string; caption: string | null; image_url: string; script: Record<string, unknown> | null } | null;
+  job: Job | null;
+};
+
+export default function EditionDetail() {
+  const { id } = useParams();
+  const nav = useNavigate();
+  const { run } = useAction();
+  const { data } = useLoad(() => get<Detail>(`/api/editions/${id}`), [id]);
+  if (!data) return <Loading />;
+  const sections = new Map<string, Detail["articles"]>();
+  for (const a of data.articles) {
+    const key = a.is_headline ? "Manchete" : a.section_name;
+    sections.set(key, [...(sections.get(key) ?? []), a]);
+  }
+
+  return (
+    <div>
+      <SectionTitle kicker={`Edição nº ${data.number} · ${new Date(data.date + "T12:00").toLocaleDateString("pt-BR", { dateStyle: "full" })}`} title={data.headline ?? data.title}>
+        {data.epub_url && <a className="btn primary" href={data.epub_url}>Baixar EPUB</a>}
+        <button className="btn danger" onClick={() => {
+          if (confirm("Excluir esta edição e seus arquivos?")) run(() => del(`/api/editions/${data.id}`), "Edição excluída").then((r) => r && nav("/edicoes"));
+        }}>Excluir</button>
+      </SectionTitle>
+
+      <div className="lead-grid">
+        <div>
+          <p className="byline">
+            <Stamp status={data.status} /> · {String(data.stats.articles ?? 0)} matérias · {String(data.stats.images ?? 0)} imagens ·
+            EPUB {String(data.stats.epub_kb ?? "?")} KB · curadoria por {data.curated_by === "ai" ? "IA" : "regras"} · gerada em {fmtDateTime(data.created_at)}
+          </p>
+          {[...sections.entries()].map(([name, items]) => (
+            <section key={name} style={{ marginBottom: 22 }}>
+              <h3 style={{ borderBottom: "1px solid var(--rule)", paddingBottom: 4 }}>{name}</h3>
+              {items.map((a) => (
+                <article key={a.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--rule-soft)" }}>
+                  <div style={{ fontFamily: "var(--display)", fontWeight: 700, fontSize: a.is_headline ? "1.4rem" : "1.05rem", lineHeight: 1.2 }}>
+                    <a href={a.url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>{a.title}</a>
+                  </div>
+                  {a.subtitle && <div className="deck small">{a.subtitle}</div>}
+                  <div className="byline">
+                    {a.author ? `Por ${a.author} · ` : ""}{a.provider} · {fmtDateTime(a.published_at)} · {USAGE_LABEL[a.usage_mode] ?? a.usage_mode}
+                    {" "}· prioridade {a.priority} · nota {a.score.toFixed(2)}
+                  </div>
+                </article>
+              ))}
+            </section>
+          ))}
+        </div>
+        <aside>
+          {data.cover_url && <div className="cover-frame" style={{ marginBottom: 24 }}><img src={data.cover_url} alt="Capa" /></div>}
+          {data.charge && (
+            <section style={{ marginBottom: 24 }}>
+              <p className="kicker">Charge ({data.charge.mode === "structured" ? "roteirizada" : "ilustrada"})</p>
+              <div className="cover-frame"><img src={data.charge.image_url} alt={data.charge.caption ?? "Charge"} /></div>
+              {data.charge.caption && <p className="deck small" style={{ marginTop: 6 }}>{data.charge.caption}</p>}
+            </section>
+          )}
+          {data.games.map((g) => (
+            <section key={g.title} style={{ marginBottom: 20 }}>
+              <p className="kicker">{g.title}</p>
+              <GamePreview kind={g.kind} puzzle={g.puzzle} solution={g.solution} />
+            </section>
+          ))}
+        </aside>
+      </div>
+      {data.job && (
+        <>
+          <hr className="rule thick" />
+          <p className="kicker">Registro da geração #{data.job.id}</p>
+          <div className="log">{data.job.log.join("\n")}</div>
+        </>
+      )}
+    </div>
+  );
+}
