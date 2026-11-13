@@ -200,8 +200,13 @@ def run_scraper_job(job_id: int) -> None:
         if kind == "test":
             report = _test(version_id, strategy, spec, pdata, log)
             ok = report["ok"]
+            with session_scope() as s:
+                is_active = s.get(Provider, pdata["id"]).active_version_id == version_id
             if ok:
                 _activate(version_id, pdata["id"], log)
+            elif is_active:
+                _set_version(version_id, status=ScraperStatus.READY)
+                log("A versão ativa falhou no teste agora, mas continua ativa (pode ser instabilidade da fonte).")
             else:
                 _set_version(version_id, status=ScraperStatus.FAILED)
             return

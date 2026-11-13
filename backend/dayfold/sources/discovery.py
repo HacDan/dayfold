@@ -81,15 +81,29 @@ def sitemap_urls(base_url: str, log: list[str]) -> list[str]:
     return maps[:5]
 
 
-def trimmed_html(url: str, limit: int = 14000) -> str:
-    """Compact HTML sample for the AI: no scripts, styles, svg or attributes noise."""
+def _content_links(el) -> int:
+    return sum(1 for a in el.iter("a") if len((a.text_content() or "").strip()) >= 25)
+
+
+def trimmed_html(url: str, limit: int = 16000) -> str:
+    """Compact HTML sample for the AI: the region that holds the article links, without
+    scripts, styles and attribute noise."""
     page = net.fetch(url, check_robots=True)
     root = lxml_html.fromstring(page.content)
-    for bad in root.xpath("//script|//style|//noscript|//svg|//iframe|//head/*[not(self::title)]"
-                          "|//footer|//form|//comment()"):
+    for bad in root.xpath("//script|//style|//noscript|//svg|//iframe|//head|//comment()"):
         bad.drop_tree()
+    candidates = []
+    for xp in ("//main", "//*[@id='content']", "//*[@id='main']", "//*[@role='main']"):
+        candidates += root.xpath(xp)
+    region = next((c for c in candidates if _content_links(c) >= 6), None)
+    if region is None:
+        trimmed = lxml_html.fromstring(lxml_html.tostring(root))
+        for bad in trimmed.xpath("//footer|//form|//*[@role='navigation']"
+                                 "|//*[contains(@class,'cookie') or contains(@class,'breadcrumb')]"):
+            bad.drop_tree()
+        region = trimmed if _content_links(trimmed) >= 6 else root
     keep = {"class", "id", "href", "datetime", "itemprop", "rel"}
-    for el in root.iter():
+    for el in region.iter():
         if not isinstance(el.tag, str):
             continue
         for attr in list(el.attrib):
@@ -97,6 +111,6 @@ def trimmed_html(url: str, limit: int = 14000) -> str:
                 del el.attrib[attr]
         if el.get("class"):
             el.set("class", " ".join(el.get("class", "").split()[:3]))
-    text = lxml_html.tostring(root, encoding="unicode")
+    text = lxml_html.tostring(region, encoding="unicode")
     text = re.sub(r"\s+", " ", text)
     return text[:limit]
