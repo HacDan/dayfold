@@ -1,0 +1,414 @@
+--[[--
+Dayfold for KOReader.
+
+* Downloads the latest edition (EPUB + games.json) from a Dayfold server.
+* While reading a Dayfold edition: links "dayfold://game/N" open the interactive game
+  and reaching the end of the edition offers the games, so reading flows from the news
+  to the cartoon and the puzzles like turning the pages of a paper.
+* Game progress is saved per edition.
+
+@module koplugin.Dayfold
+--]]--
+
+local ButtonDialog = require("ui/widget/buttondialog")
+local ConfirmBox = require("ui/widget/confirmbox")
+local DataStorage = require("datastorage")
+local Device = require("device")
+local InfoMessage = require("ui/widget/infomessage")
+local JSON = require("json")
+local LuaSettings = require("luasettings")
+local MultiInputDialog = require("ui/widget/multiinputdialog")
+local NetworkMgr = require("ui/network/manager")
+local UIManager = require("ui/uimanager")
+local WidgetContainer = require("ui/widget/container/widgetcontainer")
+local ffiUtil = require("ffi/util")
+local http = require("socket.http")
+local lfs = require("libs/libkoreader-lfs")
+local logger = require("logger")
+local ltn12 = require("ltn12")
+local socket = require("socket")
+local socketutil = require("socketutil")
+local _ = require("gettext")
+
+local GAMES = {
+    sudoku = require("dayfold_games/sudoku"),
+    wordle = require("dayfold_games/wordle"),
+    wordsearch = require("dayfold_games/wordsearch"),
+}
+
+local Dayfold = WidgetContainer:extend{
+    name = "dayfold",
+    is_doc_only = false,
+}
+
+-- ------------------------------------------------------------------ config
+
+function Dayfold:loadConfig()
+    local cfg = {}
+    local file = self.path .. "/dayfold_config.lua"
+    if lfs.attributes(file, "mode") == "file" then
+        local ok, data = pcall(dofile, file)
+        if ok and type(data) == "table" then cfg = data else logger.warn("Dayfold: invalid config", data) end
+    end
+    local saved = self.settings:readSetting("server_config") or {}
+    for k, v in pairs(saved) do cfg[k] = v end
+    cfg.keep = tonumber(cfg.keep) or 7
+    if not cfg.folder then
+        local home = G_reader_settings:readSetting("home_dir")
+        if not home then home = Device:isKindle() and "/mnt/us/documents" or DataStorage:getDataDir() end
+        cfg.folder = home .. "/Dayfold"
+    end
+    if cfg.server then cfg.server = cfg.server:gsub("/+$", "") end
+    self.config = cfg
+end
+
+function Dayfold:init()
+    self.settings = LuaSettings:open(DataStorage:getSettingsDir() .. "/dayfold.lua")
+    self:loadConfig()
+    self.ui.menu:registerToMainMenu(self)
+    if self.ui.document and self:isEdition(self.ui.document.file) then
+        self:hookReader()
+    elseif not self.ui.document then
+        -- File manager: fetch today's edition quietly if Wi-Fi is already on.
+        UIManager:scheduleIn(3, function() self:autoSync() end)
+    end
+end
+
+-- ------------------------------------------------------------------ helpers
+
+function Dayfold:isEdition(path)
+    return type(path) == "string" and path:match("dayfold%-%d%d%d%d%-%d%d%-%d%d%.epub$") ~= nil
+end
+
+local function gamesPath(epub)
+    return (epub:gsub("%.epub$", ".games.json"))
+end
+
+local function readFile(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local data = f:read("*a")
+    f:close()
+    return data
+end
+
+function Dayfold:loadGames(epub)
+    local raw = readFile(gamesPath(epub))
+    if not raw then return nil end
+    local ok, data = pcall(JSON.decode, raw)
+    if ok and type(data) == "table" then return data end
+    return nil
+end
+
+function Dayfold:localEditions()
+    local list = {}
+    if lfs.attributes(self.config.folder, "mode") ~= "directory" then return list end
+    for name in lfs.dir(self.config.folder) do
+        if name:match("^dayfold%-%d%d%d%d%-%d%d%-%d%d%.epub$") then
+            table.insert(list, self.config.folder .. "/" .. name)
+        end
+    end
+    table.sort(list, function(a, b) return a > b end)
+    return list
+end
+
+function Dayfold:request(url, filepath)
+    local sink = {}
+    local req = { url = url, method = "GET", headers = { ["X-Dayfold-Token"] = self.config.token or "" } }
+    if filepath then
+        req.sink = ltn12.sink.file(io.open(filepath, "wb"))
+        socketutil:set_timeout(socketutil.FILE_BLOCK_TIMEOUT, socketutil.FILE_TOTAL_TIMEOUT * 3)
+    else
+        req.sink = ltn12.sink.table(sink)
+        socketutil:set_timeout(socketutil.LARGE_BLOCK_TIMEOUT, socketutil.LARGE_TOTAL_TIMEOUT)
+    end
+    local code, headers, status = socket.skip(1, http.request(req))
+    socketutil:reset_timeout()
+    if headers == nil then return false, "rede indisponível (" .. tostring(status or code) .. ")" end
+    if code ~= 200 then
+        if filepath then os.remove(filepath) end
+        if code == 401 then return false, "token inválido" end
+        if code == 404 then return false, "nenhuma edição pronta no servidor" end
+        return false, "HTTP " .. tostring(code)
+    end
+    return true, filepath or table.concat(sink)
+end
+
+-- ------------------------------------------------------------------ sync
+
+function Dayfold:sync(interactive)
+    if not self.config.server or not self.config.token then
+        if interactive then self:configure() end
+        return
+    end
+    local run = function()
+        local ok, body = self:request(self.config.server .. "/feed/latest.json")
+        if not ok then
+            if interactive then UIManager:show(InfoMessage:new{ text = "Dayfold: " .. body }) end
+            return
+        end
+        local okj, meta = pcall(JSON.decode, body)
+        if not okj or type(meta) ~= "table" or not meta.epub_name then
+            if interactive then UIManager:show(InfoMessage:new{ text = _("Dayfold: resposta inválida do servidor") }) end
+            return
+        end
+        lfs.mkdir(self.config.folder)
+        local dest = self.config.folder .. "/" .. meta.epub_name
+        local same = lfs.attributes(dest, "size") == meta.size
+        if not same then
+            local tmp = dest .. ".part"
+            local okd, err = self:request(self.config.server .. meta.epub, tmp)
+            if not okd then
+                if interactive then UIManager:show(InfoMessage:new{ text = "Dayfold: " .. err }) end
+                return
+            end
+            os.rename(tmp, dest)
+        end
+        self:request(self.config.server .. meta.games, gamesPath(dest))
+        self.settings:saveSetting("last_sync", os.date("%Y-%m-%d"))
+        self.settings:saveSetting("last_edition", meta.id)
+        self.settings:flush()
+        self:prune()
+        if same and not interactive then return end
+        UIManager:show(ConfirmBox:new{
+            text = string.format(_("%s nº %s (%s) pronto.\n\n%s\n\nAbrir agora?"), meta.title or "Dayfold",
+                tostring(meta.number or ""), meta.date or "", meta.headline or ""),
+            ok_text = _("Abrir"),
+            ok_callback = function() self:open(dest) end,
+        })
+    end
+    if interactive then
+        NetworkMgr:runWhenOnline(function()
+            UIManager:show(InfoMessage:new{ text = _("Baixando a edição de hoje…"), timeout = 1 })
+            UIManager:scheduleIn(0.5, run)
+        end)
+    else
+        run()
+    end
+end
+
+function Dayfold:autoSync()
+    if self.settings:readSetting("auto_sync") == false then return end
+    if self.settings:readSetting("last_sync") == os.date("%Y-%m-%d") then return end
+    if not (self.config.server and self.config.token) then return end
+    if NetworkMgr:isOnline() then
+        local ok, err = pcall(self.sync, self, false)
+        if not ok then logger.warn("Dayfold auto sync failed", err) end
+    end
+end
+
+function Dayfold:prune()
+    local list = self:localEditions()
+    for i = self.config.keep + 1, #list do
+        local epub = list[i]
+        os.remove(epub)
+        os.remove(gamesPath(epub))
+        local sdr = epub:gsub("%.epub$", ".sdr")
+        if lfs.attributes(sdr, "mode") == "directory" then ffiUtil.purgeDir(sdr) end
+    end
+end
+
+function Dayfold:open(path)
+    if self.ui.document then
+        self.ui:switchDocument(path)
+    else
+        local ReaderUI = require("apps/reader/readerui")
+        ReaderUI:showReader(path)
+    end
+end
+
+function Dayfold:openLatest()
+    local list = self:localEditions()
+    if #list == 0 then
+        UIManager:show(ConfirmBox:new{
+            text = _("Nenhuma edição no aparelho. Baixar agora?"),
+            ok_callback = function() self:sync(true) end,
+        })
+        return
+    end
+    self:open(list[1])
+end
+
+function Dayfold:configure()
+    local dialog
+    dialog = MultiInputDialog:new{
+        title = _("Servidor Dayfold"),
+        fields = {
+            { text = self.config.server or "", hint = "http://192.168.0.10:8422", description = _("Endereço do servidor") },
+            { text = self.config.token or "", hint = "token", description = _("Token do feed (dashboard › Kindle)") },
+        },
+        buttons = { {
+            { text = _("Cancelar"), id = "close", callback = function() UIManager:close(dialog) end },
+            { text = _("Salvar"), is_enter_default = true, callback = function()
+                local f = dialog:getFields()
+                self.settings:saveSetting("server_config", { server = f[1], token = f[2] })
+                self.settings:flush()
+                UIManager:close(dialog)
+                self:loadConfig()
+                UIManager:show(InfoMessage:new{ text = _("Servidor salvo."), timeout = 2 })
+            end },
+        } },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+end
+
+-- ------------------------------------------------------------------ games
+
+function Dayfold:stateKey(data, index)
+    return (data.edition or "edition") .. ":" .. tostring(index)
+end
+
+function Dayfold:openGame(epub, index, on_close)
+    local data = self:loadGames(epub)
+    if not data or not data.games then
+        UIManager:show(InfoMessage:new{ text = _("Os jogos desta edição não foram baixados. Sincronize de novo.") })
+        return
+    end
+    local game
+    for _, g in ipairs(data.games) do
+        if tonumber(g.index) == tonumber(index) then game = g end
+    end
+    local Widget = game and GAMES[game.kind]
+    if not Widget then
+        UIManager:show(InfoMessage:new{ text = _("Jogo não encontrado.") })
+        return
+    end
+    local key = self:stateKey(data, index)
+    local states = self.settings:readSetting("games") or {}
+    local widget = Widget:new{
+        game = game,
+        edition_title = (data.title or "Dayfold") .. " · " .. (data.date or ""),
+        state = states[key] or {},
+        on_save = function(state)
+            local all = self.settings:readSetting("games") or {}
+            all[key] = state
+            self.settings:saveSetting("games", all)
+            self.settings:flush()
+        end,
+        on_close = on_close,
+    }
+    UIManager:show(widget, "full")
+end
+
+function Dayfold:gameDone(data, g)
+    local st = (self.settings:readSetting("games") or {})[self:stateKey(data, g.index)]
+    if not st then return false end
+    if g.kind == "wordle" then
+        local guesses = st.guesses or {}
+        return guesses[#guesses] == g.solution.answer
+    elseif g.kind == "wordsearch" then
+        local n = 0
+        for _ in pairs(st.found or {}) do n = n + 1 end
+        return n == #g.puzzle.words
+    end
+    return st.done == true
+end
+
+function Dayfold:showGames(epub, title)
+    local data = self:loadGames(epub)
+    if not data or not data.games or #data.games == 0 then
+        UIManager:show(InfoMessage:new{ text = _("Esta edição não tem jogos.") })
+        return
+    end
+    local dialog
+    local buttons = {}
+    for _, g in ipairs(data.games) do
+        table.insert(buttons, { {
+            text = (self:gameDone(data, g) and "✓ " or "") .. g.title,
+            callback = function()
+                UIManager:close(dialog)
+                self:openGame(epub, g.index, function() self:showGames(epub, title) end)
+            end,
+        } })
+    end
+    table.insert(buttons, { { text = _("Voltar ao jornal"), callback = function() UIManager:close(dialog) end } })
+    dialog = ButtonDialog:new{ title = title or _("Passatempos"), title_align = "center", buttons = buttons }
+    UIManager:show(dialog)
+end
+
+-- ------------------------------------------------------------------ reader integration
+
+function Dayfold:hookReader()
+    local plugin = self
+    local link = self.ui.link
+    if link and not link._dayfold_hooked then
+        link._dayfold_hooked = true
+        local orig = link.onGotoLink
+        link.onGotoLink = function(this, l, ...)
+            local url = l and (l.xpointer or l.uri)
+            if type(url) == "string" then
+                local idx = url:match("^dayfold://game/(%d+)")
+                if idx then
+                    plugin:openGame(plugin.ui.document.file, tonumber(idx))
+                    return true
+                end
+            end
+            return orig(this, l, ...)
+        end
+    end
+    local status = self.ui.status
+    if status and not status._dayfold_hooked then
+        status._dayfold_hooked = true
+        status.onEndOfBook = function()
+            plugin:onEditionEnd()
+            return true
+        end
+    end
+end
+
+function Dayfold:onEditionEnd()
+    local epub = self.ui.document.file
+    local dialog
+    local buttons = {
+        { { text = _("Jogar os passatempos"), callback = function() UIManager:close(dialog); self:showGames(epub) end } },
+        { { text = _("Voltar à primeira página"), callback = function()
+            UIManager:close(dialog)
+            self.ui:handleEvent(require("ui/event"):new("GotoPage", 1))
+        end } },
+        { { text = _("Buscar edição nova"), callback = function() UIManager:close(dialog); self:sync(true) end } },
+        { { text = _("Biblioteca"), callback = function() UIManager:close(dialog); self.ui:onClose(); require("apps/filemanager/filemanager"):showFiles(self.config.folder) end } },
+        { { text = _("Continuar lendo"), callback = function() UIManager:close(dialog) end } },
+    }
+    dialog = ButtonDialog:new{ title = _("Fim da edição"), title_align = "center", buttons = buttons }
+    UIManager:show(dialog)
+end
+
+-- ------------------------------------------------------------------ menu
+
+function Dayfold:addToMainMenu(menu_items)
+    menu_items.dayfold = {
+        text = _("Dayfold"),
+        sorting_hint = "tools",
+        sub_item_table = {
+            { text = _("Baixar edição de hoje"), callback = function() self:sync(true) end },
+            { text = _("Abrir última edição"), callback = function() self:openLatest() end },
+            {
+                text = _("Passatempos da edição"),
+                enabled_func = function() return #self:localEditions() > 0 end,
+                callback = function()
+                    local current = self.ui.document and self:isEdition(self.ui.document.file) and self.ui.document.file
+                    self:showGames(current or self:localEditions()[1])
+                end,
+            },
+            {
+                text = _("Baixar automaticamente (se o Wi-Fi já estiver ligado)"),
+                checked_func = function() return self.settings:readSetting("auto_sync") ~= false end,
+                callback = function()
+                    self.settings:saveSetting("auto_sync", self.settings:readSetting("auto_sync") == false)
+                    self.settings:flush()
+                end,
+                separator = true,
+            },
+            { text = _("Configurar servidor"), keep_menu_open = true, callback = function() self:configure() end },
+            {
+                text_func = function()
+                    return string.format(_("Última sincronização: %s"), self.settings:readSetting("last_sync") or _("nunca"))
+                end,
+                enabled = false,
+            },
+        },
+    }
+end
+
+return Dayfold

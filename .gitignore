@@ -6,7 +6,6 @@ __pycache__/
 .ruff_cache/
 node_modules/
 frontend/dist/
-backend/dayfold/web/
 data/
 *.db
 *.db-wal
@@ -15,3 +14,4 @@ data/
 dist/
 build/
 *.egg-info/
+koreader/plugins/dayfold.koplugin/dayfold_config.lua
