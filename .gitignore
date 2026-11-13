@@ -1,0 +1,17 @@
+PLAN.md
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+frontend/dist/
+backend/dayfold/web/
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+dist/
+build/
+*.egg-info/
