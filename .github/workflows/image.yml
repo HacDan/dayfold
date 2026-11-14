@@ -1,29 +1,48 @@
+# Place at .github/workflows/image.yml in your FORK of JonathanLemes/dayfold.
+#
+# Pipeline: check -> verify -> build
+#   check : poll upstream (every 30 min); decide whether anything needs building
+#   verify: merge upstream locally (NOT pushed), run ruff + pytest
+#   build : merge again, build image, password-leak guard, smoke test, push to GHCR,
+#           and only then push the merge commit to your fork's main
+# A bad upstream commit therefore never lands on your fork's main or in :latest.
+# Trade-off: while upstream stays broken, each 30-min poll retries and fails again.
+#
+# Triggers: every 30 min (build only if upstream has new commits), weekly forced
+# rebuild (Mon 05:00 UTC, picks up base-image updates), manual run, push to main.
+#
+# Pin what you run: set a repository VARIABLE named UPSTREAM_REF to a tag or commit SHA
+# (Settings > Secrets and variables > Actions > Variables). Default is upstream main.
+
 name: image
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/30 * * * *"       # poll upstream
-    - cron: "0 5 * * 1"          # weekly forced rebuild
+    - cron: "*/30 * * * *"
+    - cron: "0 5 * * 1"
   push:
     branches: [main]
-    paths: [".github/workflows/image.yml"]
 
 concurrency:
   group: image
-  cancel-in-progress: false      # let a running build finish; the next poll catches up
+  cancel-in-progress: false
 
 permissions:
-  contents: write                # push the upstream merge back to your fork
-  packages: write                # push the image to GHCR
+  contents: read
 
 env:
   UPSTREAM: JonathanLemes/dayfold
   UPSTREAM_REF: ${{ vars.UPSTREAM_REF || 'main' }}
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+      merge: ${{ steps.check.outputs.merge }}
+      upstream_sha: ${{ steps.check.outputs.upstream_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,7 +52,8 @@ jobs:
         id: check
         run: |
           git fetch "https://github.com/${UPSTREAM}.git" "${UPSTREAM_REF}"
-          if git merge-base --is-ancestor FETCH_HEAD HEAD; then
+          UP_SHA=$(git rev-parse FETCH_HEAD)
+          if git merge-base --is-ancestor "$UP_SHA" HEAD; then
             CHANGED=false
           else
             CHANGED=true
@@ -45,28 +65,76 @@ jobs:
           if [ "$CHANGED" = true ] && [ "${GITHUB_EVENT_NAME}" != push ]; then MERGE=true; fi
           BUILD=false
           if [ "$CHANGED" = true ] || [ "$FORCE" = true ]; then BUILD=true; fi
-          echo "merge=$MERGE"  >> "$GITHUB_OUTPUT"
-          echo "build=$BUILD"  >> "$GITHUB_OUTPUT"
-          echo "upstream changed: $CHANGED, build: $BUILD" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "merge=$MERGE"
+            echo "build=$BUILD"
+            echo "upstream_sha=$UP_SHA"
+          } >> "$GITHUB_OUTPUT"
+          echo "upstream changed: $CHANGED, build: $BUILD (upstream ${UP_SHA:0:7})" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Merge upstream
-        if: steps.check.outputs.merge == 'true'
+  verify:
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge upstream (local only)
+        if: needs.check.outputs.merge == 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch "https://github.com/${UPSTREAM}.git" "${UPSTREAM_REF}"
+          git fetch "https://github.com/${UPSTREAM}.git" "${{ needs.check.outputs.upstream_sha }}"
           git merge --no-edit FETCH_HEAD
-          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install backend deps
+        working-directory: backend
+        run: uv sync --frozen --group dev
+
+      - name: Lint
+        working-directory: backend
+        run: uv run ruff check dayfold tests
+
+      - name: Test
+        working-directory: backend
+        run: uv run pytest -q
+
+  build:
+    needs: [check, verify]
+    if: needs.check.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write            # push the merge commit to your fork after a green build
+      packages: write            # push the image to GHCR
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge upstream (local only)
+        if: needs.check.outputs.merge == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch "https://github.com/${UPSTREAM}.git" "${{ needs.check.outputs.upstream_sha }}"
+          git merge --no-edit FETCH_HEAD
 
       - uses: docker/login-action@v3
-        if: steps.check.outputs.build == 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
-        if: steps.check.outputs.build == 'true'
+      - name: Build image
+        id: build
         working-directory: deploy
         env:
           # Satisfies compose variable interpolation if the file requires it.
@@ -82,11 +150,40 @@ jobs:
             echo "::error::DAYFOLD_PASSWORD was baked into the image"
             exit 1
           fi
+          echo "src=$SRC" >> "$GITHUB_OUTPUT"
 
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          docker run -d --name smoke -p 8422:8422 \
+            -e DAYFOLD_PASSWORD=smoke-test -e DAYFOLD_DISABLE_SCHEDULER=1 \
+            "${{ steps.build.outputs.src }}"
+          OK=0
+          for i in $(seq 30); do
+            if curl -fsS http://localhost:8422/api/health; then OK=1; break; fi
+            sleep 1
+          done
+          if [ "$OK" != 1 ]; then
+            echo "::error::health endpoint never came up"
+            docker logs smoke
+            exit 1
+          fi
+          curl -fsS http://localhost:8422/ | grep -qi '<html'
+          docker rm -f smoke
+
+      - name: Push image
+        run: |
+          set -euo pipefail
           REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dayfold"
           SHA=$(git rev-parse --short HEAD)
           for TAG in latest "sha-${SHA}"; do
-            docker tag "$SRC" "${REPO}:${TAG}"
+            docker tag "${{ steps.build.outputs.src }}" "${REPO}:${TAG}"
             docker push "${REPO}:${TAG}"
           done
           echo "Pushed ${REPO}:sha-${SHA}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Advance fork main
+        if: needs.check.outputs.merge == 'true'
+        run: |
+          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}" \
+            || echo "::warning::could not push merge commit (main moved?). Image is published; next poll will re-merge."

@@ -1,0 +1,8 @@
+# Place at .github/dependabot.yml in your fork.
+# Keeps the pinned actions in image.yml (checkout, setup-uv, login-action) current.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
