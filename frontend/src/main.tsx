@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, NavLink, Route, Routes, Link } from "react-router-dom";
+import { BrowserRouter, NavLink, Route, Routes, Link, useLocation } from "react-router-dom";
 import "./styles.css";
 import { get, post, fmtLongDate } from "./api";
 import { ToastProvider, Loading } from "./components/ui";
@@ -55,6 +55,7 @@ function Masthead({ title }: { title: string }) {
 function App() {
   const [auth, setAuth] = useState<{ required: boolean; authenticated: boolean } | null>(null);
   const [title, setTitle] = useState("Dayfold");
+  const loc = useLocation();
 
   useEffect(() => {
     get<{ required: boolean; authenticated: boolean }>("/api/auth/status").then(setAuth).catch(() => setAuth({ required: false, authenticated: true }));
@@ -78,7 +79,7 @@ function App() {
   return (
     <div className="page">
       <Masthead title={title} />
-      <main>
+      <main key={loc.pathname} className="page-enter">
         <Routes>
           <Route path="/" element={<Overview />} />
           <Route path="/edicoes" element={<Editions />} />

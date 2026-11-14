@@ -53,7 +53,7 @@ function GameCard({ g, schema, onSaved, onMove, first, last }: {
         <button className="btn primary small" onClick={save}>Salvar</button>
         <button className="btn small" onClick={async () => { await save(); setPreview(await get(`/api/games/${g.id}/preview`)); }}>Prévia</button>
       </div>
-      {preview && <div style={{ marginTop: 12 }}><GamePreview {...preview} /></div>}
+      {preview && <div className="reveal" style={{ marginTop: 12 }}><GamePreview {...preview} /></div>}
     </section>
   );
 }

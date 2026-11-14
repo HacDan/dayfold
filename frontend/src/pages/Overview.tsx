@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { get, post, fmtDateTime, type Job, type Overview as OverviewT } from "../api";
 import { Loading, Press, Stamp, useAction, useLoad } from "../components/ui";
+import { PressImage } from "../components/ui";
 
 const STEP: Record<string, string> = {
   collect: "Coletando matérias", curate: "Curadoria", images: "Preparando imagens", games: "Gerando jogos",
@@ -73,7 +74,7 @@ export default function Overview() {
         <aside>
           {ed?.cover_url ? (
             <Link to={`/edicoes/${ed.id}`} className="cover-frame" style={{ display: "block", maxWidth: 380, marginLeft: "auto" }}>
-              <img src={`${ed.cover_url}?v=${ed.id}`} alt={`Capa da edição ${ed.number}`} />
+              <PressImage src={`${ed.cover_url}?v=${ed.id}`} alt={`Capa da edição ${ed.number}`} />
             </Link>
           ) : (
             <div className="empty" style={{ aspectRatio: "3 / 4" }}>A capa da edição aparecerá aqui.</div>
@@ -82,7 +83,7 @@ export default function Overview() {
       </div>
 
       <hr className="rule thick" style={{ marginTop: 34 }} />
-      <div className="grid cols-3 col-rule">
+      <div className="grid cols-3 col-rule stagger">
         <section>
           <p className="kicker">Próxima geração</p>
           <div className="stat">{data.schedule.enabled ? data.schedule.time : "off"}</div>
@@ -105,7 +106,7 @@ export default function Overview() {
         </section>
       </div>
       <hr className="rule" />
-      <div className="grid cols-3 col-rule">
+      <div className="grid cols-3 col-rule stagger">
         <section>
           <p className="kicker">Inteligência artificial</p>
           <h3>{data.ai.active ? data.ai.name : "Desligada"}</h3>
@@ -137,7 +138,7 @@ export default function Overview() {
           <div className="editions-grid">
             {data.recent_editions.slice(1).map((e) => (
               <Link key={e.id} to={`/edicoes/${e.id}`}>
-                {e.cover_url ? <div className="cover-frame"><img src={e.cover_url} alt="" loading="lazy" /></div> : <div className="empty">sem capa</div>}
+                {e.cover_url ? <div className="cover-frame"><PressImage src={e.cover_url} alt="" loading="lazy" /></div> : <div className="empty">sem capa</div>}
                 <div className="cap">Nº {e.number} · {e.date} <Stamp status={e.status} /></div>
               </Link>
             ))}

@@ -83,7 +83,7 @@ pre { background: var(--paper-2); padding: .8em 1em; overflow: auto; border-left
 .sections-nav a { font-family: var(--caps); font-size: .82rem; letter-spacing: .14em; text-transform: uppercase;
   text-decoration: none; padding: 4px 14px; border-right: 1px solid var(--rule-soft); }
 .sections-nav a:last-child { border-right: 0; }
-.sections-nav a.active { font-weight: 700; text-decoration: underline; text-underline-offset: 5px; }
+.sections-nav a.active { font-weight: 700; }
 .sections-nav a:hover { color: var(--accent); }
 
 /* typographic building blocks */
@@ -176,7 +176,7 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
 
 /* progress like a printing press */
 .press { height: 8px; border: 1px solid var(--rule); background: repeating-linear-gradient(90deg, var(--paper-2) 0 6px, transparent 6px 12px); }
-.press > div { height: 100%; background: var(--ink); transition: width .4s; }
+.press > div { height: 100%; background: var(--ink); }
 
 .log { font-family: ui-monospace, Menlo, monospace; font-size: .8rem; background: var(--paper-2); border-left: 3px solid var(--rule);
   padding: 10px 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; }
@@ -218,3 +218,73 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
 .footer { margin-top: 48px; border-top: 3px double var(--rule); padding-top: 10px; text-align: center; font-family: var(--caps);
   font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ------------------------------------------------------------------ motion
+   Crisp, editorial and rare. Movement is small; easing is a strong ease-out.
+   See the review notes in docs/ARCHITECTURE.md (dashboard motion). */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* Section change: the new page settles like fresh ink. */
+.page-enter { animation: ink-settle 240ms var(--ease-out) both; }
+@keyframes ink-settle { from { opacity: 0; transform: translateY(6px); } }
+
+/* Overview blocks: one staggered entrance per container. */
+.stagger > * { animation: ink-settle 260ms var(--ease-out) both; }
+.stagger > :nth-child(2) { animation-delay: 50ms; }
+.stagger > :nth-child(3) { animation-delay: 90ms; }
+
+/* Front page cover comes off the press, top to bottom, once it has loaded. */
+.cover-frame img { clip-path: inset(0 0 0 0); }
+.cover-frame img[data-loaded="false"] { clip-path: inset(0 0 100% 0); }
+.cover-frame img[data-loaded="true"] { transition: clip-path 280ms var(--ease-out); }
+
+/* Pressable things give a little under the finger. */
+.btn { transition: transform 160ms var(--ease-out), background-color 150ms ease, color 150ms ease; }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+
+/* Rubber stamp lands when a status changes (not on first render). */
+.stamp[data-changed="true"] { animation: stamp-land 200ms var(--ease-out); }
+@keyframes stamp-land { from { opacity: 0; transform: scale(1.12); } }
+
+/* Printing press progress: transform only. */
+.press > div { width: 100%; transform-origin: left center; transition: transform 300ms var(--ease-out); }
+
+/* Active section in the nav: the underline is drawn, not swapped. */
+.sections-nav a { position: relative; text-decoration: none; }
+.sections-nav a.active { text-decoration: none; }
+.sections-nav a::after {
+  content: ""; position: absolute; left: 14px; right: 14px; bottom: 0; height: 1.5px; background: currentColor;
+  transform: scaleX(0); transform-origin: left center; transition: transform 200ms var(--ease-out);
+}
+.sections-nav a.active::after { transform: scaleX(1); }
+
+/* Modal: overlay fades, sheet rises slightly. Centered, so no trigger origin. */
+.modal-bg { transition: opacity 200ms var(--ease-out); }
+.modal { transition: opacity 240ms var(--ease-out), transform 240ms var(--ease-out); }
+@starting-style {
+  .modal-bg { opacity: 0; }
+  .modal { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+
+/* Toast: Sonner-like, interruptible transition. */
+.toast { transition: opacity 400ms ease, transform 400ms ease; }
+@starting-style { .toast { opacity: 0; transform: translate(-50%, 100%); } }
+
+/* Game previews open like a clipping being unfolded. */
+.reveal { animation: unfold 260ms var(--ease-out) both; }
+@keyframes unfold { from { clip-path: inset(0 0 100% 0); opacity: 0.4; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter, .stagger > *, .reveal { animation: fade 180ms ease both; }
+  .stamp[data-changed="true"] { animation: fade 180ms ease; }
+  .cover-frame img[data-loaded="false"] { clip-path: none; opacity: 0; }
+  .cover-frame img[data-loaded="true"] { clip-path: none; transition: opacity 200ms ease; }
+  .btn:active:not(:disabled) { transform: none; }
+  .modal, .toast { transition: opacity 200ms ease; }
+  @starting-style { .modal { transform: none; } .toast { transform: translate(-50%, 0); } }
+  .press > div, .sections-nav a::after { transition: none; }
+}
+@keyframes fade { from { opacity: 0; } }

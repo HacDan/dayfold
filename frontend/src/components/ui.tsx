@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ImgHTMLAttributes, type ReactNode } from "react";
 import { STATUS_LABEL } from "../api";
 
 // ---------------------------------------------------------------- data hooks
@@ -83,7 +83,31 @@ export function useAction() {
 const RUNNING = new Set(["GENERATING", "TESTING", "RUNNING", "QUEUED", "PENDING", "BUILDING"]);
 
 export function Stamp({ status, label }: { status: string; label?: string }) {
-  return <span className={`stamp ${status}${RUNNING.has(status) ? " spin" : ""}`}>{label ?? STATUS_LABEL[status] ?? status}</span>;
+  // Animate only when the status changes while the stamp is on screen, never on first render.
+  const prev = useRef(status);
+  const [changed, setChanged] = useState(false);
+  useEffect(() => {
+    if (prev.current !== status) {
+      prev.current = status;
+      setChanged(false);
+      requestAnimationFrame(() => setChanged(true));
+    }
+  }, [status]);
+  return (
+    <span className={`stamp ${status}${RUNNING.has(status) ? " spin" : ""}`} data-changed={changed}>
+      {label ?? STATUS_LABEL[status] ?? status}
+    </span>
+  );
+}
+
+/** Image that "comes off the press" once loaded. */
+export function PressImage(props: ImgHTMLAttributes<HTMLImageElement>) {
+  const ref = useRef<HTMLImageElement>(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    if (ref.current?.complete) setLoaded(true); // already in cache: no reveal needed
+  }, []);
+  return <img ref={ref} {...props} data-loaded={loaded} onLoad={(e) => { setLoaded(true); props.onLoad?.(e); }} />;
 }
 
 export function SectionTitle({ kicker, title, children }: { kicker?: string; title: string; children?: ReactNode }) {
@@ -118,7 +142,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 }
 
 export function Press({ value }: { value: number }) {
-  return <div className="press" aria-label={`${Math.round(value * 100)}%`}><div style={{ width: `${Math.max(2, value * 100)}%` }} /></div>;
+  return <div className="press" aria-label={`${Math.round(value * 100)}%`}><div style={{ transform: `scaleX(${Math.max(0.02, value)})` }} /></div>;
 }
 
 export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {

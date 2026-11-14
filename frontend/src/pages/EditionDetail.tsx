@@ -2,6 +2,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { del, get, post, fmtDateTime, USAGE_LABEL, type EditionSummary, type Job } from "../api";
 import { GamePreview } from "../components/games";
 import { Loading, SectionTitle, Stamp, useAction, useLoad } from "../components/ui";
+import { PressImage } from "../components/ui";
 
 type Detail = EditionSummary & {
   articles: {
@@ -62,11 +63,11 @@ export default function EditionDetail() {
           ))}
         </div>
         <aside>
-          {data.cover_url && <div className="cover-frame" style={{ marginBottom: 24 }}><img src={data.cover_url} alt="Capa" /></div>}
+          {data.cover_url && <div className="cover-frame" style={{ marginBottom: 24 }}><PressImage src={data.cover_url} alt="Capa" /></div>}
           {data.charge && (
             <section style={{ marginBottom: 24 }}>
               <p className="kicker">Charge ({data.charge.mode === "structured" ? "roteirizada" : "ilustrada"})</p>
-              <div className="cover-frame"><img src={data.charge.image_url} alt={data.charge.caption ?? "Charge"} /></div>
+              <div className="cover-frame"><PressImage src={data.charge.image_url} alt={data.charge.caption ?? "Charge"} /></div>
               {data.charge.caption && <p className="deck small" style={{ marginTop: 6 }}>{data.charge.caption}</p>}
             </section>
           )}
