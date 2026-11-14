@@ -1,17 +1,36 @@
 import { useState } from "react";
 import { t } from "../i18n";
 import { Link, useNavigate } from "react-router-dom";
-import { get, post, put, fmtDateTime, USAGE_LABEL, type Provider } from "../api";
+import { get, post, put, fmtDateTime, USAGE_LABEL, type Provider, type Topic } from "../api";
 import { Empty, Field, Loading, Modal, SectionTitle, Stamp, useAction, useLoad } from "../components/ui";
 
-const CATEGORIES = ["brasil", "mundo", "ciencia", "espaco", "saude", "tecnologia", "cultura"];
+ /** Toggle chips for the provider's sections; the first selected one is the primary. */
+function SectionPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const { data } = useLoad(() => get<Topic[]>("/api/topics"));
+  if (!data) return null;
+  const known = new Set(data.map((tp) => tp.slug));
+  const extra = value.filter((v) => !known.has(v)); // sections that no longer exist stay visible
+  const toggle = (slug: string) =>
+    onChange(value.includes(slug) ? value.filter((v) => v !== slug) : [...value, slug]);
+  return (
+    <div className="chips" role="group">
+      {[...data.map((tp) => ({ slug: tp.slug, name: tp.name, off: !tp.enabled })), ...extra.map((x) => ({ slug: x, name: x, off: true }))].map((c) => (
+        <button key={c.slug} type="button" className={`chip${value.includes(c.slug) ? " on" : ""}${c.off ? " off" : ""}`}
+          aria-pressed={value.includes(c.slug)} onClick={() => toggle(c.slug)}>
+          {c.name}{value[0] === c.slug && value.length > 1 ? " ★" : ""}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function ProviderForm({ initial, onSubmit, creating }: {
   initial?: Partial<Provider>; creating?: boolean;
   onSubmit: (body: Record<string, unknown>) => void;
 }) {
   const [f, setF] = useState({
-    name: initial?.name ?? "", base_url: initial?.base_url ?? "", category: initial?.category ?? "brasil",
+    name: initial?.name ?? "", base_url: initial?.base_url ?? "",
+    categories: initial?.categories?.length ? initial.categories : [initial?.category ?? "brasil"],
     language: initial?.language ?? "pt", usage_mode: initial?.usage_mode ?? "excerpt_and_link",
     license_name: initial?.license_name ?? "Verificar termos", license_url: initial?.license_url ?? "",
     license_note: initial?.license_note ?? "", enabled: initial?.enabled ?? true, max_items: initial?.max_items ?? 15,
@@ -26,6 +45,7 @@ export function ProviderForm({ initial, onSubmit, creating }: {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!f.categories.length) { alert(t("Escolha ao menos uma seção.")); return; }
     const body: Record<string, unknown> = { ...f, license_url: f.license_url || null };
     if (creating) {
       body.mode = mode;
@@ -49,9 +69,8 @@ export function ProviderForm({ initial, onSubmit, creating }: {
       <div className="grid cols-2" style={{ gap: 16 }}>
         <Field label={t("Nome")}><input type="text" required value={f.name} onChange={(e) => set("name", e.target.value)} /></Field>
         <Field label={t("URL base")}><input type="url" required value={f.base_url} onChange={(e) => set("base_url", e.target.value)} placeholder={t("https://...")} /></Field>
-        <Field label={t("Categoria / seção")}>
-          <input type="text" list="cats" value={f.category} onChange={(e) => set("category", e.target.value)} />
-          <datalist id="cats">{CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
+        <Field label={t("Seções")} hint={t("Uma ou mais. Cada matéria vai para a seção que mais combina com ela; ★ marca a principal.")}>
+          <SectionPicker value={f.categories} onChange={(v) => set("categories", v)} />
         </Field>
         <Field label={t("Idioma")}>
           <select value={f.language} onChange={(e) => set("language", e.target.value)}>
@@ -134,7 +153,7 @@ export default function Providers() {
       {data.length === 0 && <Empty>{t("Nenhum provedor.")}</Empty>}
       <div className="table-wrap">
         <table className="ledger">
-          <thead><tr><th>{t("Provedor")}</th><th>{t("Seção")}</th><th>{t("Uso")}</th><th>{t("Scraper")}</th><th>{t("Última coleta")}</th><th></th></tr></thead>
+          <thead><tr><th>{t("Provedor")}</th><th>{t("Seções")}</th><th>{t("Uso")}</th><th>{t("Scraper")}</th><th>{t("Última coleta")}</th><th></th></tr></thead>
           <tbody>
             {data.map((p) => (
               <tr key={p.id} style={{ opacity: p.enabled ? 1 : 0.55 }}>
@@ -142,7 +161,7 @@ export default function Providers() {
                   <Link to={`/provedores/${p.id}`} className="name" style={{ textDecoration: "none" }}>{p.name}</Link>
                   <div className="small muted">{p.license_name} · {p.language.toUpperCase()}</div>
                 </td>
-                <td className="small">{p.category}</td>
+                <td className="small">{(p.categories?.length ? p.categories : [p.category]).join(", ")}</td>
                 <td className="small">{t(USAGE_LABEL[p.usage_mode] ?? p.usage_mode)}</td>
                 <td>
                   {p.active_version ? <><Stamp status={p.active_version.status} /> <span className="small muted">v{p.active_version.version} · {p.active_version.strategy}</span></> : <Stamp status="off" label={t("sem scraper")} />}

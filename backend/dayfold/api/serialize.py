@@ -49,7 +49,7 @@ def provider_out(p: Provider, *, with_versions: bool = False) -> dict:
     latest = p.versions[-1] if p.versions else None
     out = {
         "id": p.id, "slug": p.slug, "name": p.name, "base_url": p.base_url,
-        "source_type": p.source_type, "category": p.category, "language": p.language,
+        "source_type": p.source_type, "category": p.category, "categories": p.sections, "language": p.language,
         "enabled": p.enabled, "usage_mode": p.usage_mode, "license_name": p.license_name,
         "license_url": p.license_url, "license_note": p.license_note, "is_default": p.is_default,
         "max_items": p.max_items, "active_version_id": p.active_version_id,

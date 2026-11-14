@@ -98,7 +98,7 @@ function App() {
     if (auth?.authenticated) {
       get<{ values: { newspaper: { title: string } } }>("/api/settings").then((s) => {
         setTitle(s.values.newspaper.title);
-        document.title = `${s.values.newspaper.title} | Redação`;
+        document.title = `${s.values.newspaper.title}`;
       }).catch(() => {});
     }
   }, [auth?.authenticated]);

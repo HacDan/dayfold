@@ -90,7 +90,7 @@ export type ScraperJob = {
 };
 
 export type Provider = {
-  id: number; slug: string; name: string; base_url: string; source_type: string; category: string; language: string;
+  id: number; slug: string; name: string; base_url: string; source_type: string; category: string; categories: string[]; language: string;
   enabled: boolean; usage_mode: string; license_name: string; license_url: string | null; license_note: string;
   is_default: boolean; max_items: number; active_version_id: number | null; active_version: Version | null;
   latest_status: string | null; latest_version: number | null; last_run_at: string | null; last_run_ok: boolean | null;

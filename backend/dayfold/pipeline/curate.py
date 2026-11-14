@@ -14,7 +14,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..ai.client import AIError, active_client
-from ..models import Article, Edition, EditionArticle, EditionStatus, Topic, utcnow
+from ..models import Article, Edition, EditionArticle, EditionStatus, Provider, Topic, utcnow
 from ..settings import CurationSettings, NewspaperSettings
 
 
@@ -78,6 +78,7 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
     by_slug = {t.slug: t for t in topics}
     blocked = [fold(b) for b in cur.blocked_keywords if b.strip()]
     langs = {lang[:2] for lang in cur.languages}
+    provider_sections = {p.id: tuple(p.sections) for p in session.scalars(select(Provider))}
     out: list[Candidate] = []
     skipped = defaultdict(int)
     for a in rows:
@@ -92,7 +93,7 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
         best, best_hits = None, 0
         for t in topics:
             hits = _keyword_hits(a.title, t.keywords) * 3 + _keyword_hits(text, t.keywords)
-            if t.slug == a.category:
+            if t.slug in provider_sections.get(a.provider_id, (a.category,)):
                 hits += 4
             if hits > best_hits:
                 best, best_hits = t, hits

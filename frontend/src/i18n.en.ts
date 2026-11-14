@@ -408,4 +408,6 @@ export const en: Record<string, string> = {
   "erro inesperado": "unexpected error",
   "Usar a capa do último jornal como tela de descanso do Kindle": "Use the latest front page as the Kindle sleep screen",
   "Aplicado pelo plugin na próxima sincronização. Na tela de descanso nativa do Kindle exige o vigia instalado com make kindle-screensaver.": "Applied by the plugin on the next sync. On the stock Kindle sleep screen it needs the watcher installed with make kindle-screensaver.",
+  "Escolha ao menos uma seção.": "Choose at least one section.",
+  "Uma ou mais. Cada matéria vai para a seção que mais combina com ela; ★ marca a principal.": "One or more. Each story goes to the section that fits it best; ★ marks the primary one.",
 };

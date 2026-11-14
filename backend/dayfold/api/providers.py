@@ -6,7 +6,7 @@ import re
 import unicodedata
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -30,7 +30,19 @@ def slugify(s: str) -> str:
 class ProviderIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     base_url: HttpUrl
-    category: str = Field(min_length=1, max_length=40)
+    category: str | None = Field(None, max_length=40)  # legacy single section
+    categories: list[str] = Field(default_factory=list, max_length=12)
+
+    @model_validator(mode="after")
+    def _sections(self):
+        cats = [c.strip() for c in self.categories if c and c.strip()]
+        if not cats and self.category:
+            cats = [self.category.strip()]
+        if not cats:
+            raise ValueError("escolha ao menos uma seção")
+        self.categories = list(dict.fromkeys(cats))[:12]
+        self.category = self.categories[0]
+        return self
     language: str = Field("pt", max_length=8)
     usage_mode: UsageMode = UsageMode.EXCERPT_AND_LINK
     license_name: str = Field("Verificar termos", max_length=120)

@@ -228,7 +228,9 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
 }
 
 /* Section change (tens of times a day): kept short and small, the new page settles like fresh ink. */
-.page-enter { animation: ink-settle 160ms var(--ease-out) both; }
+/* "backwards", not "both": a transform kept after the animation would become the containing
+   block of position:fixed descendants and push modals down the page. */
+.page-enter { animation: ink-settle 160ms var(--ease-out) backwards; }
 @keyframes ink-settle { from { opacity: 0; transform: translateY(4px); } }
 
 
@@ -272,11 +274,11 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
 @starting-style { .toast { opacity: 0; transform: translate(-50%, 100%); } }
 
 /* Game previews open like a clipping being unfolded. */
-.reveal { animation: unfold 260ms var(--ease-out) both; }
+.reveal { animation: unfold 260ms var(--ease-out) backwards; }
 @keyframes unfold { from { clip-path: inset(0 0 100% 0); opacity: 0.4; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-enter, .reveal { animation: fade 150ms ease both; }
+  .page-enter, .reveal { animation: fade 150ms ease backwards; }
   .stamp[data-changed="true"] { animation: fade 180ms ease; }
   .cover-frame img[data-loaded="pending"] { clip-path: none; opacity: 0; }
   .cover-frame img[data-loaded="fresh"] { clip-path: none; transition: opacity 200ms ease; }
@@ -299,3 +301,11 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
 .lang-switch button.on { background: var(--ink); color: var(--paper); font-weight: 700; }
 .header-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 640px) { .header-controls .ctl span { display: none; } }
+
+/* Section chips (provider form) */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--caps); font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+  background: var(--card); color: var(--ink-2); border: 1px solid var(--rule-soft); padding: 5px 10px; }
+.chip.on { background: var(--ink); color: var(--paper); border-color: var(--ink); font-weight: 700; }
+.chip.off:not(.on) { opacity: .55; }
+.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

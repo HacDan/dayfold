@@ -15,3 +15,18 @@ def test_settings_and_feed_auth(data_dir):
         assert c.get(f"/feed/latest.json?token={token}").status_code == 404  # no edition yet
         assert s["values"]["device"]["screensaver_cover"] is False  # sleep screen is opt-in
         assert c.put("/api/settings/device", json={"screensaver_cover": True}).json()["screensaver_cover"] is True
+
+
+def test_provider_with_several_sections(data_dir):
+    from dayfold.app import app
+
+    with TestClient(app) as c:
+        p = c.get("/api/providers").json()[0]
+        body = {k: p[k] for k in ("name", "base_url", "language", "usage_mode", "license_name",
+                                  "license_url", "license_note", "enabled", "max_items")}
+        r = c.put(f"/api/providers/{p['id']}", json={**body, "categories": ["ciencia", "saude", "ciencia"]})
+        assert r.status_code == 200, r.text
+        assert r.json()["categories"] == ["ciencia", "saude"] and r.json()["category"] == "ciencia"
+        assert c.put(f"/api/providers/{p['id']}", json={**body, "categories": []}).status_code == 422
+        legacy = c.put(f"/api/providers/{p['id']}", json={**body, "category": "mundo"}).json()
+        assert legacy["categories"] == ["mundo"]

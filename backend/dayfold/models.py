@@ -98,7 +98,9 @@ class Provider(Base):
     name: Mapped[str] = mapped_column(String(120))
     base_url: Mapped[str] = mapped_column(String(300))
     source_type: Mapped[str] = mapped_column(String(10), default=SourceType.RSS)
-    category: Mapped[str] = mapped_column(String(40))
+    category: Mapped[str] = mapped_column(String(40))  # primary section (first of `categories`)
+    # All sections this provider feeds; each story goes to the one whose keywords match it best.
+    categories: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     language: Mapped[str] = mapped_column(String(8), default="pt")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     usage_mode: Mapped[str] = mapped_column(String(30), default=UsageMode.EXCERPT_AND_LINK)
@@ -115,6 +117,10 @@ class Provider(Base):
     last_run_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_run_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    @property
+    def sections(self) -> list[str]:
+        return [c for c in (self.categories or []) if c] or [self.category]
 
     versions: Mapped[list[ScraperVersion]] = relationship(
         back_populates="provider",

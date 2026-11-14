@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ImgHTMLAttributes, type ReactNode } from "react";
 import { t } from "../i18n";
+import { createPortal } from "react-dom";
 import { STATUS_LABEL } from "../api";
 
 // ---------------------------------------------------------------- data hooks
@@ -54,7 +55,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={show}>
       {children}
-      {toast && <div className={`toast${toast.bad ? " bad" : ""}`} role="status">{toast.msg}</div>}
+      {toast && createPortal(<div className={`toast${toast.bad ? " bad" : ""}`} role="status">{toast.msg}</div>, document.body)}
     </ToastCtx.Provider>
   );
 }
@@ -130,7 +131,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  return (
+  return createPortal(
     <div className="modal-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
         <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
@@ -139,7 +140,8 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body, // portal: a transformed ancestor must never become the modal's containing block
   );
 }
 

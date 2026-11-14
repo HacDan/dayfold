@@ -37,7 +37,7 @@ export default function ProviderDetail() {
 
   return (
     <div>
-      <SectionTitle kicker={`Provedor · ${data.category}`} title={data.name}>
+      <SectionTitle kicker={`${t("Provedor")} · ${(data.categories?.length ? data.categories : [data.category]).join(", ")}`} title={data.name}>
         <button className="btn" disabled={busy || !data.active_version_id} onClick={() => run(() => post(`/api/providers/${data.id}/test`), t("Teste enfileirado")).then(reload)}>{t("Testar")}</button>
         <button className="btn" disabled={!!runningJob} onClick={() => setRegen(true)}>{t("Regenerar scraper")}</button>
         <button className="btn" onClick={() => setEditing(true)}>{t("Editar")}</button>
