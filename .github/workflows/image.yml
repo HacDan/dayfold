@@ -1,0 +1,92 @@
+name: image
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"       # poll upstream
+    - cron: "0 5 * * 1"          # weekly forced rebuild
+  push:
+    branches: [main]
+    paths: [".github/workflows/image.yml"]
+
+concurrency:
+  group: image
+  cancel-in-progress: false      # let a running build finish; the next poll catches up
+
+permissions:
+  contents: write                # push the upstream merge back to your fork
+  packages: write                # push the image to GHCR
+
+env:
+  UPSTREAM: JonathanLemes/dayfold
+  UPSTREAM_REF: ${{ vars.UPSTREAM_REF || 'main' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check upstream
+        id: check
+        run: |
+          git fetch "https://github.com/${UPSTREAM}.git" "${UPSTREAM_REF}"
+          if git merge-base --is-ancestor FETCH_HEAD HEAD; then
+            CHANGED=false
+          else
+            CHANGED=true
+          fi
+          FORCE=false
+          case "${GITHUB_EVENT_NAME}" in push|workflow_dispatch) FORCE=true ;; esac
+          if [ "${{ github.event.schedule }}" = "0 5 * * 1" ]; then FORCE=true; fi
+          MERGE=false
+          if [ "$CHANGED" = true ] && [ "${GITHUB_EVENT_NAME}" != push ]; then MERGE=true; fi
+          BUILD=false
+          if [ "$CHANGED" = true ] || [ "$FORCE" = true ]; then BUILD=true; fi
+          echo "merge=$MERGE"  >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD"  >> "$GITHUB_OUTPUT"
+          echo "upstream changed: $CHANGED, build: $BUILD" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Merge upstream
+        if: steps.check.outputs.merge == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch "https://github.com/${UPSTREAM}.git" "${UPSTREAM_REF}"
+          git merge --no-edit FETCH_HEAD
+          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
+
+      - uses: docker/login-action@v3
+        if: steps.check.outputs.build == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        if: steps.check.outputs.build == 'true'
+        working-directory: deploy
+        env:
+          # Satisfies compose variable interpolation if the file requires it.
+          # Runtime variable only; the guard below fails the build if it leaks into the image.
+          DAYFOLD_PASSWORD: ci-build-only
+        run: |
+          set -euo pipefail
+          docker compose build
+          SRC=$(docker compose config --images | head -n1)
+
+          META=$( { docker image inspect "$SRC"; docker history --no-trunc "$SRC"; } )
+          if grep -q ci-build-only <<<"$META"; then
+            echo "::error::DAYFOLD_PASSWORD was baked into the image"
+            exit 1
+          fi
+
+          REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dayfold"
+          SHA=$(git rev-parse --short HEAD)
+          for TAG in latest "sha-${SHA}"; do
+            docker tag "$SRC" "${REPO}:${TAG}"
+            docker push "${REPO}:${TAG}"
+          done
+          echo "Pushed ${REPO}:sha-${SHA}" >> "$GITHUB_STEP_SUMMARY"
