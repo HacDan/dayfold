@@ -1,3 +1,4 @@
+import { locale, t } from "./i18n";
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -12,7 +13,7 @@ function detail(body: unknown): string {
     if (typeof d === "string") return d;
     if (Array.isArray(d)) return d.map((e) => (e as { msg?: string }).msg ?? JSON.stringify(e)).join("; ");
   }
-  return "erro inesperado";
+  return "erro inesperado / unexpected error";
 }
 
 export async function api<T = unknown>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
@@ -129,7 +130,7 @@ export const STATUS_LABEL: Record<string, string> = {
 };
 
 export const fmtDateTime = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "nunca";
+  iso ? new Date(iso).toLocaleString(locale(), { dateStyle: "short", timeStyle: "short" }) : t("nunca");
 
 export const fmtLongDate = (d: Date) =>
-  d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  d.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long", year: "numeric" });

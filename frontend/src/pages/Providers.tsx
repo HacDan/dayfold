@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { t } from "../i18n";
 import { Link, useNavigate } from "react-router-dom";
 import { get, post, put, fmtDateTime, USAGE_LABEL, type Provider } from "../api";
 import { Empty, Field, Loading, Modal, SectionTitle, Stamp, useAction, useLoad } from "../components/ui";
@@ -33,7 +34,7 @@ export function ProviderForm({ initial, onSubmit, creating }: {
         if (strategy === "rss") body.spec = { feed_url: feedUrl };
         else if (strategy === "generic") body.spec = { list_url: feedUrl || f.base_url };
         else {
-          try { body.spec = JSON.parse(specJson); } catch { alert("Spec JSON inválida"); return; }
+          try { body.spec = JSON.parse(specJson); } catch { alert(t("Spec JSON inválida")); return; }
         }
       } else {
         body.use_ai = useAi;
@@ -46,59 +47,59 @@ export function ProviderForm({ initial, onSubmit, creating }: {
   return (
     <form onSubmit={submit}>
       <div className="grid cols-2" style={{ gap: 16 }}>
-        <Field label="Nome"><input type="text" required value={f.name} onChange={(e) => set("name", e.target.value)} /></Field>
-        <Field label="URL base"><input type="url" required value={f.base_url} onChange={(e) => set("base_url", e.target.value)} placeholder="https://..." /></Field>
-        <Field label="Categoria / seção">
+        <Field label={t("Nome")}><input type="text" required value={f.name} onChange={(e) => set("name", e.target.value)} /></Field>
+        <Field label={t("URL base")}><input type="url" required value={f.base_url} onChange={(e) => set("base_url", e.target.value)} placeholder={t("https://...")} /></Field>
+        <Field label={t("Categoria / seção")}>
           <input type="text" list="cats" value={f.category} onChange={(e) => set("category", e.target.value)} />
           <datalist id="cats">{CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
         </Field>
-        <Field label="Idioma">
+        <Field label={t("Idioma")}>
           <select value={f.language} onChange={(e) => set("language", e.target.value)}>
-            <option value="pt">Português</option><option value="en">Inglês</option><option value="es">Espanhol</option>
+            <option value="pt">{t("Português")}</option><option value="en">{t("Inglês")}</option><option value="es">{t("Espanhol")}</option>
           </select>
         </Field>
-        <Field label="Modo de uso do conteúdo" hint="Na dúvida, use excerto + link. Texto integral só com licença clara.">
+        <Field label={t("Modo de uso do conteúdo")} hint={t("Na dúvida, use excerto + link. Texto integral só com licença clara.")}>
           <select value={f.usage_mode} onChange={(e) => set("usage_mode", e.target.value)}>
-            {Object.entries(USAGE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.entries(USAGE_LABEL).map(([k, v]) => <option key={k} value={k}>{t(v)}</option>)}
           </select>
         </Field>
-        <Field label="Máximo de itens por coleta"><input type="number" min={1} max={50} value={f.max_items} onChange={(e) => set("max_items", Number(e.target.value))} /></Field>
-        <Field label="Licença / política observada"><input type="text" value={f.license_name} onChange={(e) => set("license_name", e.target.value)} /></Field>
-        <Field label="URL da licença ou termos"><input type="url" value={f.license_url ?? ""} onChange={(e) => set("license_url", e.target.value)} /></Field>
+        <Field label={t("Máximo de itens por coleta")}><input type="number" min={1} max={50} value={f.max_items} onChange={(e) => set("max_items", Number(e.target.value))} /></Field>
+        <Field label={t("Licença / política observada")}><input type="text" value={f.license_name} onChange={(e) => set("license_name", e.target.value)} /></Field>
+        <Field label={t("URL da licença ou termos")}><input type="url" value={f.license_url ?? ""} onChange={(e) => set("license_url", e.target.value)} /></Field>
       </div>
-      <Field label="Notas sobre a licença"><textarea value={f.license_note} onChange={(e) => set("license_note", e.target.value)} /></Field>
-      <label className="check"><input type="checkbox" checked={f.enabled} onChange={(e) => set("enabled", e.target.checked)} /> Provedor ativo</label>
+      <Field label={t("Notas sobre a licença")}><textarea value={f.license_note} onChange={(e) => set("license_note", e.target.value)} /></Field>
+      <label className="check"><input type="checkbox" checked={f.enabled} onChange={(e) => set("enabled", e.target.checked)} />{" "}{t("Provedor ativo")}</label>
 
       {creating && (
         <fieldset>
-          <legend>Scraper</legend>
+          <legend>{t("Scraper")}</legend>
           <div className="tabs">
-            <button type="button" className={mode === "assisted" ? "active" : ""} onClick={() => setMode("assisted")}>Assistido</button>
-            <button type="button" className={mode === "manual" ? "active" : ""} onClick={() => setMode("manual")}>Manual</button>
+            <button type="button" className={mode === "assisted" ? "active" : ""} onClick={() => setMode("assisted")}>{t("Assistido")}</button>
+            <button type="button" className={mode === "manual" ? "active" : ""} onClick={() => setMode("manual")}>{t("Manual")}</button>
           </div>
           {mode === "assisted" ? (
             <>
-              <p className="small">O Dayfold procura um feed RSS/Atom, depois tenta a extração genérica e, se nada passar no teste, pede à IA um scraper declarativo (seletores CSS).</p>
-              <label className="check"><input type="checkbox" checked={useAi} onChange={(e) => setUseAi(e.target.checked)} /> Usar IA se o automático falhar</label>
-              <Field label="Instruções extras para a IA (opcional)" hint="Com instruções, o Dayfold vai direto para a IA.">
-                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Ex.: use só a seção de economia" />
+              <p className="small">{t("O Dayfold procura um feed RSS/Atom, depois tenta a extração genérica e, se nada passar no teste, pede à IA um scraper declarativo (seletores CSS).")}</p>
+              <label className="check"><input type="checkbox" checked={useAi} onChange={(e) => setUseAi(e.target.checked)} />{" "}{t("Usar IA se o automático falhar")}</label>
+              <Field label={t("Instruções extras para a IA (opcional)")} hint={t("Com instruções, o Dayfold vai direto para a IA.")}>
+                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t("Ex.: use só a seção de economia")} />
               </Field>
             </>
           ) : (
             <>
-              <Field label="Estratégia">
+              <Field label={t("Estratégia")}>
                 <select value={strategy} onChange={(e) => setStrategy(e.target.value)}>
-                  <option value="rss">RSS / Atom</option>
-                  <option value="generic">Extração genérica (links + Trafilatura)</option>
-                  <option value="selectors">Seletores CSS</option>
+                  <option value="rss">{t("RSS / Atom")}</option>
+                  <option value="generic">{t("Extração genérica (links + Trafilatura)")}</option>
+                  <option value="selectors">{t("Seletores CSS")}</option>
                 </select>
               </Field>
               {strategy !== "selectors" ? (
-                <Field label={strategy === "rss" ? "URL do feed" : "URL da listagem (vazio = URL base)"}>
+                <Field label={strategy === "rss" ? t("URL do feed") : t("URL da listagem (vazio = URL base)")}>
                   <input type="url" value={feedUrl} onChange={(e) => setFeedUrl(e.target.value)} required={strategy === "rss"} />
                 </Field>
               ) : (
-                <Field label="Spec (JSON)" hint='Campos: list_url, item_selector, link_selector, article {title, subtitle, author, date, body, image}'>
+                <Field label={t("Spec (JSON)")} hint={t("Campos: list_url, item_selector, link_selector, article {title, subtitle, author, date, body, image}")}>
                   <textarea style={{ fontFamily: "monospace", minHeight: 140 }} value={specJson} onChange={(e) => setSpecJson(e.target.value)} />
                 </Field>
               )}
@@ -106,7 +107,7 @@ export function ProviderForm({ initial, onSubmit, creating }: {
           )}
         </fieldset>
       )}
-      <button className="btn primary" type="submit">{creating ? "Adicionar provedor" : "Salvar"}</button>
+      <button className="btn primary" type="submit">{creating ? t("Adicionar provedor") : t("Salvar")}</button>
     </form>
   );
 }
@@ -119,22 +120,21 @@ export default function Providers() {
   const [adding, setAdding] = useState(false);
   if (!data) return <Loading />;
 
-  const toggle = (p: Provider) => run(() => put(`/api/providers/${p.id}`, { ...p, enabled: !p.enabled }), p.enabled ? "Provedor desativado" : "Provedor ativado").then(reload);
+  const toggle = (p: Provider) => run(() => put(`/api/providers/${p.id}`, { ...p, enabled: !p.enabled }), p.enabled ? t("Provedor desativado") : t("Provedor ativado")).then(reload);
 
   return (
     <div>
-      <SectionTitle kicker="Fontes" title="Provedores">
-        <button className="btn primary" onClick={() => setAdding(true)}>Adicionar provedor</button>
+      <SectionTitle kicker={t("Fontes")} title={t("Provedores")}>
+        <button className="btn primary" onClick={() => setAdding(true)}>{t("Adicionar provedor")}</button>
       </SectionTitle>
       <p className="small muted" style={{ maxWidth: 760 }}>
-        O Dayfold só publica o que o modo de uso permite: <strong>texto integral</strong> para fontes com licença aberta clara,
-        {" "}<strong>excerto + link</strong> quando a licença é incerta, e <strong>só metadados</strong> quando nem o excerto é seguro.
-        Confira os termos de cada fonte que você habilitar.
+        {t("O Dayfold só publica o que o modo de uso permite:")}{" "}<strong>{t("texto integral")}</strong>{" "}{t("para fontes com licença aberta clara,")}
+        {" "}<strong>{t("excerto + link")}</strong>{" "}{t("quando a licença é incerta, e")}{" "}<strong>{t("só metadados")}</strong>{" "}{t("quando nem o excerto é seguro. Confira os termos de cada fonte que você habilitar.")}
       </p>
-      {data.length === 0 && <Empty>Nenhum provedor.</Empty>}
+      {data.length === 0 && <Empty>{t("Nenhum provedor.")}</Empty>}
       <div className="table-wrap">
         <table className="ledger">
-          <thead><tr><th>Provedor</th><th>Seção</th><th>Uso</th><th>Scraper</th><th>Última coleta</th><th></th></tr></thead>
+          <thead><tr><th>{t("Provedor")}</th><th>{t("Seção")}</th><th>{t("Uso")}</th><th>{t("Scraper")}</th><th>{t("Última coleta")}</th><th></th></tr></thead>
           <tbody>
             {data.map((p) => (
               <tr key={p.id} style={{ opacity: p.enabled ? 1 : 0.55 }}>
@@ -143,19 +143,19 @@ export default function Providers() {
                   <div className="small muted">{p.license_name} · {p.language.toUpperCase()}</div>
                 </td>
                 <td className="small">{p.category}</td>
-                <td className="small">{USAGE_LABEL[p.usage_mode]}</td>
+                <td className="small">{t(USAGE_LABEL[p.usage_mode] ?? p.usage_mode)}</td>
                 <td>
-                  {p.active_version ? <><Stamp status={p.active_version.status} /> <span className="small muted">v{p.active_version.version} · {p.active_version.strategy}</span></> : <Stamp status="off" label="sem scraper" />}
+                  {p.active_version ? <><Stamp status={p.active_version.status} /> <span className="small muted">v{p.active_version.version} · {p.active_version.strategy}</span></> : <Stamp status="off" label={t("sem scraper")} />}
                   {p.latest_status && p.latest_version !== p.active_version?.version && (
                     <div className="small" style={{ marginTop: 4 }}>v{p.latest_version}: <Stamp status={p.latest_status} /></div>
                   )}
                 </td>
                 <td className="small">
-                  {p.last_run_at ? <>{p.last_run_ok ? <Stamp status="ok" label={`${p.last_run_count ?? 0} itens`} /> : <Stamp status="bad" label="falhou" />} <span className="muted">{fmtDateTime(p.last_run_at)}</span></> : <span className="muted">nunca</span>}
+                  {p.last_run_at ? <>{p.last_run_ok ? <Stamp status="ok" label={t("{n} itens", { n: p.last_run_count ?? 0 })} /> : <Stamp status="bad" label={t("falhou")} />} <span className="muted">{fmtDateTime(p.last_run_at)}</span></> : <span className="muted">{t("nunca")}</span>}
                 </td>
                 <td style={{ whiteSpace: "nowrap" }}>
-                  <button className="btn small" onClick={() => toggle(p)}>{p.enabled ? "Desativar" : "Ativar"}</button>{" "}
-                  <Link className="btn small" to={`/provedores/${p.id}`}>Abrir</Link>
+                  <button className="btn small" onClick={() => toggle(p)}>{p.enabled ? t("Desativar") : t("Ativar")}</button>{" "}
+                  <Link className="btn small" to={`/provedores/${p.id}`}>{t("Abrir")}</Link>
                 </td>
               </tr>
             ))}
@@ -163,8 +163,8 @@ export default function Providers() {
         </table>
       </div>
       {adding && (
-        <Modal title="Novo provedor" onClose={() => setAdding(false)}>
-          <ProviderForm creating onSubmit={(body) => run(() => post<Provider>("/api/providers", body), "Provedor criado. O scraper está sendo preparado.").then((p) => {
+        <Modal title={t("Novo provedor")} onClose={() => setAdding(false)}>
+          <ProviderForm creating onSubmit={(body) => run(() => post<Provider>("/api/providers", body), t("Provedor criado. O scraper está sendo preparado.")).then((p) => {
             if (p) { setAdding(false); nav(`/provedores/${p.id}`); }
           })} />
         </Modal>

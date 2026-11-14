@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ImgHTMLAttributes, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ImgHTMLAttributes, type ReactNode } from "react";
+import { t } from "../i18n";
 import { STATUS_LABEL } from "../api";
 
 // ---------------------------------------------------------------- data hooks
@@ -95,7 +96,7 @@ export function Stamp({ status, label }: { status: string; label?: string }) {
   }, [status]);
   return (
     <span className={`stamp ${status}${RUNNING.has(status) ? " spin" : ""}`} data-changed={changed}>
-      {label ?? STATUS_LABEL[status] ?? status}
+      {label ?? (STATUS_LABEL[status] ? t(STATUS_LABEL[status]) : status)}
     </span>
   );
 }
@@ -103,11 +104,12 @@ export function Stamp({ status, label }: { status: string; label?: string }) {
 /** Image that "comes off the press" once loaded. */
 export function PressImage(props: ImgHTMLAttributes<HTMLImageElement>) {
   const ref = useRef<HTMLImageElement>(null);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    if (ref.current?.complete) setLoaded(true); // already in cache: no reveal needed
+  const [state, setState] = useState<"pending" | "fresh" | "cached">("pending");
+  useLayoutEffect(() => {
+    if (ref.current?.complete && ref.current.naturalWidth) setState("cached"); // seen before: no reveal
   }, []);
-  return <img ref={ref} {...props} data-loaded={loaded} onLoad={(e) => { setLoaded(true); props.onLoad?.(e); }} />;
+  return <img ref={ref} {...props} data-loaded={state}
+    onLoad={(e) => { setState((s) => (s === "pending" ? "fresh" : s)); props.onLoad?.(e); }} />;
 }
 
 export function SectionTitle({ kicker, title, children }: { kicker?: string; title: string; children?: ReactNode }) {
@@ -133,7 +135,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
       <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
         <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
           <h2 style={{ margin: 0 }}>{title}</h2>
-          <button className="btn small" onClick={onClose}>Fechar</button>
+          <button className="btn small" onClick={onClose}>{t("Fechar")}</button>
         </div>
         {children}
       </div>
@@ -160,5 +162,5 @@ export function Empty({ children }: { children: ReactNode }) {
 }
 
 export function Loading() {
-  return <p className="muted center" style={{ padding: 40 }}><em>Compondo a página…</em></p>;
+  return <p className="muted center" style={{ padding: 40 }}><em>{t("Compondo a página…")}</em></p>;
 }

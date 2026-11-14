@@ -26,7 +26,8 @@ downloads one file a day and reads it offline.
 
 * **Classic newspaper design** everywhere: blackletter masthead (Chomsky, an open font in the
   spirit of the New York Times nameplate), Playfair Display headlines and Literata body text,
-  rules, kickers, bylines and columns. The dashboard looks like a newsroom, not a SaaS.
+  rules, kickers, bylines and columns. The dashboard looks like a newsroom, not a SaaS, with light and
+  dark themes and a Portuguese/English switch (both remembered by the browser).
 * **Front page cover** rendered for e-ink (16 gray levels): masthead, date, edition number,
   headline, deck, lead photo or lead text in columns, and "also in this edition".
 * **Sources you control**: RSS/Atom first, generic article extraction (Trafilatura) when there

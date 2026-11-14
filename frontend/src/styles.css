@@ -227,39 +227,37 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
-/* Section change: the new page settles like fresh ink. */
-.page-enter { animation: ink-settle 240ms var(--ease-out) both; }
-@keyframes ink-settle { from { opacity: 0; transform: translateY(6px); } }
+/* Section change (tens of times a day): kept short and small, the new page settles like fresh ink. */
+.page-enter { animation: ink-settle 160ms var(--ease-out) both; }
+@keyframes ink-settle { from { opacity: 0; transform: translateY(4px); } }
 
-/* Overview blocks: one staggered entrance per container. */
-.stagger > * { animation: ink-settle 260ms var(--ease-out) both; }
-.stagger > :nth-child(2) { animation-delay: 50ms; }
-.stagger > :nth-child(3) { animation-delay: 90ms; }
 
 /* Front page cover comes off the press, top to bottom, once it has loaded. */
 .cover-frame img { clip-path: inset(0 0 0 0); }
-.cover-frame img[data-loaded="false"] { clip-path: inset(0 0 100% 0); }
-.cover-frame img[data-loaded="true"] { transition: clip-path 280ms var(--ease-out); }
+.cover-frame img[data-loaded="pending"] { clip-path: inset(0 0 100% 0); }
+.cover-frame img[data-loaded="fresh"] { transition: clip-path 280ms var(--ease-out); }
+/* data-loaded="cached": already seen, shown at once (no reveal on every visit). */
 
 /* Pressable things give a little under the finger. */
 .btn { transition: transform 160ms var(--ease-out), background-color 150ms ease, color 150ms ease; }
-.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:active:not(:disabled) { transform: scale(0.97); transition-duration: 100ms, 150ms, 150ms; } /* press snaps in, release eases out */
 
 /* Rubber stamp lands when a status changes (not on first render). */
 .stamp[data-changed="true"] { animation: stamp-land 200ms var(--ease-out); }
 @keyframes stamp-land { from { opacity: 0; transform: scale(1.12); } }
 
 /* Printing press progress: transform only. */
-.press > div { width: 100%; transform-origin: left center; transition: transform 300ms var(--ease-out); }
+.press > div { width: 100%; transform-origin: left center; transition: transform 300ms linear; } /* progress: linear */
 
 /* Active section in the nav: the underline is drawn, not swapped. */
 .sections-nav a { position: relative; text-decoration: none; }
 .sections-nav a.active { text-decoration: none; }
 .sections-nav a::after {
   content: ""; position: absolute; left: 14px; right: 14px; bottom: 0; height: 1.5px; background: currentColor;
-  transform: scaleX(0); transform-origin: left center; transition: transform 200ms var(--ease-out);
+  transform: scaleX(0); transform-origin: left center;
 }
-.sections-nav a.active::after { transform: scaleX(1); }
+/* Only the new section draws its rule; the old one snaps off (navigation is frequent). */
+.sections-nav a.active::after { transform: scaleX(1); transition: transform 180ms var(--ease-out); }
 
 /* Modal: overlay fades, sheet rises slightly. Centered, so no trigger origin. */
 .modal-bg { transition: opacity 200ms var(--ease-out); }
@@ -278,13 +276,26 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
 @keyframes unfold { from { clip-path: inset(0 0 100% 0); opacity: 0.4; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-enter, .stagger > *, .reveal { animation: fade 180ms ease both; }
+  .page-enter, .reveal { animation: fade 150ms ease both; }
   .stamp[data-changed="true"] { animation: fade 180ms ease; }
-  .cover-frame img[data-loaded="false"] { clip-path: none; opacity: 0; }
-  .cover-frame img[data-loaded="true"] { clip-path: none; transition: opacity 200ms ease; }
+  .cover-frame img[data-loaded="pending"] { clip-path: none; opacity: 0; }
+  .cover-frame img[data-loaded="fresh"] { clip-path: none; transition: opacity 200ms ease; }
   .btn:active:not(:disabled) { transform: none; }
   .modal, .toast { transition: opacity 200ms ease; }
   @starting-style { .modal { transform: none; } .toast { transform: translate(-50%, 0); } }
   .press > div, .sections-nav a::after { transition: none; }
 }
 @keyframes fade { from { opacity: 0; } }
+
+/* Header controls: theme and language, set in small caps like the ears of a front page. */
+.header-controls { display: inline-flex; align-items: center; gap: 14px; }
+.header-controls button { font-family: var(--caps); font-size: .74rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-2); background: none; border: 0; padding: 4px 2px; cursor: pointer; }
+.header-controls .ctl { display: inline-flex; align-items: center; gap: 6px; }
+.header-controls .ctl:hover, .lang-switch button:hover { color: var(--ink); }
+.lang-switch { display: inline-flex; border: 1px solid var(--rule-soft); }
+.lang-switch button { padding: 3px 8px; }
+.lang-switch button + button { border-left: 1px solid var(--rule-soft); }
+.lang-switch button.on { background: var(--ink); color: var(--paper); font-weight: 700; }
+.header-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 640px) { .header-controls .ctl span { display: none; } }

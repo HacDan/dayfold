@@ -1,4 +1,6 @@
 import { StrictMode, useEffect, useState } from "react";
+import { getLang, setLang, t, type Lang } from "./i18n";
+import { applyTheme, effectiveTheme, type Theme } from "./theme";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, NavLink, Route, Routes, Link, useLocation } from "react-router-dom";
 import "./styles.css";
@@ -31,22 +33,48 @@ const NAV = [
   ["/kindle", "Kindle"],
 ] as const;
 
-function Masthead({ title }: { title: string }) {
+function HeaderControls({ onLang }: { onLang: (l: Lang) => void }) {
+  const [theme, setTheme] = useState<Theme>(effectiveTheme());
+  const next: Theme = theme === "dark" ? "light" : "dark";
+  const lang = getLang();
+  return (
+    <span className="header-controls">
+      <button type="button" className="ctl" onClick={() => { applyTheme(next); setTheme(next); }}
+        aria-label={t(next === "dark" ? "Mudar para o tema escuro" : "Mudar para o tema claro")}
+        title={t(next === "dark" ? "Mudar para o tema escuro" : "Mudar para o tema claro")}>
+        {theme === "dark" ? (
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.8"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>
+        )}
+        <span>{theme === "dark" ? t("Tema claro") : t("Tema escuro")}</span>
+      </button>
+      <span className="lang-switch" role="group" aria-label={t("Idioma da dashboard")}>
+        {(["pt", "en"] as Lang[]).map((l) => (
+          <button key={l} type="button" className={l === lang ? "on" : ""} aria-pressed={l === lang}
+            onClick={() => l !== lang && onLang(l)}>{l.toUpperCase()}</button>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+function Masthead({ title, onLang }: { title: string; onLang: (l: Lang) => void }) {
   const today = fmtLongDate(new Date());
   return (
     <header>
       <div className="mast">
-        <div className="ears"><span>Sala de redação</span><span>Self-hosted</span></div>
+        <div className="ears"><span>{t("Sala de redação")}</span><HeaderControls onLang={onLang} /></div>
         <h1 className="name"><Link to="/">{title}</Link></h1>
-        <p className="tag">Painel editorial do seu jornal diário para e-readers</p>
+        <p className="tag">{t("Painel editorial do seu jornal diário para e-readers")}</p>
       </div>
       <div className="dateline">
-        <span>Edição do operador</span>
+        <span>{t("Edição do operador")}</span>
         <span className="center">{today}</span>
-        <span>Dayfold 0.1</span>
+        <span>{t("Dayfold 0.1")}</span>
       </div>
-      <nav className="sections-nav" aria-label="Seções">
-        {NAV.map(([to, label]) => <NavLink key={to} to={to} end={to === "/"}>{label}</NavLink>)}
+      <nav className="sections-nav" aria-label={t("Seções")}>
+        {NAV.map(([to, label]) => <NavLink key={to} to={to} end={to === "/"}>{t(label)}</NavLink>)}
       </nav>
     </header>
   );
@@ -55,6 +83,8 @@ function Masthead({ title }: { title: string }) {
 function App() {
   const [auth, setAuth] = useState<{ required: boolean; authenticated: boolean } | null>(null);
   const [title, setTitle] = useState("Dayfold");
+  const [lang, setLangState] = useState<Lang>(getLang());
+  const changeLang = (l: Lang) => { setLang(l); setLangState(l); };
   const loc = useLocation();
 
   useEffect(() => {
@@ -77,8 +107,8 @@ function App() {
   if (!auth.authenticated) return <Login onDone={() => setAuth({ ...auth, authenticated: true })} />;
 
   return (
-    <div className="page">
-      <Masthead title={title} />
+    <div className="page" key={lang}>
+      <Masthead title={title} onLang={changeLang} />
       <main key={loc.pathname} className="page-enter">
         <Routes>
           <Route path="/" element={<Overview />} />
@@ -93,12 +123,12 @@ function App() {
           <Route path="/ia" element={<AI />} />
           <Route path="/registros" element={<Logs />} />
           <Route path="/kindle" element={<Kindle />} />
-          <Route path="*" element={<p className="empty">Página não encontrada.</p>} />
+          <Route path="*" element={<p className="empty">{t("Página não encontrada.")}</p>} />
         </Routes>
       </main>
       <footer className="footer">
-        Dayfold · software livre (MIT) · fontes OFL ·{" "}
-        {auth.required && <button className="btn link" onClick={() => post("/api/auth/logout").then(() => location.reload())}>sair</button>}
+        {t("Dayfold · software livre (MIT) · fontes OFL ·")}{" "}
+        {auth.required && <button className="btn link" onClick={() => post("/api/auth/logout").then(() => location.reload())}>{t("sair")}</button>}
       </footer>
     </div>
   );

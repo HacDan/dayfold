@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 type Puzzle = Record<string, unknown>;
 
 export function SudokuGrid({ grid }: { grid: number[] }) {
@@ -37,13 +38,13 @@ export function WordSearchGrid({ rows }: { rows: string[] }) {
 
 export function GamePreview({ kind, puzzle, solution }: { kind: string; puzzle: Puzzle; solution: Puzzle }) {
   if (kind === "sudoku") {
-    return <div><SudokuGrid grid={puzzle.grid as number[]} /><p className="small muted">{String(puzzle.clues)} pistas</p></div>;
+    return <div><SudokuGrid grid={puzzle.grid as number[]} /><p className="small muted">{String(puzzle.clues)}{" "}{t("pistas")}</p></div>;
   }
   if (kind === "wordle") {
     const pocket = puzzle.pocket as { word: string; feedback: string[] }[];
     return (
       <div>
-        <p className="small muted">Resposta: <strong>{String(solution.answer)}</strong>. Palpites de bolso do EPUB:</p>
+        <p className="small muted">{t("Resposta:")}{" "}<strong>{String(solution.answer)}</strong>{t(". Palpites de bolso do EPUB:")}</p>
         {pocket.slice(0, 4).map((p) => <WordleTiles key={p.word} word={p.word} feedback={p.feedback} />)}
       </div>
     );
@@ -51,7 +52,7 @@ export function GamePreview({ kind, puzzle, solution }: { kind: string; puzzle: 
   return (
     <div>
       <WordSearchGrid rows={puzzle.rows as string[]} />
-      <p className="small muted" style={{ marginTop: 8 }}>Tema: {String(puzzle.theme)} · {(puzzle.words as string[]).join(" · ")}</p>
+      <p className="small muted" style={{ marginTop: 8 }}>{t("Tema:")}{" "}{String(puzzle.theme)} · {(puzzle.words as string[]).join(" · ")}</p>
     </div>
   );
 }
