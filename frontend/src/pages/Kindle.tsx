@@ -55,7 +55,7 @@ function NativeSetup({ cfg, token, origin, onSaved }: { cfg: KindleCfg; token: s
             {cfg.native_games ? (
               <p className="small" style={{ margin: 0 }}>{t("Incluídos, sem os jogos interativos do KOReader: Sudoku, Caça-palavras e Palavras Cruzadas para resolver de cabeça, Palavra do Dia com palpites de bolso, e soluções só depois da página “Respostas a seguir”.")}</p>
             ) : (
-              <p className="small" style={{ margin: 0 }}><strong>{t("Esta versão não possui jogos.")}</strong>{" "}{t("Sem o KOReader não há jogos interativos, e o Kindle pode mostrar as páginas de solução ao virar a página. Envie a edição de teste abaixo; inclua os passatempos só se as soluções não aparecerem.")}</p>
+              <p className="small" style={{ margin: 0 }}><strong>{t("Esta versão não possui jogos.")}</strong>{" "}{t("Use esta opção se, no seu aparelho, as soluções aparecerem ao virar as páginas da edição de teste.")}</p>
             )}
           </div>
           <div className="row" role="group" aria-label={t("Passatempos na versão Kindle")}>

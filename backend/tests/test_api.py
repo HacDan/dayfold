@@ -37,7 +37,7 @@ def test_kindle_settings_hide_the_app_password(data_dir):
 
     with TestClient(app) as c:
         k = c.get("/api/settings").json()["values"]["kindle"]
-        assert k["mode"] == "koreader" and k["native_games"] is False and k["gmail_app_password_set"] is False
+        assert k["mode"] == "koreader" and k["native_games"] is True and k["gmail_app_password_set"] is False
         r = c.put("/api/settings/kindle", json={"mode": "native", "kindle_email": "eu_123@kindle.com",
                                                 "gmail_address": "eu@gmail.com",
                                                 "gmail_app_password": "abcd efgh ijkl mnop"})

@@ -103,11 +103,12 @@ phone) and send it with the [Send to Kindle website](https://www.amazon.com/send
 Send to Kindle app for Windows and macOS, or the Kindle phone app (**Share** › **Kindle**).
 Copying the EPUB over USB does not work.
 
-**Puzzles.** Off by default: while off, the native version has no games at all. Amazon's
-conversion may ignore `linear="no"`, which would let page turns reach the solutions and the Word
-of the Day hints. To check your device, use **Test edition**: the latest edition with every game
-and a checklist page. Read it straight through and only turn puzzles on if no solution or hint
-shows up before "Answers ahead" and nothing shows up after it.
+**Puzzles.** On by default. They were validated on a Kindle Paperwhite 5 through Send to Kindle:
+Sudoku, Word Search and Crossword as printed puzzles, the pocket Word of the Day with its hint
+links, and "See solution" links, with no solution or hint showing up as you turn pages. To check
+another device, use **Test edition** (the latest edition with every game and a checklist page);
+if solutions leak while turning pages, choose **No games** and the native version has no puzzles
+at all.
 
 ## Battery
 

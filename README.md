@@ -176,8 +176,8 @@ over USB, the sleep screen cover and troubleshooting, is in [docs/KINDLE.md](doc
   checking, saved progress, end of edition dialog) needs KOReader with the Dayfold plugin.
 * **Kindle.** The stock Kindle software does not open EPUB, and KOReader requires a jailbroken
   Kindle. Without a jailbreak, Dayfold sends a native Kindle version through Amazon's Send to
-  Kindle (automatically from your Gmail, or by hand): no interactive games, and puzzles only after
-  you validate them with the test edition.
+  Kindle (automatically from your Gmail, or by hand): no interactive games, but the printed puzzles,
+  the pocket Word of the Day and the solutions work (validated on a Kindle Paperwhite 5).
 * **Scrapers** depend on the sites. Feeds are stable; selector scrapers break when a site changes,
   which is why versions, tests and rollback exist.
 * **Cartoons** look like real illustrations only in illustrated mode, which needs an image capable

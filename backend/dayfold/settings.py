@@ -164,9 +164,9 @@ class KindleSettings(BaseModel):
     # koreader = jailbroken Kindle with KOReader and the plugin (interactive games);
     # native = stock Kindle, the EPUB goes through Amazon's Send to Kindle.
     mode: Literal["koreader", "native"] = "koreader"
-    # Puzzles in the native version. Off until the test edition shows that the Kindle keeps the
-    # answer pages hidden; while off the native EPUB has no games at all.
-    native_games: bool = False
+    # Puzzles in the native version (no KOReader links, answers after "Answers ahead"). Validated
+    # on a Kindle Paperwhite 5 through Send to Kindle with the test edition; off = no games at all.
+    native_games: bool = True
     kindle_email: str = Field("", max_length=120)
     gmail_address: str = Field("", max_length=120)
     gmail_app_password: str = Field("", max_length=64)

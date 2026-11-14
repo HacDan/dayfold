@@ -9,7 +9,7 @@ export const en: Record<string, string> = {
   "Passatempos na versão Kindle": "Puzzles in the Kindle version",
   "Incluídos, sem os jogos interativos do KOReader: Sudoku, Caça-palavras e Palavras Cruzadas para resolver de cabeça, Palavra do Dia com palpites de bolso, e soluções só depois da página “Respostas a seguir”.": "Included, without KOReader's interactive games: Sudoku, Word Search and Crossword to solve in your head, Word of the Day with pocket guesses, and solutions only after the “Answers ahead” page.",
   "Esta versão não possui jogos.": "This version has no games.",
-  "Sem o KOReader não há jogos interativos, e o Kindle pode mostrar as páginas de solução ao virar a página. Envie a edição de teste abaixo; inclua os passatempos só se as soluções não aparecerem.": "Without KOReader there are no interactive games, and the Kindle may show the solution pages as you turn pages. Send the test edition below; include puzzles only if the solutions stay hidden.",
+  "Use esta opção se, no seu aparelho, as soluções aparecerem ao virar as páginas da edição de teste.": "Use this option if, on your device, solutions show up as you turn the pages of the test edition.",
   "Sem jogos": "No games",
   "Com jogos": "With games",
   "1. Enviar pelo Gmail (automático)": "1. Send through Gmail (automatic)",
