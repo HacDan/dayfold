@@ -1,1 +1,183 @@
-# dayfold
+<p align="center">
+  <img src="docs/screenshots/kindle-cover.png" alt="Dayfold front page on a Kindle" width="300">
+</p>
+
+<h1 align="center">Dayfold</h1>
+
+<p align="center">
+  <em>A self-hosted daily newspaper for your e-reader.</em><br>
+  News from sources you choose, typeset every morning as a classic broadsheet, with a cartoon and puzzles at the end.
+</p>
+
+---
+
+Dayfold runs on a home server and does all the heavy lifting: it collects news from feeds and
+scrapers, picks and organizes the stories (by rules, or with an optional AI), draws the front page,
+writes an EPUB with sections, a cartoon and games, and serves it to your Kindle. The e-reader only
+downloads one file a day and reads it offline.
+
+<p align="center">
+  <img src="docs/screenshots/kindle-reading-flow.png" alt="Reading flow on a Kindle: cover, front page, cartoon, puzzles, interactive game, end of edition">
+</p>
+
+> The screenshots above were taken on a Kindle Paperwhite running KOReader and the Dayfold plugin.
+
+## Features
+
+* **Classic newspaper design** everywhere: blackletter masthead (Chomsky, an open font in the
+  spirit of the New York Times nameplate), Playfair Display headlines and Literata body text,
+  rules, kickers, bylines and columns. The dashboard looks like a newsroom, not a SaaS.
+* **Front page cover** rendered for e-ink (16 gray levels): masthead, date, edition number,
+  headline, deck, lead photo or lead text in columns, and "also in this edition".
+* **Sources you control**: RSS/Atom first, generic article extraction (Trafilatura) when there
+  is no feed, and CSS selector scrapers for the rest. Scrapers are versioned, tested in an
+  isolated process before activation, and can be rolled back.
+* **License aware**: every provider declares how its content may be used
+  (`metadata_only`, `excerpt_and_link`, `full_content_allowed`) and Dayfold stores only what that mode allows.
+* **Curation without AI** by section keywords, recency, deduplication and per source limits.
+* **Optional AI** (OpenAI compatible APIs, Ollama, Anthropic, or a local CLI such as Claude Code or Codex) for:
+  editorial selection over pre-filtered candidates, the daily cartoon, and AI assisted scraper generation.
+  Everything else keeps working without it.
+* **Daily cartoon** (needs AI): the model writes a short script and the server draws it as clean
+  line art, or an image model draws it.
+* **Games** prepared on the server: Sudoku (unique solution), Word of the Day (Wordle style) and
+  Word Search (themes or words from the day's headlines), in Portuguese or English.
+* **KOReader plugin**: sync over Wi-Fi, interactive games with saved progress, and a continuous
+  flow from the news to the cartoon and the puzzles.
+* **Distribution**: dashboard download, token protected feed (`/feed/latest.epub`), OPDS catalog.
+* Built for a home server: one Python process, SQLite, a persistent job queue and a daily schedule.
+
+## Screenshots
+
+| Newsroom (overview) | Newspaper settings and live typography preview |
+| --- | --- |
+| ![Overview](docs/screenshots/dashboard-overview.png) | ![Newspaper settings](docs/screenshots/dashboard-newspaper.png) |
+| **Providers with license and usage mode** | **Scraper versions, test report and rollback** |
+| ![Providers](docs/screenshots/dashboard-providers.png) | ![Scraper versions](docs/screenshots/dashboard-scraper-versions.png) |
+| **Edition details** | **Games configuration and preview** |
+| ![Edition](docs/screenshots/dashboard-edition.png) | ![Games](docs/screenshots/dashboard-games.png) |
+
+On the Kindle:
+
+| Front page | Cartoon | Puzzle page in the EPUB | Pocket Wordle (plain EPUB) |
+| --- | --- | --- | --- |
+| ![](docs/screenshots/kindle-front-page.png) | ![](docs/screenshots/kindle-cartoon.png) | ![](docs/screenshots/kindle-sudoku-page.png) | ![](docs/screenshots/kindle-pocket-wordle.png) |
+| **Sudoku in KOReader** | **Word of the Day in KOReader** | **Word Search in KOReader** | **End of the edition** |
+| ![](docs/screenshots/kindle-sudoku-game.png) | ![](docs/screenshots/kindle-wordle-game.png) | ![](docs/screenshots/kindle-wordsearch-game.png) | ![](docs/screenshots/kindle-end-of-edition.png) |
+
+## Quick start
+
+### Docker
+
+```bash
+git clone https://github.com/JonathanLemes/dayfold.git
+cd dayfold/deploy
+DAYFOLD_PASSWORD=choose-one docker compose up -d --build
+```
+
+Open `http://SERVER:8422`, press **Gerar jornal agora** and download the EPUB.
+
+### From source (systemd user service)
+
+Requirements: Python 3.12+ with [uv](https://docs.astral.sh/uv/), Node 20+ with pnpm, Linux with systemd.
+
+```bash
+git clone https://github.com/JonathanLemes/dayfold.git
+cd dayfold
+make install          # uv sync, pnpm build, installs and starts dayfold.service (port 8422)
+```
+
+Settings live in `~/.config/dayfold/env` (see `deploy/env.example`):
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `DAYFOLD_PORT` | `8422` | HTTP port |
+| `DAYFOLD_HOST` | `0.0.0.0` | Bind address |
+| `DAYFOLD_DATA_DIR` | `~/.local/share/dayfold` | Database and editions |
+| `DAYFOLD_PASSWORD` | unset | Dashboard password. Without it the dashboard is open to your network |
+| `DAYFOLD_DISABLE_SCHEDULER` | unset | `1` disables the daily schedule |
+
+Other commands:
+
+```bash
+make dev-backend      # API with auto reload on :8422
+make dev-frontend     # Vite dev server on :5173 (proxies the API)
+make generate         # generate an edition in the foreground
+make test             # backend tests
+cd backend && uv run dayfold retypeset 12   # re-typeset edition 12 with the current settings
+```
+
+## Using it
+
+1. **Jornal**: name of the newspaper (also the EPUB title), masthead font, type sizes (limited to
+   ranges that keep the Kindle layout intact), number of stories, sections, schedule, cartoon and games,
+   closing order (news, cartoon, games). The cover preview renders with unsaved settings.
+2. **Seções**: sections and their keywords. Keywords drive the rule based curation and guide the AI.
+3. **Provedores**: enable sources, set their usage mode and license notes, test them, add new ones
+   manually (feed, generic extraction or CSS selectors) or with assisted creation.
+4. **Scrapers**: every version with its state (`PENDING`, `GENERATING`, `TESTING`, `READY`,
+   `FAILED`, `DISABLED`). A new version replaces the active one only after it passes its test.
+5. **IA**: add a provider, test it, activate it. Presets for Claude Code CLI, Codex CLI,
+   Anthropic, OpenAI, Ollama and OpenRouter.
+6. **Jogos**: enable, order and configure Sudoku, Word of the Day and Word Search, with previews.
+7. **Registros**: every generation with its steps and log. **Gerar jornal agora** works from the
+   overview or from here.
+
+## Connecting the e-reader
+
+Short version for a jailbroken Kindle with SSH and KPM:
+
+```bash
+make kindle-koreader                                   # installs KOReader via KPM
+make kindle-install SERVER=http://192.168.0.10:8422    # plugin, config and today's edition
+```
+
+Then open KOReader on the Kindle: menu › **Tools** › **Dayfold** › **Baixar edição de hoje**.
+OPDS and direct download also work with any reader. The full guide, including manual install
+over USB, the sleep screen cover and troubleshooting, is in [docs/KINDLE.md](docs/KINDLE.md).
+
+## AI, tokens and battery
+
+* AI is never required. Without it you get rule based curation and no cartoon.
+* The model only sees candidates that survived deterministic filters, as one line each
+  (id, section, source, title, 30 words). It returns JSON that is validated; invalid answers fall
+  back to the rules. A typical curation call is about 2,500 input tokens.
+* The model never rewrites articles.
+* Scraper generation sends a trimmed HTML sample (no scripts, styles or attribute noise) and only
+  after feed discovery and generic extraction failed. The AI produces a selector spec, never code.
+* The Kindle only downloads and reads; images are grayscale and sized on the server.
+
+## Limitations
+
+* **Copyright.** Dayfold cannot verify licenses for you. The defaults favor public sources and
+  open licenses, and unknown sources default to excerpt and link, but you are responsible for the
+  sources you enable. Read [docs/LICENSING.md](docs/LICENSING.md).
+* **Interactive games and EPUB.** EPUB readers do not run scripts. In a plain EPUB the puzzles are
+  printed (solve them in your head or on paper), the Word of the Day becomes a "pocket" version with
+  a fixed set of tappable guesses, and solutions are behind links. Full interactivity (typing,
+  checking, saved progress, end of edition dialog) needs KOReader with the Dayfold plugin.
+* **Kindle.** The stock Kindle software does not open EPUB, and KOReader requires a jailbroken
+  Kindle. Without a jailbreak, use another e-reader with KOReader (Kobo, PocketBook) or any EPUB app.
+* **Scrapers** depend on the sites. Feeds are stable; selector scrapers break when a site changes,
+  which is why versions, tests and rollback exist.
+* **Cartoons** in structured mode are simple line drawings with a limited set of poses and props;
+  illustrated mode needs an image capable API.
+* Single user. The dashboard has one optional password, and feeds use a single token.
+
+## Architecture
+
+```
+backend/      FastAPI app, pipeline, scrapers, AI adapters, EPUB and cover rendering, games
+frontend/     React + TypeScript dashboard (served by the backend in production)
+koreader/     dayfold.koplugin for KOReader (sync, end of edition flow, interactive games)
+kindle/       install scripts for a jailbroken Kindle over SSH
+deploy/       systemd unit, Dockerfile, docker-compose
+docs/         architecture, Kindle guide, licensing, screenshots
+```
+
+Details, data model and flows: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## License
+
+Code under the [MIT License](LICENSE). Bundled fonts under the SIL Open Font License 1.1.
+News content belongs to its publishers; see [docs/LICENSING.md](docs/LICENSING.md).

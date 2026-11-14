@@ -43,4 +43,5 @@ def test_helpers():
     assert normalize_url("https://www.X.org/a/?utm_source=t&id=2") == "https://x.org/a?id=2"
     assert strip_author("noreply@blogger.com (Python Insider)") == "Python Insider"
     assert strip_author("Por da Agência Senado") == "Agência Senado"
+    assert strip_author("courtney.groeneveld") == "Courtney Groeneveld"
     assert html_to_paragraphs("<p>Um</p><script>x</script><p>Dois</p>") == "Um\n\nDois"

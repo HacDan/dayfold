@@ -104,4 +104,6 @@ def strip_author(author: str | None) -> str | None:
         return None
     if "@" in a and " " not in a:
         return None
+    if " " not in a and re.fullmatch(r"[a-z]+[._][a-z]+(?:[._][a-z]+)*", a):
+        a = " ".join(part.capitalize() for part in re.split(r"[._]", a))  # 'jane.doe' login
     return a[:200]
