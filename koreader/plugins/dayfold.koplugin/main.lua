@@ -28,6 +28,7 @@ local logger = require("logger")
 local ltn12 = require("ltn12")
 local socket = require("socket")
 local socketutil = require("socketutil")
+local util = require("util")
 local _ = require("gettext")
 
 local GAMES = {
@@ -139,6 +140,52 @@ function Dayfold:request(url, filepath)
     return true, filepath or table.concat(sink)
 end
 
+-- ------------------------------------------------------------------ sleep screen
+
+-- Folder holding only the latest front page. KOReader's "random image" sleep screen points
+-- here, and on a Kindle the optional watcher (kindle/dayfold-screensaver.sh) draws the same file
+-- over the stock screensaver.
+function Dayfold:screensaverDir()
+    if Device:isKindle() then return "/mnt/us/dayfold/screensaver" end
+    return DataStorage:getDataDir() .. "/dayfold-screensaver"
+end
+
+function Dayfold:applyScreensaver(enabled, cover_url)
+    local dir = self:screensaverDir()
+    local file = dir .. "/cover.png"
+    if enabled then
+        util.makePath(dir)
+        if cover_url then
+            local ok = self:request(cover_url, file .. ".part")
+            if ok then os.rename(file .. ".part", file) end
+        end
+        if lfs.attributes(file, "mode") ~= "file" then return end
+        if self.settings:readSetting("previous_screensaver") == nil then
+            self.settings:saveSetting("previous_screensaver", {
+                type = G_reader_settings:readSetting("screensaver_type") or false,
+                dir = G_reader_settings:readSetting("screensaver_dir") or false,
+                message = G_reader_settings:readSetting("screensaver_show_message") or false,
+            })
+        end
+        G_reader_settings:saveSetting("screensaver_type", "random_image")
+        G_reader_settings:saveSetting("screensaver_dir", dir)
+        G_reader_settings:saveSetting("screensaver_show_message", false) -- the front page speaks for itself
+    else
+        os.remove(file)
+        local prev = self.settings:readSetting("previous_screensaver")
+        if prev then
+            if prev.type then G_reader_settings:saveSetting("screensaver_type", prev.type)
+            else G_reader_settings:delSetting("screensaver_type") end
+            if prev.dir then G_reader_settings:saveSetting("screensaver_dir", prev.dir)
+            else G_reader_settings:delSetting("screensaver_dir") end
+            G_reader_settings:saveSetting("screensaver_show_message", prev.message == true)
+            self.settings:delSetting("previous_screensaver")
+        end
+    end
+    self.settings:saveSetting("screensaver_enabled", enabled)
+    self.settings:flush()
+end
+
 -- ------------------------------------------------------------------ sync
 
 function Dayfold:sync(interactive)
@@ -170,6 +217,9 @@ function Dayfold:sync(interactive)
             os.rename(tmp, dest)
         end
         self:request(self.config.server .. meta.games, gamesPath(dest))
+        local ok_ss, err_ss = pcall(self.applyScreensaver, self, meta.screensaver == true,
+            self.config.server .. (meta.cover or "/feed/latest.cover.png"))
+        if not ok_ss then logger.warn("Dayfold: sleep screen", err_ss) end
         self.settings:saveSetting("last_sync", os.date("%Y-%m-%d"))
         self.settings:saveSetting("last_edition", meta.id)
         self.settings:flush()

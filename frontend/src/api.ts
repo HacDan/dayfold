@@ -63,7 +63,7 @@ export type Settings = {
     schedule: { enabled: boolean; time: string; timezone: string };
     curation: { use_ai: boolean; max_age_hours: number; languages: string[]; blocked_keywords: string[]; ai_candidates: number; per_provider_limit: number };
     charge: { mode: "structured" | "illustrated"; style: string };
-    device: { cover_width: number; cover_height: number; image_max_width: number };
+    device: { cover_width: number; cover_height: number; image_max_width: number; screensaver_cover: boolean };
     distribution: { feed_token: string; keep_editions: number };
   };
   meta: {

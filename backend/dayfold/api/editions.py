@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
+from ..settings import get_section
 from ..jobs.queue import enqueue_generation
 from ..models import Edition, EditionStatus, GenerationJob, Topic
 from .auth import require_admin, require_feed_token
@@ -170,6 +171,7 @@ def feed_latest(session: Session = Depends(get_session)) -> dict:
         "epub": "/feed/latest.epub", "games": "/feed/latest.games.json", "cover": "/feed/latest.cover.png",
         "epub_name": f"{base}.epub", "games_name": f"{base}.games.json",
         "size": Path(e.epub_path).stat().st_size if e.epub_path and Path(e.epub_path).exists() else None,
+        "screensaver": get_section(session, "device").screensaver_cover,
     }
 
 

@@ -13,3 +13,5 @@ def test_settings_and_feed_auth(data_dir):
         assert c.get("/feed/latest.json").status_code == 401
         token = s["values"]["distribution"]["feed_token"]
         assert c.get(f"/feed/latest.json?token={token}").status_code == 404  # no edition yet
+        assert s["values"]["device"]["screensaver_cover"] is False  # sleep screen is opt-in
+        assert c.put("/api/settings/device", json={"screensaver_cover": True}).json()["screensaver_cover"] is True

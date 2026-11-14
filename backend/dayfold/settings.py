@@ -150,6 +150,9 @@ class DeviceSettings(BaseModel):
     cover_width: int = Field(1236, ge=600, le=2000)
     cover_height: int = Field(1648, ge=800, le=2600)
     image_max_width: int = Field(1000, ge=300, le=1600)
+    # Use the latest front page as the e-reader sleep screen (applied by the KOReader plugin and,
+    # on a jailbroken Kindle, by the optional screensaver watcher). Off by default.
+    screensaver_cover: bool = False
 
 
 class DistributionSettings(BaseModel):

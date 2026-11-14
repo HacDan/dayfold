@@ -211,6 +211,11 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
               <Field label={t("Largura das fotos")}><input type="number" value={v.device.image_max_width} onChange={(e) => setV({ ...v, device: { ...v.device, image_max_width: Number(e.target.value) } })} /></Field>
             </div>
             <p className="hint">{t("Padrão: Kindle Paperwhite 5 (1236 × 1648). Paperwhite 3/4: 1072 × 1448. Basic: 600 × 800.")}</p>
+            <label className="check">
+              <input type="checkbox" checked={v.device.screensaver_cover} onChange={(e) => setV({ ...v, device: { ...v.device, screensaver_cover: e.target.checked } })} />
+              {t("Usar a capa do último jornal como tela de descanso do Kindle")}
+            </label>
+            <p className="hint">{t("Aplicado pelo plugin na próxima sincronização. Na tela de descanso nativa do Kindle exige o vigia instalado com make kindle-screensaver.")}</p>
             <button className="btn" onClick={() => save("device")}>{t("Salvar aparelho")}</button>
           </fieldset>
         </div>

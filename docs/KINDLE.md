@@ -82,13 +82,28 @@ sent as the password of HTTP Basic authentication or in the `X-Dayfold-Token` he
 * The plugin never turns Wi-Fi on by itself during automatic sync. It syncs only if Wi-Fi is
   already connected, or when you tap **Baixar edição de hoje**.
 
-## Cover and screensaver
+## Front page as sleep screen (optional, off by default)
 
-The cover is a 16 gray level PNG sized for the device (1236 × 1648 by default; change it on the
-dashboard **Jornal** page). It is the EPUB cover, so KOReader shows it in the library and can use
-it as the sleep screen: KOReader menu › **Settings** › **Screen** › **Sleep screen** › **Wallpaper** ›
-**Show book cover on sleep screen**. The latest cover is also served at
-`/feed/latest.cover.png?token=...` for custom screensaver scripts.
+Turn on **Jornal › Aparelho › Usar a capa do último jornal como tela de descanso do Kindle** in the
+dashboard. On the next sync the plugin downloads the latest cover to
+`/mnt/us/dayfold/screensaver/cover.png` and:
+
+* **inside KOReader**, sets KOReader's sleep screen to that image (no "Sleeping" message). The
+  previous sleep screen settings are saved and restored when you turn the option off;
+* **in the stock Kindle interface**, the image is drawn over the stock screensaver by a small
+  watcher, installed once with:
+
+  ```bash
+  make kindle-screensaver                 # UNINSTALL=1 ./kindle/install-screensaver.sh removes it
+  ```
+
+  The watcher (`/var/local/dayfold/screensaver.sh`, started by the upstart job
+  `/etc/upstart/dayfold-screensaver.conf`) waits for powerd's `goingToScreenSaver` event and runs
+  FBInk. It does nothing while the cover file is absent, so the dashboard option is the only switch.
+  Installing it remounts the root filesystem read-write for a moment; a firmware update removes it.
+
+Turning the option off makes the plugin delete the cover on the next sync. The cover is also served
+at `/feed/latest.cover.png?token=...` for your own scripts.
 
 ## Troubleshooting
 
