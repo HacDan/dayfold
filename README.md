@@ -38,8 +38,10 @@ downloads one file a day and reads it offline.
 * **Optional AI** (OpenAI compatible APIs, Ollama, Anthropic, or a local CLI such as Claude Code or Codex) for:
   editorial selection over pre-filtered candidates, the daily cartoon, and AI assisted scraper generation.
   Everything else keeps working without it.
-* **Daily cartoon** (needs AI): the model writes a short script and the server draws it as clean
-  line art, or an image model draws it.
+* **Daily cartoon** (needs AI): the model picks the story and writes the gag, and an image model
+  draws a newspaper style ink illustration. Works with Codex CLI (image generation with your
+  ChatGPT account, no API key) or any OpenAI compatible image API. Without an image model it
+  falls back to a simple line drawing rendered by the server.
 * **Games** prepared on the server: Sudoku (unique solution), Word of the Day (Wordle style) and
   Word Search (themes or words from the day's headlines), in Portuguese or English.
 * **KOReader plugin**: sync over Wi-Fi, interactive games with saved progress, and a continuous
@@ -118,7 +120,9 @@ cd backend && uv run dayfold retypeset 12   # re-typeset edition 12 with the cur
 4. **Scrapers**: every version with its state (`PENDING`, `GENERATING`, `TESTING`, `READY`,
    `FAILED`, `DISABLED`). A new version replaces the active one only after it passes its test.
 5. **IA**: add a provider, test it, activate it. Presets for Claude Code CLI, Codex CLI,
-   Anthropic, OpenAI, Ollama and OpenRouter.
+   Anthropic, OpenAI, Ollama and OpenRouter. For illustrated cartoons, set an image model (API) or an
+   image command (CLI agent that can draw, e.g. `codex exec --skip-git-repo-check -s workspace-write --ephemeral -`).
+   Each edition page has **Refazer charge** to draw a new cartoon and **Recompor** to re-typeset.
 6. **Jogos**: enable, order and configure Sudoku, Word of the Day and Word Search, with previews.
 7. **Registros**: every generation with its steps and log. **Gerar jornal agora** works from the
    overview or from here.
@@ -160,8 +164,9 @@ over USB, the sleep screen cover and troubleshooting, is in [docs/KINDLE.md](doc
   Kindle. Without a jailbreak, use another e-reader with KOReader (Kobo, PocketBook) or any EPUB app.
 * **Scrapers** depend on the sites. Feeds are stable; selector scrapers break when a site changes,
   which is why versions, tests and rollback exist.
-* **Cartoons** in structured mode are simple line drawings with a limited set of poses and props;
-  illustrated mode needs an image capable API.
+* **Cartoons** look like real illustrations only in illustrated mode, which needs an image capable
+  AI (Codex CLI with image generation, or an image API) and takes one to two minutes. The fallback
+  structured mode is a simple line drawing with a limited set of poses and props.
 * Single user. The dashboard has one optional password, and feeds use a single token.
 
 ## Architecture

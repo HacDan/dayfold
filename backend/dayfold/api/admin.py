@@ -193,6 +193,7 @@ class AIIn(BaseModel):
     api_key: str | None = None
     command: str | None = None
     image_model: str | None = None
+    image_command: str | None = None
     max_tokens: int = Field(1500, ge=100, le=16000)
     timeout_s: int = Field(120, ge=10, le=900)
 
@@ -202,7 +203,7 @@ def ai_out(p: AIProvider) -> dict:
     return {
         "id": p.id, "name": p.name, "kind": p.kind, "base_url": p.base_url, "model": p.model,
         "api_key_set": bool(key), "api_key_hint": f"…{key[-4:]}" if len(key) > 8 else None,
-        "command": p.command, "image_model": p.image_model, "max_tokens": p.max_tokens,
+        "command": p.command, "image_model": p.image_model, "image_command": p.image_command, "max_tokens": p.max_tokens,
         "timeout_s": p.timeout_s, "is_active": p.is_active, "last_test_ok": p.last_test_ok,
         "last_test_message": p.last_test_message, "can_generate_images": AIClient(p).can_generate_images,
     }

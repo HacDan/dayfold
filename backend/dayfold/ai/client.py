@@ -162,11 +162,13 @@ class AIClient:
     # -- images -------------------------------------------------------------
     @property
     def can_generate_images(self) -> bool:
-        return self.p.kind == "openai" and bool(self.p.image_model)
+        return bool(self.p.image_command) or (self.p.kind == "openai" and bool(self.p.image_model))
 
-    def generate_image(self, prompt: str, size: str = "1024x1024") -> bytes:
+    def generate_image(self, prompt: str, size: str = "1536x1024") -> bytes:
         if not self.can_generate_images:
             raise AIError("este provedor de IA não gera imagens")
+        if self.p.image_command:
+            return _cli_image(self, prompt)
         base = (self.p.base_url or "https://api.openai.com/v1").rstrip("/")
         headers = {"Authorization": f"Bearer {self.p.api_key}"} if self.p.api_key else {}
         r = httpx.post(
@@ -182,6 +184,35 @@ class AIClient:
         if data.get("url"):
             return httpx.get(data["url"], timeout=60).content
         raise AIError("resposta de imagem vazia")
+
+
+IMAGE_CLI_PROMPT = """Use your image generation tool to create this image:
+
+{prompt}
+
+Landscape format. Save the final image as charge.png in the current directory and reply only
+with the file name. Do not create any other file."""
+
+
+def _cli_image(self: AIClient, prompt: str) -> bytes:
+    import tempfile
+    from pathlib import Path
+
+    argv = shlex.split(self.p.image_command or "")
+    with tempfile.TemporaryDirectory(prefix="dayfold-img-") as tmp:
+        try:
+            proc = subprocess.run(argv, input=IMAGE_CLI_PROMPT.format(prompt=prompt), cwd=tmp,
+                                  capture_output=True, text=True, timeout=max(self.p.timeout_s, 420))
+        except FileNotFoundError as exc:
+            raise AIError(f"comando não encontrado: {argv[0] if argv else '?'}") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise AIError("a geração de imagem passou do tempo limite") from exc
+        images = sorted((p for p in Path(tmp).rglob("*") if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")),
+                        key=lambda p: p.stat().st_size, reverse=True)
+        if not images:
+            raise AIError(f"a CLI não gerou imagem (código {proc.returncode}): {proc.stderr[-300:]}")
+        return images[0].read_bytes()
+
 
 
 def active_client(session: Session) -> AIClient | None:

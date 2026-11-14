@@ -68,6 +68,9 @@ class AIProvider(Base):
     api_key: Mapped[str | None] = mapped_column(String(400), nullable=True)
     command: Mapped[str | None] = mapped_column(String(400), nullable=True)
     image_model: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # CLI agent that can draw (e.g. Codex with image generation): runs in a temp dir and must
+    # leave an image file there.
+    image_command: Mapped[str | None] = mapped_column(String(400), nullable=True)
     max_tokens: Mapped[int] = mapped_column(Integer, default=1500)
     timeout_s: Mapped[int] = mapped_column(Integer, default=120)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)

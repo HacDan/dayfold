@@ -100,7 +100,7 @@ export type Topic = { id: number; slug: string; name: string; keywords: string[]
 
 export type AIProvider = {
   id: number; name: string; kind: "openai" | "anthropic" | "cli"; base_url: string | null; model: string | null;
-  api_key_set: boolean; api_key_hint: string | null; command: string | null; image_model: string | null;
+  api_key_set: boolean; api_key_hint: string | null; command: string | null; image_model: string | null; image_command: string | null;
   max_tokens: number; timeout_s: number; is_active: boolean; last_test_ok: boolean | null; last_test_message: string | null;
   can_generate_images: boolean;
 };

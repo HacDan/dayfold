@@ -111,6 +111,35 @@ def retypeset_edition(eid: int, session: Session = Depends(get_session)) -> dict
     return edition_summary(_edition(session, eid))
 
 
+@router.post("/editions/{eid}/charge")
+def redo_charge(eid: int, session: Session = Depends(get_session)) -> dict:
+    """Draw a new cartoon for an edition with the current charge settings, then re-typeset."""
+    from ..charge.service import generate_charge
+    from ..models import ChargeAsset, JobStatus
+    from ..pipeline.generate import edition_dir, retypeset
+    from ..settings import get_section
+
+    e = _edition(session, eid)
+    news = get_section(session, "newspaper")
+    titles = [it.article.title for it in sorted(e.items, key=lambda i: i.position)]
+    logs: list[str] = []
+    out = edition_dir(e.edition_date, e.number)
+    out.mkdir(parents=True, exist_ok=True)
+    result = generate_charge(session, titles, news.title, news.language, get_section(session, "charge"),
+                             out, logs.append)
+    if not result:
+        raise HTTPException(400, "; ".join(logs) or "não foi possível gerar a charge")
+    if e.charge:
+        session.delete(e.charge)
+        session.flush()
+    session.add(ChargeAsset(edition_id=e.id, mode=result["mode"], status=JobStatus.SUCCEEDED,
+                            script=result["script"], image_path=result["image_path"], caption=result["caption"]))
+    session.commit()
+    retypeset(eid)
+    session.expire_all()
+    return {"logs": logs, **edition_summary(_edition(session, eid))}
+
+
 @router.delete("/editions/{eid}")
 def delete_edition(eid: int, session: Session = Depends(get_session)) -> dict:
     e = _edition(session, eid)

@@ -4,7 +4,7 @@ import { Empty, Field, Loading, Modal, SectionTitle, Stamp, useAction, useLoad }
 
 const PRESETS: Record<string, Partial<AIProvider> & { label: string }> = {
   claude_cli: { label: "Claude Code (CLI)", name: "Claude CLI", kind: "cli", command: "claude -p --model claude-haiku-5-5 --output-format text" },
-  codex_cli: { label: "Codex (CLI)", name: "Codex CLI", kind: "cli", command: "codex exec --skip-git-repo-check -s read-only --ephemeral -C /tmp -" },
+  codex_cli: { label: "Codex (CLI)", name: "Codex CLI", kind: "cli", command: "codex exec --skip-git-repo-check -s read-only --ephemeral -C /tmp -", image_command: "codex exec --skip-git-repo-check -s workspace-write --ephemeral -" },
   anthropic: { label: "Anthropic API", name: "Anthropic", kind: "anthropic", model: "claude-haiku-5-5" },
   openai: { label: "OpenAI API", name: "OpenAI", kind: "openai", base_url: "https://api.openai.com/v1", model: "gpt-5-mini", image_model: "gpt-image-1" },
   ollama: { label: "Ollama (local)", name: "Ollama", kind: "openai", base_url: "http://localhost:11434/v1", model: "llama3.2" },
@@ -14,14 +14,14 @@ const PRESETS: Record<string, Partial<AIProvider> & { label: string }> = {
 function AIForm({ initial, onSubmit }: { initial?: Partial<AIProvider>; onSubmit: (b: Record<string, unknown>) => void }) {
   const [f, setF] = useState({
     name: initial?.name ?? "", kind: initial?.kind ?? "cli", base_url: initial?.base_url ?? "", model: initial?.model ?? "",
-    api_key: "", command: initial?.command ?? "", image_model: initial?.image_model ?? "",
+    api_key: "", command: initial?.command ?? "", image_model: initial?.image_model ?? "", image_command: initial?.image_command ?? "",
     max_tokens: initial?.max_tokens ?? 1500, timeout_s: initial?.timeout_s ?? 120,
   });
   const set = (k: string, v: unknown) => setF((p) => ({ ...p, [k]: v }));
   return (
     <form onSubmit={(e) => {
       e.preventDefault();
-      onSubmit({ ...f, base_url: f.base_url || null, model: f.model || null, api_key: f.api_key || null, command: f.command || null, image_model: f.image_model || null });
+      onSubmit({ ...f, base_url: f.base_url || null, model: f.model || null, api_key: f.api_key || null, command: f.command || null, image_model: f.image_model || null, image_command: f.image_command || null });
     }}>
       {!initial?.id && (
         <div className="row" style={{ marginBottom: 14 }}>
@@ -54,6 +54,9 @@ function AIForm({ initial, onSubmit }: { initial?: Partial<AIProvider>; onSubmit
           {f.kind === "openai" && <Field label="Modelo de imagem (charge ilustrada)" hint="opcional"><input type="text" value={f.image_model} onChange={(e) => set("image_model", e.target.value)} /></Field>}
         </div>
       )}
+      <Field label="Comando de imagem (charge ilustrada, opcional)" hint="CLI capaz de gerar imagens (ex.: Codex com sua conta ChatGPT). Roda numa pasta temporária e deve salvar um PNG nela.">
+        <input type="text" value={f.image_command} onChange={(e) => set("image_command", e.target.value)} />
+      </Field>
       <div className="grid cols-2" style={{ gap: 14 }}>
         <Field label="Máx. tokens por resposta"><input type="number" min={100} max={16000} value={f.max_tokens} onChange={(e) => set("max_tokens", Number(e.target.value))} /></Field>
         <Field label="Tempo limite (s)"><input type="number" min={10} max={900} value={f.timeout_s} onChange={(e) => set("timeout_s", Number(e.target.value))} /></Field>
@@ -89,7 +92,7 @@ export default function AI() {
               <tr key={p.id}>
                 <td><span className="name">{p.name}</span> {p.is_active && <Stamp status="ok" label="ativa" />}</td>
                 <td className="small">{p.kind}</td>
-                <td className="small"><code>{p.kind === "cli" ? p.command : `${p.model ?? ""} ${p.base_url ? "@ " + p.base_url : ""}`}</code>{p.can_generate_images && <div className="muted">imagens: {p.image_model}</div>}</td>
+                <td className="small"><code>{p.kind === "cli" ? p.command : `${p.model ?? ""} ${p.base_url ? "@ " + p.base_url : ""}`}</code>{p.can_generate_images && <div className="muted">imagens: {p.image_command ? "via CLI" : p.image_model}</div>}</td>
                 <td className="small">{p.last_test_ok === null ? <span className="muted">não testada</span> : <><Stamp status={p.last_test_ok ? "ok" : "bad"} label={p.last_test_ok ? "ok" : "falhou"} /> <span className="muted">{p.last_test_message}</span></>}</td>
                 <td style={{ whiteSpace: "nowrap" }}>
                   <button className="btn small" disabled={busy} onClick={() => run(() => post(`/api/ai/providers/${p.id}/test`)).then(reload)}>{busy ? "Testando…" : "Testar"}</button>{" "}

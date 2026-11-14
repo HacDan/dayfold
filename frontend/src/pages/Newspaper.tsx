@@ -187,8 +187,8 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
             <legend>Charge</legend>
             <Field label="Modo">
               <select value={v.charge.mode} onChange={(e) => setV({ ...v, charge: { ...v.charge, mode: e.target.value as "structured" | "illustrated" } })}>
-                <option value="structured">Roteirizada: a IA escreve o roteiro e o servidor desenha</option>
-                <option value="illustrated">Ilustrada: gerador de imagem (exige modelo de imagem)</option>
+                <option value="illustrated">Ilustrada: gerador de imagem (Codex/ChatGPT ou API de imagem)</option>
+                <option value="structured">Roteirizada: traço simples desenhado pelo servidor (sem gerador de imagem)</option>
               </select>
             </Field>
             <Field label="Estilo / linha editorial"><textarea value={v.charge.style} onChange={(e) => setV({ ...v, charge: { ...v.charge, style: e.target.value } })} /></Field>

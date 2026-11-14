@@ -17,7 +17,7 @@ type Detail = EditionSummary & {
 export default function EditionDetail() {
   const { id } = useParams();
   const nav = useNavigate();
-  const { run } = useAction();
+  const { run, busy } = useAction();
   const { data, reload } = useLoad(() => get<Detail>(`/api/editions/${id}`), [id]);
   if (!data) return <Loading />;
   const sections = new Map<string, Detail["articles"]>();
@@ -30,6 +30,7 @@ export default function EditionDetail() {
     <div>
       <SectionTitle kicker={`Edição nº ${data.number} · ${new Date(data.date + "T12:00").toLocaleDateString("pt-BR", { dateStyle: "full" })}`} title={data.headline ?? data.title}>
         {data.epub_url && <a className="btn primary" href={data.epub_url}>Baixar EPUB</a>}
+        <button className="btn" disabled={busy} onClick={() => run(() => post(`/api/editions/${data.id}/charge`), "Nova charge desenhada").then((r) => r && reload())}>{busy ? "Desenhando…" : "Refazer charge"}</button>
         <button className="btn" onClick={() => run(() => post(`/api/editions/${data.id}/retypeset`), "Edição recomposta com as configurações atuais").then((r) => r && reload())}>Recompor</button>
         <button className="btn danger" onClick={() => {
           if (confirm("Excluir esta edição e seus arquivos?")) run(() => del(`/api/editions/${data.id}`), "Edição excluída").then((r) => r && nav("/edicoes"));

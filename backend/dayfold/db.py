@@ -72,4 +72,20 @@ def get_session() -> Iterator[Session]:
 def init_db() -> None:
     from . import models  # noqa: F401  (register tables)
 
-    Base.metadata.create_all(get_engine())
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+    _add_missing_columns(engine)
+
+
+def _add_missing_columns(engine: Engine) -> None:
+    """Tiny forward migration: add nullable columns introduced after a database was created."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            existing = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name not in existing and col.nullable:
+                    conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN "{col.name}" '
+                                      f"{col.type.compile(engine.dialect)}"))

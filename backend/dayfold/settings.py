@@ -135,7 +135,9 @@ class CurationSettings(BaseModel):
 
 
 class ChargeSettings(BaseModel):
-    mode: Literal["structured", "illustrated"] = "structured"
+    # illustrated = real illustration from an image model (falls back to structured when the
+    # active AI cannot draw); structured = AI script drawn by the server as simple line art.
+    mode: Literal["structured", "illustrated"] = "illustrated"
     style: str = Field(
         "Charge editorial elegante, bem-humorada e respeitosa, sem ataques pessoais.",
         max_length=400,
