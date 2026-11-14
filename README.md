@@ -23,7 +23,7 @@ downloads one file a day and reads it offline.
 > The screenshots above were taken on a Kindle Paperwhite running KOReader and the Dayfold plugin.
 > With KOmpanion, each edition also appears in the stock Kindle library with its front page as cover:
 
-<p align="center"><img src="docs/screenshots/kindle-library.png" alt="Dayfold edition in the Kindle library" width="300"></p>
+<p align="center"><img src="docs/screenshots/kindle-library.png" alt="Dayfold edition in the Kindle library" width="180"></p>
 
 ## Features
 
