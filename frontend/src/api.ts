@@ -52,7 +52,7 @@ export type Typography = { masthead: number; headline: number; title: number; su
 
 export type Newspaper = {
   title: string; tagline: string; masthead_font: string; language: "pt" | "en"; max_articles: number;
-  excerpt_words: number; include_images: boolean; include_charge: boolean; include_games: boolean;
+  excerpt_words: number; include_images: boolean; include_charge: boolean; include_games: boolean; games_per_edition: number;
   closing_order: ("news" | "charge" | "games")[]; typography: Typography;
 };
 

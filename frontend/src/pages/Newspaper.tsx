@@ -135,6 +135,13 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
               Incluir charge {meta.ai_available ? "" : <em className="muted">(indisponível: exige IA configurada)</em>}
             </label>
             <label className="check"><input type="checkbox" checked={news.include_games} onChange={(e) => setNews({ include_games: e.target.checked })} /> Incluir jogos</label>
+            {news.include_games && (
+              <Field label="Jogos por edição" hint="Escolhidos entre os jogos ativos, em rodízio: cada dia traz uma combinação diferente.">
+                <select value={news.games_per_edition} onChange={(e) => setNews({ games_per_edition: Number(e.target.value) })}>
+                  {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </Field>
+            )}
             <p className="kicker" style={{ marginTop: 10 }}>Ordem de fechamento</p>
             <ol style={{ paddingLeft: 20, margin: "0 0 10px" }}>
               {news.closing_order.map((o, i) => (

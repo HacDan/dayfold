@@ -139,7 +139,10 @@ def run_generation_job(job_id: int) -> None:
             log.step("games", 0.55)
             n_games = 0
             with session_scope() as s:
-                configs = list(s.scalars(select(Game).where(Game.enabled.is_(True)).order_by(Game.position)))
+                enabled = list(s.scalars(select(Game).where(Game.enabled.is_(True)).order_by(Game.position)))
+                configs = todays_games(enabled, news.games_per_edition, ed_date)
+                if configs:
+                    log("Jogos do dia (rodízio): " + ", ".join(g.name for g in configs) + ".")
                 for g in configs:
                     cfg = dict(g.config)
                     count = int(cfg.get("count", 1)) if g.kind == "sudoku" else 1
@@ -194,6 +197,20 @@ def run_generation_job(job_id: int) -> None:
                 ed.status = EditionStatus.FAILED
         log(f"Falhou: {exc}")
         raise
+
+
+def todays_games(enabled: list, per_edition: int, day: date) -> list:
+    """Pick `per_edition` of the enabled games, rotating by day so each edition varies.
+
+    Keeps the configured order: with games [A, B, C] and 1 per edition the days go A, B, C, A...;
+    with 2 per edition: AB, BC, CA, AB..."""
+    if not enabled:
+        return []
+    n = len(enabled)
+    k = max(1, min(per_edition, n))
+    start = (day.toordinal() * k) % n if k < n else 0
+    picked = [enabled[(start + i) % n] for i in range(k)]
+    return sorted(picked, key=lambda g: g.position)
 
 
 def edition_dir(ed_date: date, number: int) -> Path:

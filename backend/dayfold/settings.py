@@ -86,6 +86,8 @@ class NewspaperSettings(BaseModel):
     include_images: bool = True
     include_charge: bool = False
     include_games: bool = True
+    # How many of the enabled games go into each edition; they rotate from day to day.
+    games_per_edition: int = Field(1, ge=1, le=3)
     closing_order: list[Literal["news", "charge", "games"]] = ["news", "charge", "games"]
     typography: Typography = Typography()
 

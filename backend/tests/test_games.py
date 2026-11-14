@@ -35,3 +35,19 @@ def test_wordsearch_places_words_in_grid():
         n = len(p["word"])
         dr, dc = (r1 - r0) // max(1, n - 1), (c1 - c0) // max(1, n - 1)
         assert "".join(rows[r0 + dr * k][c0 + dc * k] for k in range(n)) == p["word"]
+
+
+def test_todays_games_rotate():
+    from datetime import date, timedelta
+    from types import SimpleNamespace
+
+    from dayfold.pipeline.generate import todays_games
+
+    games = [SimpleNamespace(name=n, position=i) for i, n in enumerate("ABC")]
+    day = date(2026, 1, 1)
+    singles = [todays_games(games, 1, day + timedelta(d))[0].name for d in range(3)]
+    assert sorted(singles) == ["A", "B", "C"]
+    pairs = {tuple(g.name for g in todays_games(games, 2, day + timedelta(d))) for d in range(3)}
+    assert len(pairs) == 3 and all(len(p) == 2 for p in pairs)
+    assert [g.name for g in todays_games(games, 3, day)] == ["A", "B", "C"]
+    assert len(todays_games(games[:1], 3, day)) == 1

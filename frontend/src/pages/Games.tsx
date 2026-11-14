@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { get, put, type Game } from "../api";
+import { get, put, type Game, type Settings } from "../api";
 import { GamePreview } from "../components/games";
 import { Field, Loading, SectionTitle, useAction, useLoad } from "../components/ui";
 
@@ -58,6 +58,31 @@ function GameCard({ g, schema, onSaved, onMove, first, last }: {
   );
 }
 
+function PerEdition({ active }: { active: number }) {
+  const { run } = useAction();
+  const { data, reload } = useLoad(() => get<Settings>("/api/settings"));
+  if (!data) return null;
+  const n = data.values.newspaper.games_per_edition;
+  const set = (v: number) => run(() => put("/api/settings/newspaper", { games_per_edition: v }), "Quantidade salva").then(reload);
+  return (
+    <div className="clip ruled" style={{ marginBottom: 22 }}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <div>
+          <p className="kicker">Jogos por edição</p>
+          <p className="small muted" style={{ margin: 0 }}>
+            {Math.min(n, active)} de {active} jogos ativos por dia, em rodízio: a seleção muda a cada edição, seguindo a ordem abaixo.
+          </p>
+        </div>
+        <div className="row" role="group" aria-label="Jogos por edição">
+          {[1, 2, 3].map((v) => (
+            <button key={v} className={`btn${v === n ? " primary" : ""}`} aria-pressed={v === n} onClick={() => set(v)}>{v}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Games() {
   const { run } = useAction();
   const { data, reload } = useLoad(() => get<GamesResp>("/api/games"));
@@ -74,6 +99,7 @@ export default function Games() {
         Os jogos são gerados no servidor com uma semente do dia e entram no fim da edição, depois da charge. As soluções ficam em páginas
         separadas, só acessíveis por link, para não estragar a surpresa ao virar a página.
       </p>
+      <PerEdition active={data.games.filter((g) => g.enabled).length} />
       <div className="grid cols-3">
         {data.games.map((g, i) => (
           <GameCard key={`${g.id}-${g.position}`} g={g} schema={data.schemas[g.kind]} onSaved={reload} onMove={(d) => move(i, d)} first={i === 0} last={i === data.games.length - 1} />
