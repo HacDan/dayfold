@@ -80,10 +80,15 @@ function Dayfold:init()
     end
 end
 
+-- Waking the device up is a good moment to look for a new edition (only if Wi-Fi is on).
+function Dayfold:onResume()
+    UIManager:scheduleIn(15, function() self:autoSync() end)
+end
+
 -- ------------------------------------------------------------------ helpers
 
 function Dayfold:isEdition(path)
-    return type(path) == "string" and path:match("dayfold%-%d%d%d%d%-%d%d%-%d%d%.epub$") ~= nil
+    return type(path) == "string" and path:match("dayfold%-%d%d%d%d%-%d%d%-%d%d[%-%d]*%.epub$") ~= nil
 end
 
 local function gamesPath(epub)
@@ -110,7 +115,7 @@ function Dayfold:localEditions()
     local list = {}
     if lfs.attributes(self.config.folder, "mode") ~= "directory" then return list end
     for name in lfs.dir(self.config.folder) do
-        if name:match("^dayfold%-%d%d%d%d%-%d%d%-%d%d%.epub$") then
+        if name:match("^dayfold%-%d%d%d%d%-%d%d%-%d%d[%-%d]*%.epub$") then
             table.insert(list, self.config.folder .. "/" .. name)
         end
     end
@@ -206,7 +211,7 @@ function Dayfold:sync(interactive)
         end
         lfs.mkdir(self.config.folder)
         local dest = self.config.folder .. "/" .. meta.epub_name
-        local same = lfs.attributes(dest, "size") == meta.size
+        local same = lfs.attributes(dest, "mode") == "file"
         if not same then
             local tmp = dest .. ".part"
             local okd, err = self:request(self.config.server .. meta.epub, tmp)
@@ -244,8 +249,8 @@ end
 
 function Dayfold:autoSync()
     if self.settings:readSetting("auto_sync") == false then return end
-    if self.settings:readSetting("last_sync") == os.date("%Y-%m-%d") then return end
     if not (self.config.server and self.config.token) then return end
+    -- cheap: one small JSON request; the EPUB is only fetched when the edition id changed
     if NetworkMgr:isOnline() then
         local ok, err = pcall(self.sync, self, false)
         if not ok then logger.warn("Dayfold auto sync failed", err) end

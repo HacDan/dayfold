@@ -51,7 +51,9 @@ downloads one file a day and reads it offline.
 * **KOReader plugin**: sync over Wi-Fi, interactive games with saved progress, and a continuous
   flow from the news to the cartoon and the puzzles.
 * **Sleep screen** (optional, off by default): the latest front page as the Kindle sleep screen,
-  in KOReader and, with a small watcher, in the stock Kindle interface.
+  in KOReader and, with the Dayfold agent, in the stock Kindle interface.
+* **Kindle agent** (optional): new editions are downloaded on wake and every 30 minutes while awake
+  (Wi-Fi already on) and show up as the first book in the library, no KOReader needed.
 * **Distribution**: dashboard download, token protected feed (`/feed/latest.epub`), OPDS catalog.
 * Built for a home server: one Python process, SQLite, a persistent job queue and a daily schedule.
 
@@ -141,7 +143,7 @@ Short version for a jailbroken Kindle with SSH and KPM:
 make kindle-koreader                                   # installs KOReader via KPM
 make kindle-install SERVER=http://192.168.0.10:8422    # plugin, config and today's edition
 make kindle-library                                    # optional: editions in the stock Kindle library
-make kindle-screensaver                                # optional: front page as the stock sleep screen
+make kindle-agent                                      # optional: new editions land in the library by themselves
 ```
 
 With `kindle-library`, each edition shows up in the Kindle library with its front page as cover

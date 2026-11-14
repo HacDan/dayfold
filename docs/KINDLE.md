@@ -10,7 +10,7 @@ There are three ways to get the daily edition, from most to least integrated.
 
 The plugin:
 
-* downloads today's EPUB and its `games.json` over Wi-Fi (menu or automatically when Wi-Fi is already on);
+* downloads the latest EPUB and its `games.json` over Wi-Fi (menu, or automatically on start and on wake when Wi-Fi is already on);
 * opens the interactive game when you tap **Jogar no KOReader** on a puzzle page;
 * shows an **end of edition** dialog after the last page (play the puzzles, back to the front page,
   fetch a new edition, library);
@@ -82,6 +82,27 @@ sent as the password of HTTP Basic authentication or in the `X-Dayfold-Token` he
 * The plugin never turns Wi-Fi on by itself during automatic sync. It syncs only if Wi-Fi is
   already connected, or when you tap **Baixar edição de hoje**.
 
+## Dayfold agent: new editions in the library without opening KOReader
+
+```bash
+make kindle-agent                       # UNINSTALL=1 ./kindle/install-agent.sh removes it
+```
+
+A small shell script (`/var/local/dayfold/agent.sh`, started with the Kindle interface by the
+upstart job `/etc/upstart/dayfold-agent.conf`) that:
+
+* checks the server when the Kindle wakes up and every 30 minutes while it is awake, **only if Wi-Fi
+  is already connected** (it never turns Wi-Fi on), and downloads a new edition to
+  `documents/Dayfold`. Each edition has its own file name (`dayfold-2026-11-13-0002.epub`), so a
+  second edition on the same day is a new book;
+* keeps the last 7 editions;
+* draws the front page over the stock sleep screen when that option is on (see below).
+
+With KOmpanion and the library sorted by **Mais recentes / Recent**, the newest edition is always the
+first book. Server and token are read from the plugin's `dayfold_config.lua`; the log is in
+`/var/local/dayfold/agent.log`. Installing remounts the root filesystem read-write for a moment, and
+a firmware update removes the job (run `make kindle-agent` again).
+
 ## Front page as sleep screen (optional, off by default)
 
 Turn on **Jornal › Aparelho › Usar a capa do último jornal como tela de descanso do Kindle** in the
@@ -90,17 +111,7 @@ dashboard. On the next sync the plugin downloads the latest cover to
 
 * **inside KOReader**, sets KOReader's sleep screen to that image (no "Sleeping" message). The
   previous sleep screen settings are saved and restored when you turn the option off;
-* **in the stock Kindle interface**, the image is drawn over the stock screensaver by a small
-  watcher, installed once with:
-
-  ```bash
-  make kindle-screensaver                 # UNINSTALL=1 ./kindle/install-screensaver.sh removes it
-  ```
-
-  The watcher (`/var/local/dayfold/screensaver.sh`, started by the upstart job
-  `/etc/upstart/dayfold-screensaver.conf`) waits for powerd's `goingToScreenSaver` event and runs
-  FBInk. It does nothing while the cover file is absent, so the dashboard option is the only switch.
-  Installing it remounts the root filesystem read-write for a moment; a firmware update removes it.
+* **in the stock Kindle interface**, the Dayfold agent (below) draws it over the stock screensaver.
 
 Turning the option off makes the plugin delete the cover on the next sync. The cover is also served
 at `/feed/latest.cover.png?token=...` for your own scripts.

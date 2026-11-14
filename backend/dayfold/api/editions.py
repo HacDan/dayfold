@@ -164,7 +164,7 @@ def _latest(session: Session) -> Edition:
 @feed.get("/feed/latest.json", dependencies=[Depends(require_feed_token)])
 def feed_latest(session: Session = Depends(get_session)) -> dict:
     e = _latest(session)
-    base = f"dayfold-{e.edition_date.isoformat()}"
+    base = Path(e.epub_path).stem if e.epub_path else f"dayfold-{e.edition_date.isoformat()}"
     return {
         "id": f"dayfold-{e.edition_date.isoformat()}-{e.number}", "number": e.number,
         "date": e.edition_date.isoformat(), "title": e.title, "headline": e.headline,

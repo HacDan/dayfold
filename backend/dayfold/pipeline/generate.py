@@ -213,6 +213,10 @@ def todays_games(enabled: list, per_edition: int, day: date) -> list:
     return sorted(picked, key=lambda g: g.position)
 
 
+def edition_basename(ed_date: date, number: int) -> str:
+    return f"dayfold-{ed_date.isoformat()}-{number:04d}"
+
+
 def edition_dir(ed_date: date, number: int) -> Path:
     return config.editions_dir / f"{ed_date.isoformat()}-{number:04d}"
 
@@ -306,8 +310,13 @@ def typeset(edition_id: int, log) -> Path:
         closing_order=news.closing_order, sources=sources, curated_by=curated_by,
         generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
     )
-    epub_path = build_epub(doc, out_dir / f"dayfold-{ed_date.isoformat()}.epub")
-    games_path = out_dir / f"dayfold-{ed_date.isoformat()}.games.json"
+    # One file name per edition, so a second edition on the same day is a new book on the device
+    # (and lands on top of the library) instead of overwriting the first one.
+    base = edition_basename(ed_date, number)
+    for old in [*out_dir.glob("dayfold-*.epub"), *out_dir.glob("dayfold-*.games.json")]:
+        old.unlink()
+    epub_path = build_epub(doc, out_dir / f"{base}.epub")
+    games_path = out_dir / f"{base}.games.json"
     games_path.write_text(json.dumps({
         "edition": identifier, "date": ed_date.isoformat(), "title": news.title, "language": lang,
         "games": [{"index": i, "kind": g["kind"], "title": g["title"], "puzzle": g["puzzle"],
