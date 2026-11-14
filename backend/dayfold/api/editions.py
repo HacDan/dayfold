@@ -12,9 +12,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
-from ..settings import get_section
 from ..jobs.queue import enqueue_generation
 from ..models import Edition, EditionStatus, GenerationJob, Topic
+from ..settings import get_section
 from .auth import require_admin, require_feed_token
 from .serialize import edition_summary, iso, job_out
 
