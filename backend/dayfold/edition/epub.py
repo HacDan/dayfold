@@ -65,7 +65,11 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
     L = LABELS[doc.lang]
     book = epub.EpubBook()
     book.set_identifier(doc.identifier)
-    book.set_title(doc.title)
+    from datetime import date as _date
+
+    from .i18n import book_title
+
+    book.set_title(book_title(doc.title, _date.fromisoformat(doc.iso_date), doc.lang))
     book.set_language(doc.lang)
     book.add_author(doc.title)
     book.add_metadata("DC", "date", doc.iso_date)

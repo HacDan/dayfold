@@ -3,7 +3,7 @@ KINDLE ?= kindle
 PORT ?= 8422
 SERVER ?= http://$(shell hostname -I 2>/dev/null | awk '{print $$1}'):$(PORT)
 
-.PHONY: setup build dev-backend dev-frontend serve generate test lint install kindle-install kindle-koreader
+.PHONY: setup build dev-backend dev-frontend serve generate test lint install kindle-install kindle-koreader kindle-library
 
 setup:
 	cd backend && uv sync
@@ -45,3 +45,6 @@ kindle-koreader:
 
 kindle-install:
 	KINDLE=$(KINDLE) SERVER=$(SERVER) ./kindle/install-plugin.sh
+
+kindle-library:
+	KINDLE=$(KINDLE) ./kindle/install-kompanion.sh

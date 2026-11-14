@@ -96,3 +96,16 @@ def roman(n: int) -> str:
             out += s
             n -= v
     return out
+
+
+MONTHS_ABBR = {
+    "pt": ["jan.", "fev.", "mar.", "abr.", "maio", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."],
+    "en": ["Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."],
+}
+
+
+def book_title(name: str, d: date, lang: str) -> str:
+    """Title shown in e-reader libraries: the newspaper name plus the date, so a week of
+    editions does not look like seven copies of the same book."""
+    m = MONTHS_ABBR[lang][d.month - 1]
+    return f"{name} · {d.day} {m} {d.year}" if lang == "pt" else f"{name} · {m} {d.day}, {d.year}"

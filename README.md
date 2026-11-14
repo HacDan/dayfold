@@ -21,6 +21,9 @@ downloads one file a day and reads it offline.
 </p>
 
 > The screenshots above were taken on a Kindle Paperwhite running KOReader and the Dayfold plugin.
+> With KOmpanion, each edition also appears in the stock Kindle library with its front page as cover:
+
+<p align="center"><img src="docs/screenshots/kindle-library.png" alt="Dayfold edition in the Kindle library" width="300"></p>
 
 ## Features
 
@@ -135,9 +138,11 @@ Short version for a jailbroken Kindle with SSH and KPM:
 ```bash
 make kindle-koreader                                   # installs KOReader via KPM
 make kindle-install SERVER=http://192.168.0.10:8422    # plugin, config and today's edition
+make kindle-library                                    # optional: editions in the stock Kindle library
 ```
 
-Then open KOReader on the Kindle: menu › **Tools** › **Dayfold** › **Baixar edição de hoje**.
+With `kindle-library`, each edition shows up in the Kindle library with its front page as cover
+("Dayfold · 13 nov. 2026") and opens in KOReader. Otherwise open KOReader on the Kindle: menu › **Tools** › **Dayfold** › **Baixar edição de hoje**.
 OPDS and direct download also work with any reader. The full guide, including manual install
 over USB, the sleep screen cover and troubleshooting, is in [docs/KINDLE.md](docs/KINDLE.md).
 

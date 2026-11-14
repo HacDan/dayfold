@@ -50,6 +50,18 @@ pass it explicitly: `TOKEN=... make kindle-install SERVER=...`.
 4. Restart KOReader. Editions are saved to `<home folder>/Dayfold`
    (`/mnt/us/documents/Dayfold` on a Kindle) and only the last 7 are kept.
 
+### Show editions in the Kindle library (optional)
+
+```bash
+make kindle-library
+```
+
+Installs [KOmpanion](https://github.com/KindleModding/repo) through KPM. The stock Kindle
+library then lists every Dayfold edition as a book, with the front page as cover and a title like
+**Dayfold · 13 nov. 2026**; tapping it opens the edition in KOReader with the plugin. KOmpanion
+registers an EPUB extractor and launcher in `/var/local/appreg.db` (backed up first to
+`/mnt/us/appreg.db.backup-dayfold`); undo with `kpm uninstall kompanion`.
+
 ## 2. OPDS catalog
 
 KOReader: **Search** › **OPDS catalog** › **+** and paste the address shown on the dashboard
