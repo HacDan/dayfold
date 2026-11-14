@@ -4,6 +4,6 @@
 <p class="meta">{{ L.difficulty[g.puzzle.difficulty] }} · {{ g.puzzle.clues }} {{ L.clues }}</p>
 <p class="help">{{ L.sudoku_help }}</p>
 <div class="puzzle-img"><img src="{{ g.grid_img }}" alt="Sudoku"/></div>
-<p class="play"><a href="dayfold://game/{{ g.index }}">▶ {{ L.play_koreader }}</a></p>
+{% if not native %}<p class="play"><a href="dayfold://game/{{ g.index }}">▶ {{ L.play_koreader }}</a></p>{% endif %}
 <p class="back"><a href="solutions.xhtml#s{{ g.index }}">{{ L.see_solution }}</a></p>
 </div>

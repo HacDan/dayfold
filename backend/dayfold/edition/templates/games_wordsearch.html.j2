@@ -7,6 +7,6 @@
 {% endfor %}
 </table>
 <p class="wordlist">{{ g.puzzle.words | join(' · ') }}</p>
-<p class="play"><a href="dayfold://game/{{ g.index }}">▶ {{ L.play_koreader }}</a></p>
+{% if not native %}<p class="play"><a href="dayfold://game/{{ g.index }}">▶ {{ L.play_koreader }}</a></p>{% endif %}
 <p class="back"><a href="solutions.xhtml#s{{ g.index }}">{{ L.see_solution }}</a></p>
 </div>

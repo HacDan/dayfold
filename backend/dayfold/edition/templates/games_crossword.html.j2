@@ -11,6 +11,6 @@
 {% for e in g.puzzle.down %}<p class="clue"><b>{{ e.n }}</b> {{ e.clue }} ({{ e.len }})</p>
 {% endfor %}
 </div>
-<p class="play"><a href="dayfold://game/{{ g.index }}">▶ {{ L.play_koreader }}</a></p>
+{% if not native %}<p class="play"><a href="dayfold://game/{{ g.index }}">▶ {{ L.play_koreader }}</a></p>{% endif %}
 <p class="back"><a href="solutions.xhtml#s{{ g.index }}">{{ L.see_solution }}</a></p>
 </div>

@@ -42,6 +42,7 @@ e-reader only reads an offline file.
 | Images | Pillow, 8 bit grayscale, 16 level palette, dithering for photos | Ready for e-ink, nothing left to process on the device. |
 | Dashboard | React + TypeScript + Vite, hand written editorial CSS | No UI kit: the product must look like a newspaper, not a SaaS. |
 | Kindle | KOReader + `dayfold.koplugin` | The stock Kindle reader does not open EPUB. KOReader does, and the plugin adds sync and interactive games. |
+| Kindle without jailbreak | Send to Kindle by e-mail (`delivery/kindle_mail.py`, Gmail SMTP) | Amazon converts the EPUB. A native variant (`*.kindle.epub`, `*.kindle-games.epub`) drops the KOReader links and keeps answers after an "Answers ahead" page. |
 | Auth | Optional dashboard password (signed cookie) + feed token for devices | Simple for a LAN, safe enough behind Tailscale. |
 
 ## Data model

@@ -2,9 +2,11 @@
 
 The stock Kindle reader does not open EPUB files. Dayfold therefore targets
 [KOReader](https://koreader.rocks), a free reader that runs on Kindle, Kobo, PocketBook,
-reMarkable and Android. On a Kindle, KOReader requires a jailbroken device.
+reMarkable and Android. On a Kindle, KOReader requires a jailbroken device. A Kindle without
+jailbreak can still get the edition through Amazon's Send to Kindle, without the interactive
+games: see [Kindle without jailbreak](#kindle-without-jailbreak-send-to-kindle).
 
-There are three ways to get the daily edition, from most to least integrated.
+There are three ways to get the daily edition on KOReader, from most to least integrated.
 
 ## 1. KOReader + the Dayfold plugin (recommended)
 
@@ -73,6 +75,39 @@ with its cover. Games work as printed puzzles; the interactive versions need the
 Any EPUB reader can fetch `http://SERVER:8422/feed/latest.epub?token=...`. The token can also be
 sent as the password of HTTP Basic authentication or in the `X-Dayfold-Token` header.
 `/feed/latest.json` returns the edition metadata for scripts.
+
+## Kindle without jailbreak (Send to Kindle)
+
+On the dashboard **Kindle** page choose **No jailbreak**. Amazon converts the EPUB and delivers it
+to the device over Wi-Fi, under Documents (it also stays in the Amazon cloud and syncs with the
+Kindle apps). Every edition gets a native Kindle EPUB next to the KOReader one: no
+`dayfold://` links and, when puzzles are included, the answer pages only after an "Answers ahead"
+page at the very end.
+
+**Automatic delivery through Gmail.** The server e-mails the EPUB to the device's
+`@kindle.com` address from your own Gmail account:
+
+1. Turn on 2-Step Verification on the Google account and create an app password at
+   <https://myaccount.google.com/apppasswords> (16 letters; it is not the account password).
+2. At Amazon, **Content & Devices** › **Preferences** › **Personal Document Settings**: add the
+   Gmail address to the approved e-mail list and copy the device's `@kindle.com` address.
+3. Fill in both addresses and the app password on the dashboard, save, and tick
+   **Send every new edition automatically**. "Send the latest edition now" sends on demand.
+
+The app password is stored in the Dayfold database and never sent back to the browser. A failed
+delivery is logged in the generation job and shown on the Kindle page; it does not fail the
+edition. Gmail limits attachments to 25 MB (an edition is usually 2 to 5 MB).
+
+**Manual delivery.** "Download EPUB for Kindle" (or `/feed/latest.kindle.epub?token=...` on a
+phone) and send it with the [Send to Kindle website](https://www.amazon.com/sendtokindle), the
+Send to Kindle app for Windows and macOS, or the Kindle phone app (**Share** › **Kindle**).
+Copying the EPUB over USB does not work.
+
+**Puzzles.** Off by default: while off, the native version has no games at all. Amazon's
+conversion may ignore `linear="no"`, which would let page turns reach the solutions and the Word
+of the Day hints. To check your device, use **Test edition**: the latest edition with every game
+and a checklist page. Read it straight through and only turn puzzles on if no solution or hint
+shows up before "Answers ahead" and nothing shows up after it.
 
 ## Battery
 

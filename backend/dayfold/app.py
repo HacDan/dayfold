@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import admin, auth, editions, providers
+from .api import admin, auth, editions, kindle, providers
 from .bootstrap import bootstrap
 from .config import FONTS_DIR, config
 from .jobs.queue import recover_interrupted, start_worker, stop_worker
@@ -38,6 +38,8 @@ app.include_router(admin.router)
 app.include_router(providers.router)
 app.include_router(editions.router)
 app.include_router(editions.feed)
+app.include_router(kindle.router)
+app.include_router(kindle.feed)
 app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
 
 

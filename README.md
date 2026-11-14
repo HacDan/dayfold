@@ -149,7 +149,9 @@ make kindle-agent                                      # optional: new editions 
 
 With `kindle-library`, each edition shows up in the Kindle library with its front page as cover
 ("Dayfold · 13 nov. 2026") and opens in KOReader. Otherwise open KOReader on the Kindle: menu › **Tools** › **Dayfold** › **Baixar edição de hoje**.
-OPDS and direct download also work with any reader. The full guide, including manual install
+OPDS and direct download also work with any reader. **Kindle without jailbreak:** choose "No
+jailbreak" on the dashboard Kindle page and fill in your Gmail and `@kindle.com` addresses; each
+edition is e-mailed to Send to Kindle. The full guide, including manual install
 over USB, the sleep screen cover and troubleshooting, is in [docs/KINDLE.md](docs/KINDLE.md).
 
 ## AI, tokens and battery
@@ -173,7 +175,9 @@ over USB, the sleep screen cover and troubleshooting, is in [docs/KINDLE.md](doc
   a fixed set of tappable guesses, and solutions are behind links. Full interactivity (typing,
   checking, saved progress, end of edition dialog) needs KOReader with the Dayfold plugin.
 * **Kindle.** The stock Kindle software does not open EPUB, and KOReader requires a jailbroken
-  Kindle. Without a jailbreak, use another e-reader with KOReader (Kobo, PocketBook) or any EPUB app.
+  Kindle. Without a jailbreak, Dayfold sends a native Kindle version through Amazon's Send to
+  Kindle (automatically from your Gmail, or by hand): no interactive games, and puzzles only after
+  you validate them with the test edition.
 * **Scrapers** depend on the sites. Feeds are stable; selector scrapers break when a site changes,
   which is why versions, tests and rollback exist.
 * **Cartoons** look like real illustrations only in illustrated mode, which needs an image capable

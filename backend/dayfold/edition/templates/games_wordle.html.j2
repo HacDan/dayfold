@@ -3,7 +3,7 @@
 <h2>{{ g.title }}</h2>
 <p class="help">{{ help }}</p>
 <div class="tiles">{% for i in range(g.puzzle.length) %}<span class="tile absent">?</span>{% endfor %}</div>
-<p class="play"><a href="dayfold://game/{{ g.index }}">▶ {{ L.play_koreader }}</a></p>
+{% if not native %}<p class="play"><a href="dayfold://game/{{ g.index }}">▶ {{ L.play_koreader }}</a></p>{% endif %}
 <p class="meta">{{ L.wordle_pocket }}</p>
 <table class="pocket">
 {% for row in g.puzzle.pocket | batch(3) %}{% set r = loop.index0 %}<tr>{% for p in row %}<td><a href="wordle_{{ g.index }}_{{ r * 3 + loop.index0 }}.xhtml">{{ p.word }}</a></td>{% endfor %}</tr>

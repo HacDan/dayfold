@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -149,21 +150,7 @@ def run_generation_job(job_id: int) -> None:
                     count = int(cfg.get("count", 1)) if g.kind == "sudoku" else 1
                     for n in range(max(1, min(count, 4))):
                         rng = seeded(ed_date.isoformat(), g.kind, n)
-                        if g.kind == "sudoku":
-                            puzzle, solution = GENERATORS["sudoku"](rng, cfg.get("difficulty", "medium"))
-                        elif g.kind == "wordle":
-                            puzzle, solution = GENERATORS["wordle"](
-                                rng, cfg.get("language", lang), int(cfg.get("length", 5)),
-                                int(cfg.get("attempts", 6)))
-                        elif g.kind == "crossword":
-                            puzzle, solution = GENERATORS["crossword"](
-                                rng, cfg.get("language", lang), int(cfg.get("words", 10)),
-                                int(cfg.get("size", 13)))
-                        else:
-                            puzzle, solution = GENERATORS["wordsearch"](
-                                rng, cfg.get("language", lang), int(cfg.get("size", 12)),
-                                cfg.get("theme", "news"), int(cfg.get("words", 10)),
-                                same_lang_titles, cfg.get("difficulty", "medium"))
+                        puzzle, solution = make_game(g.kind, cfg, rng, lang, same_lang_titles)
                         title = GAME_TITLES[lang][g.kind] + (f" {n + 1}" if count > 1 else "")
                         s.add(GameInstance(edition_id=edition_id, kind=g.kind, position=n_games,
                                            title=title, puzzle=puzzle, solution=solution))
@@ -190,6 +177,7 @@ def run_generation_job(job_id: int) -> None:
             job.progress = 1.0
             job.finished_at = utcnow()
         log(f"Edição pronta: {epub_path.name} ({epub_path.stat().st_size // 1024} KB).")
+        _auto_send_kindle(edition_id, epub_path, log)
         _prune()
     except Exception as exc:
         with session_scope() as s:
@@ -202,6 +190,57 @@ def run_generation_job(job_id: int) -> None:
                 ed.status = EditionStatus.FAILED
         log(f"Falhou: {exc}")
         raise
+
+
+def _auto_send_kindle(edition_id: int, epub_path: Path, log) -> None:
+    """Native Kindle mode with automatic delivery: e-mail the edition to Send to Kindle.
+    A failure is logged and shown on the dashboard, but does not fail the edition."""
+    from ..delivery.kindle_mail import KindleMailError, send_and_record
+    from ..edition.i18n import book_title
+
+    with session_scope() as s:
+        cfg = get_section(s, "kindle")
+        if cfg.mode != "native" or not cfg.auto_send:
+            return
+        ed = s.get(Edition, edition_id)
+        lang = get_section(s, "newspaper").language
+        path = kindle_epub_path(epub_path, cfg.native_games)
+        try:
+            log("Send to Kindle: " + send_and_record(s, path, book_title(ed.title or "Dayfold", ed.edition_date, lang)))
+        except KindleMailError as exc:
+            log(f"Send to Kindle falhou: {exc}")
+
+
+def make_game(kind: str, cfg: dict, rng, lang: str, headlines: list[str]) -> tuple[dict, dict]:
+    if kind == "sudoku":
+        return GENERATORS["sudoku"](rng, cfg.get("difficulty", "medium"))
+    if kind == "wordle":
+        return GENERATORS["wordle"](rng, cfg.get("language", lang), int(cfg.get("length", 5)),
+                                    int(cfg.get("attempts", 6)))
+    if kind == "crossword":
+        return GENERATORS["crossword"](rng, cfg.get("language", lang), int(cfg.get("words", 10)),
+                                       int(cfg.get("size", 13)))
+    return GENERATORS["wordsearch"](rng, cfg.get("language", lang), int(cfg.get("size", 12)),
+                                    cfg.get("theme", "news"), int(cfg.get("words", 10)),
+                                    headlines, cfg.get("difficulty", "medium"))
+
+
+def kindle_test_epub(edition_id: int) -> Path:
+    """Native Kindle test EPUB for an edition: every game kind (enabled or not, with its saved
+    settings) so all of them can be checked on the device."""
+    with session_scope() as s:
+        lang = get_section(s, "newspaper").language
+        ed = s.get(Edition, edition_id)
+        key = f"kindle-test-{ed.edition_date.isoformat()}"
+        titles = [a.title for a in s.scalars(
+            select(Article).join(EditionArticle, EditionArticle.article_id == Article.id)
+            .where(EditionArticle.edition_id == edition_id))]
+        games = []
+        for g in s.scalars(select(Game).order_by(Game.position)):
+            puzzle, solution = make_game(g.kind, dict(g.config), seeded(key, g.kind), lang, titles)
+            games.append({"kind": g.kind, "title": GAME_TITLES[lang].get(g.kind, g.name),
+                          "puzzle": puzzle, "solution": solution})
+    return typeset(edition_id, _PrintLog(), test_games=games)
 
 
 def todays_games(enabled: list, per_edition: int, day: date) -> list:
@@ -226,11 +265,21 @@ def edition_dir(ed_date: date, number: int) -> Path:
     return config.editions_dir / f"{ed_date.isoformat()}-{number:04d}"
 
 
-def typeset(edition_id: int, log) -> Path:
+def kindle_epub_path(epub_path: str | Path, games: bool) -> Path:
+    """Native Kindle (Send to Kindle) variant written next to the KOReader EPUB."""
+    p = Path(epub_path)
+    return p.with_name(p.stem + (".kindle-games.epub" if games else ".kindle.epub"))
+
+
+def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
     """Images, cover, EPUB and games.json from what is stored for an edition.
 
     Used by the generation job and to re-typeset an edition after layout changes
-    (no new collection, no AI calls)."""
+    (no new collection, no AI calls). Besides the KOReader EPUB it writes the two native
+    Kindle variants (with and without puzzles).
+
+    With ``test_games`` it only builds the native Kindle test EPUB (those games plus a
+    checklist page) and leaves the edition untouched."""
     if hasattr(log, "step"):
         log.step("images", 0.75)
     with session_scope() as s:
@@ -264,6 +313,8 @@ def typeset(edition_id: int, log) -> Path:
                    for p in providers.values()]
         games = [{"kind": g.kind, "title": g.title, "puzzle": g.puzzle, "solution": g.solution}
                  for g in sorted(ed.games, key=lambda g: g.position)]
+        if test_games is not None:
+            games = test_games
         charge = ({"image_path": ed.charge.image_path, "caption": ed.charge.caption}
                   if ed.charge and ed.charge.image_path and Path(ed.charge.image_path).exists() else None)
     out_dir = edition_dir(ed_date, number)
@@ -300,7 +351,8 @@ def typeset(edition_id: int, log) -> Path:
     )
     if hasattr(log, "step"):
         log.step("cover", 0.85)
-    cover_path = render_cover(cover_data, out_dir / "cover.png", device.cover_width, device.cover_height)
+    cover_name = "cover-test.png" if test_games is not None else "cover.png"
+    cover_path = render_cover(cover_data, out_dir / cover_name, device.cover_width, device.cover_height)
 
     if hasattr(log, "step"):
         log.step("epub", 0.92)
@@ -318,9 +370,20 @@ def typeset(edition_id: int, log) -> Path:
     # One file name per edition, so a second edition on the same day is a new book on the device
     # (and lands on top of the library) instead of overwriting the first one.
     base = edition_basename(ed_date, number)
+    if test_games is not None:
+        test_doc = replace(doc, native=True, test_checklist=True, identifier=identifier + "-kindle-test",
+                           games=[dict(g) for g in games])
+        return build_epub(test_doc, out_dir / f"{base}.kindle-test.epub")
     for old in [*out_dir.glob("dayfold-*.epub"), *out_dir.glob("dayfold-*.games.json")]:
         old.unlink()
     epub_path = build_epub(doc, out_dir / f"{base}.epub")
+    # Native Kindle variants. Without puzzles the cover must not announce them either.
+    build_epub(replace(doc, native=True, games=[dict(g) for g in games]), kindle_epub_path(epub_path, True))
+    plain_cover = cover_path
+    if games:
+        plain_cover = render_cover(replace(cover_data, footer=" · ".join([L["charge"]] if charge else [])),
+                                   out_dir / "cover-kindle.png", device.cover_width, device.cover_height)
+    build_epub(replace(doc, native=True, games=[], cover_path=plain_cover), kindle_epub_path(epub_path, False))
     games_path = out_dir / f"{base}.games.json"
     games_path.write_text(json.dumps({
         "edition": identifier, "date": ed_date.isoformat(), "title": news.title, "language": lang,

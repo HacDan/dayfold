@@ -57,6 +57,12 @@ export type Newspaper = {
   closing_order: ("news" | "charge" | "games")[]; typography: Typography;
 };
 
+export type KindleCfg = {
+  mode: "koreader" | "native"; native_games: boolean; kindle_email: string; gmail_address: string;
+  gmail_app_password: string; gmail_app_password_set: boolean; auto_send: boolean;
+  last_send_at: string | null; last_send_ok: boolean | null; last_send_message: string | null;
+};
+
 export type Settings = {
   values: {
     newspaper: Newspaper;
@@ -65,6 +71,7 @@ export type Settings = {
     charge: { mode: "structured" | "illustrated"; style: string };
     device: { cover_width: number; cover_height: number; image_max_width: number; screensaver_cover: boolean };
     distribution: { feed_token: string; keep_editions: number };
+    kindle: KindleCfg;
   };
   meta: {
     masthead_fonts: { key: string; label: string; family: string; file: string; license: string }[];

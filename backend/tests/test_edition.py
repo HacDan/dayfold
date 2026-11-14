@@ -1,3 +1,4 @@
+import re
 import zipfile
 from pathlib import Path
 
@@ -27,6 +28,9 @@ def test_cover_and_epub(tmp_path: Path):
                      sections=[{"slug": "mundo", "name": "Mundo", "file": "sec_mundo.xhtml",
                                 "articles": [dict(art, id=2, excerpt="Excerto", paragraphs=[])]}],
                      games=games)
+    import copy
+
+    native_doc = copy.deepcopy(doc)
     path = build_epub(doc, tmp_path / "e.epub")
     with zipfile.ZipFile(path) as z:
         names = z.namelist()
@@ -34,3 +38,17 @@ def test_cover_and_epub(tmp_path: Path):
         assert any(n.endswith("Chomsky.otf") for n in names)
         assert "dayfold://game/0" in z.read("EPUB/game_0.xhtml").decode()
         assert "crossword_3.png" in z.read("EPUB/game_3.xhtml").decode()
+
+    # native Kindle variant: no KOReader links, answers only after the warning page
+    from dataclasses import replace
+
+    native = build_epub(replace(native_doc, native=True, test_checklist=True), tmp_path / "n.epub")
+    with zipfile.ZipFile(native) as z:
+        pages = {n: z.read(n).decode() for n in z.namelist() if n.endswith(".xhtml")}
+        opf = z.read("EPUB/content.opf").decode()
+    assert not any("dayfold://" in body for body in pages.values())
+    assert "EPUB/kindle_test.xhtml" in pages and "EPUB/answers_ahead.xhtml" in pages
+    spine = re.findall(r'<itemref idref="([^"]+)"', opf)
+    assert spine.index("answers-ahead") < spine.index("solutions")
+    assert spine.index("colophon") < spine.index("answers-ahead")
+    assert all(spine.index(i) > spine.index("answers-ahead") for i in spine if i.startswith("wordle-"))

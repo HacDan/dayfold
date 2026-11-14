@@ -28,7 +28,15 @@ from ..models import (
     ScraperVersion,
     Topic,
 )
-from ..settings import MASTHEAD_FONTS, SECTIONS, TYPE_RANGES, all_settings, get_section, set_section
+from ..settings import (
+    MASTHEAD_FONTS,
+    SECRET_FIELDS,
+    SECTIONS,
+    TYPE_RANGES,
+    all_settings,
+    get_section,
+    set_section,
+)
 from .auth import require_admin
 from .serialize import edition_summary, job_out
 
@@ -82,10 +90,18 @@ def overview(session: Session = Depends(get_session)) -> dict:
 # ---------------------------------------------------------------- settings
 
 
+def _masked(section: str, values: dict) -> dict:
+    """Secrets never go back to the browser: only whether they are set."""
+    for k in SECRET_FIELDS.get(section, []):
+        values[f"{k}_set"] = bool(values.get(k))
+        values[k] = ""
+    return values
+
+
 @router.get("/settings")
 def read_settings(session: Session = Depends(get_session)) -> dict:
     return {
-        "values": all_settings(session),
+        "values": {k: _masked(k, v) for k, v in all_settings(session).items()},
         "meta": {
             "masthead_fonts": [{"key": k, **v} for k, v in MASTHEAD_FONTS.items()],
             "type_ranges": {k: {"min": lo, "default": d, "max": hi} for k, (lo, d, hi) in TYPE_RANGES.items()},
@@ -102,6 +118,13 @@ def write_settings(section: str, body: dict, session: Session = Depends(get_sess
         raise HTTPException(400, "a charge exige uma IA configurada e ativa")
     if section == "curation" and body.get("use_ai") and not ai_available(session):
         raise HTTPException(400, "a curadoria com IA exige uma IA configurada e ativa")
+    for k in SECRET_FIELDS.get(section, []):
+        if not body.get(k):
+            body.pop(k, None)  # blank in the form keeps the stored secret
+        body.pop(f"{k}_set", None)
+    if section == "kindle":
+        for k in ("last_send_at", "last_send_ok", "last_send_message"):
+            body.pop(k, None)
     try:
         value = set_section(session, section, body)
     except ValidationError as exc:
@@ -109,7 +132,7 @@ def write_settings(section: str, body: dict, session: Session = Depends(get_sess
     session.commit()
     if section == "schedule":
         scheduler.reschedule()
-    return value.model_dump()
+    return _masked(section, value.model_dump())
 
 
 @router.post("/settings/distribution/rotate-token")

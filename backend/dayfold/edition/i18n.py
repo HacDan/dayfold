@@ -28,6 +28,22 @@ LABELS = {
         "wordle": "Palavra do Dia",
         "wordle_help": "Descubra a palavra de {n} letras. No KOReader, jogue com até {a} tentativas. "
                         "Aqui, toque em uma das palavras abaixo para ver as dicas.",
+        "wordle_help_native": "Descubra a palavra de {n} letras. Toque em uma das palavras abaixo "
+                               "para ver as dicas e use Voltar para tentar outra.",
+        "answers_ahead": "Respostas a seguir",
+        "answers_ahead_note": "Fim da edição. Depois desta página vêm as soluções e as dicas dos "
+                              "passatempos. Pare aqui se ainda estiver jogando.",
+        "test_title": "Teste do Kindle",
+        "test_intro": "Edição de teste com todos os passatempos, para validar o Kindle sem jailbreak. "
+                      "Confira cada item abaixo no aparelho:",
+        "test_checks": [
+            "Vire as páginas do começo ao fim, sem tocar em links. Nenhuma solução e nenhuma dica do {wordle} deve aparecer antes da página “Respostas a seguir”.",
+            "Depois de “Respostas a seguir”, continue virando. Se aparecerem soluções ou dicas, o Kindle ignorou as páginas ocultas: mantenha os jogos desligados na versão Kindle nativo.",
+            "No {wordle}, toque em uma palavra: a página de dicas deve abrir, e “Voltar” deve retornar ao jogo.",
+            "Em cada jogo, “Ver solução” deve levar à solução certa, e “Voltar” deve retornar ao jogo.",
+            "As grades (Sudoku, Caça-palavras e Palavras Cruzadas) devem aparecer inteiras e legíveis.",
+        ],
+        "test_games": "Jogos nesta edição de teste",
         "wordle_legend": "■ letra certa no lugar certo · ▣ letra existe em outra posição · □ não existe",
         "wordle_pocket": "Palpites de bolso",
         "wordsearch_help": "Encontre as palavras escondidas na grade. Tema: {theme}.",
@@ -58,6 +74,22 @@ LABELS = {
         "wordle": "Word of the Day",
         "wordle_help": "Find the {n} letter word. In KOReader you get {a} tries. Here, tap one "
                         "of the words below to see the hints.",
+        "wordle_help_native": "Find the {n} letter word. Tap one of the words below to see the "
+                               "hints, then use Back to try another.",
+        "answers_ahead": "Answers ahead",
+        "answers_ahead_note": "End of the edition. The puzzle solutions and hints come after this "
+                              "page. Stop here if you are still playing.",
+        "test_title": "Kindle test",
+        "test_intro": "Test edition with every puzzle, to validate a Kindle without jailbreak. "
+                      "Check each item below on the device:",
+        "test_checks": [
+            "Turn the pages from start to end without tapping links. No solution and no {wordle} hint may show up before the “Answers ahead” page.",
+            "After “Answers ahead”, keep turning. If solutions or hints show up, the Kindle ignored the hidden pages: keep games off in the native Kindle version.",
+            "In {wordle}, tap a word: its hint page must open, and “Back” must return to the game.",
+            "In every game, “See solution” must open the right solution, and “Back” must return to the game.",
+            "The grids (Sudoku, Word Search and Crossword) must show complete and readable.",
+        ],
+        "test_games": "Games in this test edition",
         "wordle_legend": "■ right letter, right spot · ▣ letter elsewhere · □ not in the word",
         "wordle_pocket": "Pocket guesses",
         "wordsearch_help": "Find the hidden words in the grid. Theme: {theme}.",

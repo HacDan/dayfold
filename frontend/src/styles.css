@@ -133,7 +133,7 @@ pre { background: var(--paper-2); padding: .8em 1em; overflow: auto; border-left
 label.field { display: block; margin: 0 0 14px; }
 label.field > span { display: block; font-family: var(--caps); font-size: .74rem; letter-spacing: .12em; text-transform: uppercase;
   color: var(--ink-2); margin-bottom: 4px; }
-input[type=text], input[type=url], input[type=password], input[type=number], input[type=time], select, textarea {
+input[type=text], input[type=email], input[type=url], input[type=password], input[type=number], input[type=time], select, textarea {
   width: 100%; font-family: var(--text); font-size: 1rem; color: var(--ink); background: var(--card);
   border: 1px solid var(--rule-soft); border-bottom: 2px solid var(--rule); padding: 8px 10px; border-radius: 0; }
 textarea { min-height: 90px; resize: vertical; }

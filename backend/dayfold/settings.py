@@ -160,6 +160,38 @@ class DistributionSettings(BaseModel):
     keep_editions: int = Field(30, ge=1, le=365)
 
 
+class KindleSettings(BaseModel):
+    # koreader = jailbroken Kindle with KOReader and the plugin (interactive games);
+    # native = stock Kindle, the EPUB goes through Amazon's Send to Kindle.
+    mode: Literal["koreader", "native"] = "koreader"
+    # Puzzles in the native version. Off until the test edition shows that the Kindle keeps the
+    # answer pages hidden; while off the native EPUB has no games at all.
+    native_games: bool = False
+    kindle_email: str = Field("", max_length=120)
+    gmail_address: str = Field("", max_length=120)
+    gmail_app_password: str = Field("", max_length=64)
+    auto_send: bool = False
+    last_send_at: str | None = None
+    last_send_ok: bool | None = None
+    last_send_message: str | None = None
+
+    @field_validator("kindle_email", "gmail_address")
+    @classmethod
+    def _email(cls, v: str) -> str:
+        v = v.strip()
+        if v and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
+            raise ValueError("e-mail inválido")
+        return v
+
+    @field_validator("gmail_app_password")
+    @classmethod
+    def _app_password(cls, v: str) -> str:
+        return re.sub(r"\s+", "", v)  # Google shows it in groups of four
+
+
+SECRET_FIELDS = {"kindle": ["gmail_app_password"]}
+
+
 SECTIONS: dict[str, type[BaseModel]] = {
     "newspaper": NewspaperSettings,
     "schedule": ScheduleSettings,
@@ -167,6 +199,7 @@ SECTIONS: dict[str, type[BaseModel]] = {
     "charge": ChargeSettings,
     "device": DeviceSettings,
     "distribution": DistributionSettings,
+    "kindle": KindleSettings,
 }
 
 

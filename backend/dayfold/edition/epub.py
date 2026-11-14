@@ -48,6 +48,11 @@ class EditionDoc:
     sources: list[dict] = field(default_factory=list)
     curated_by: str = "rules"
     generated_at: str = ""
+    # Native Kindle (Send to Kindle, no jailbreak): no KOReader links, and the answer pages sit
+    # behind a warning page at the end in case the conversion ignores linear="no".
+    native: bool = False
+    # Test edition for native Kindle: adds a page with what to check on the device.
+    test_checklist: bool = False
 
 
 def _page(uid: str, file_name: str, title: str, body: str, lang: str, css: epub.EpubItem) -> epub.EpubHtml:
@@ -63,6 +68,13 @@ def _font_media(name: str) -> str:
 
 def build_epub(doc: EditionDoc, dest: Path) -> Path:
     L = LABELS[doc.lang]
+
+    class tpl:  # noqa: N801 - every template also sees ``native``
+        def __init__(self, name: str):
+            self.t = env.get_template(name)
+
+        def render(self, **kw) -> str:
+            return self.t.render(native=doc.native, **kw)
     book = epub.EpubBook()
     book.set_identifier(doc.identifier)
     from datetime import date as _date
@@ -86,7 +98,7 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
         book.add_item(epub.EpubItem(uid=f"font-{name}", file_name=f"fonts/{name}",
                                     media_type=_font_media(name),
                                     content=(FONTS_DIR / name).read_bytes()))
-    css_text = env.get_template("style.css.j2").render(t=doc.typography, masthead_file=masthead_file)
+    css_text = tpl("style.css.j2").render(t=doc.typography, masthead_file=masthead_file)
     css = epub.EpubItem(uid="style", file_name="style/edition.css", media_type="text/css",
                         content=css_text.encode())
     book.add_item(css)
@@ -135,17 +147,24 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
             g["solution_img"] = add_image_bytes(
                 crossword_png(pz["grid"], pz["numbers"], g["solution"]["grid"]), f"crossword_{i}_sol.png")
 
-    front = _page("front", "front.xhtml", L["front_page"], env.get_template("front.html.j2").render(
+    front = _page("front", "front.xhtml", L["front_page"], tpl("front.html.j2").render(
         ed=ed, L=L, headline=doc.headline, sections=doc.sections, games=doc.games,
         has_charge=bool(doc.charge)), doc.lang, css)
     book.add_item(front)
     spine.append(front)
     toc.append(front)
 
+    if doc.test_checklist:
+        check = _page("kindle-test", "kindle_test.xhtml", L["test_title"],
+                      tpl("kindle_test.html.j2").render(L=L, games=doc.games), doc.lang, css)
+        book.add_item(check)
+        spine.append(check)
+        toc.append(check)
+
     def add_news() -> None:
         for s in doc.sections:
             page = _page(f"sec-{s['slug']}", s["file"], s["name"],
-                         env.get_template("section.html.j2").render(ed=ed, L=L, sec=s), doc.lang, css)
+                         tpl("section.html.j2").render(ed=ed, L=L, sec=s), doc.lang, css)
             book.add_item(page)
             spine.append(page)
             toc.append(page)
@@ -156,7 +175,7 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
         charge = dict(doc.charge)
         charge["image"] = add_image(charge["image_path"], "charge.png")
         page = _page("charge", "charge.xhtml", L["charge"],
-                     env.get_template("charge.html.j2").render(L=L, charge=charge), doc.lang, css)
+                     tpl("charge.html.j2").render(L=L, charge=charge), doc.lang, css)
         book.add_item(page)
         spine.append(page)
         toc.append(page)
@@ -168,22 +187,22 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
         for g in doc.games:
             first = g["index"] == 0
             if g["kind"] == "sudoku":
-                body = env.get_template("games_sudoku.html.j2").render(ed=ed, L=L, g=g, first=first)
+                body = tpl("games_sudoku.html.j2").render(ed=ed, L=L, g=g, first=first)
             elif g["kind"] == "wordle":
-                help_ = L["wordle_help"].format(n=g["puzzle"]["length"], a=g["puzzle"]["attempts"])
-                body = env.get_template("games_wordle.html.j2").render(ed=ed, L=L, g=g, first=first,
+                help_ = L["wordle_help_native" if doc.native else "wordle_help"].format(n=g["puzzle"]["length"], a=g["puzzle"]["attempts"])
+                body = tpl("games_wordle.html.j2").render(ed=ed, L=L, g=g, first=first,
                                                                        help=help_)
                 for j, guess in enumerate(g["puzzle"]["pocket"]):
                     gp = _page(f"wordle-{g['index']}-{j}", f"wordle_{g['index']}_{j}.xhtml", guess["word"],
-                               env.get_template("wordle_guess.html.j2").render(L=L, g=g, guess=guess),
+                               tpl("wordle_guess.html.j2").render(L=L, g=g, guess=guess),
                                doc.lang, css)
                     book.add_item(gp)
                     nonlinear.append(gp)
             elif g["kind"] == "crossword":
-                body = env.get_template("games_crossword.html.j2").render(ed=ed, L=L, g=g, first=first)
+                body = tpl("games_crossword.html.j2").render(ed=ed, L=L, g=g, first=first)
             else:
                 help_ = L["wordsearch_help"].format(theme=g["puzzle"]["theme"])
-                body = env.get_template("games_wordsearch.html.j2").render(ed=ed, L=L, g=g, first=first,
+                body = tpl("games_wordsearch.html.j2").render(ed=ed, L=L, g=g, first=first,
                                                                            help=help_)
             page = _page(f"game-{g['index']}", g["file"], g["title"], body, doc.lang, css)
             book.add_item(page)
@@ -194,12 +213,18 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
     for part in doc.closing_order:
         {"news": add_news, "charge": add_charge, "games": add_games}[part]()
 
-    colophon = _page("colophon", "colophon.xhtml", L["colophon"], env.get_template("colophon.html.j2").render(
+    colophon = _page("colophon", "colophon.xhtml", L["colophon"], tpl("colophon.html.j2").render(
         ed=ed, L=L, sources=doc.sources, curated_by=doc.curated_by, generated_at=doc.generated_at),
         doc.lang, css)
     book.add_item(colophon)
     spine.append(colophon)
     toc.append(colophon)
+
+    if doc.games and doc.native:
+        guard = _page("answers-ahead", "answers_ahead.xhtml", L["answers_ahead"],
+                      tpl("answers_ahead.html.j2").render(L=L), doc.lang, css)
+        book.add_item(guard)
+        spine.append(guard)
 
     if doc.games:
         for g in doc.games:
@@ -213,7 +238,7 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
                     for k in range(n):
                         g["hits"].add((r0 + dr * k, c0 + dc * k))
         sol = _page("solutions", "solutions.xhtml", L["solutions"],
-                    env.get_template("solutions.html.j2").render(L=L, games=doc.games), doc.lang, css)
+                    tpl("solutions.html.j2").render(L=L, games=doc.games), doc.lang, css)
         book.add_item(sol)
         nonlinear.insert(0, sol)  # only reachable through "see solution" links: no spoilers
         toc.append(sol)

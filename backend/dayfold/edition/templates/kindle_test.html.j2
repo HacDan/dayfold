@@ -1,0 +1,8 @@
+<div class="colophon">
+<div class="section-head"><p class="kicker">Dayfold</p><h1>{{ L.test_title }}</h1></div>
+<p>{{ L.test_intro }}</p>
+{% for c in L.test_checks %}<p class="src"><b>{{ loop.index }}.</b> {{ c.format(wordle=L.wordle) }}</p>
+{% endfor %}
+<h3>{{ L.test_games }}</h3>
+{% for g in games %}<p class="src"><a href="{{ g.file }}">{{ g.title }}</a></p>{% endfor %}
+</div>
