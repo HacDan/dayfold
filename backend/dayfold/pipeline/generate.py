@@ -104,15 +104,12 @@ def run_generation_job(job_id: int) -> None:
             news = get_section(s, "newspaper")
             cur = get_section(s, "curation")
             charge_cfg = get_section(s, "charge")
-            device = get_section(s, "device")
             picks, curated_by = curate(s, news, cur, log)
             if not picks:
                 raise RuntimeError("nenhuma matéria disponível para a edição (verifique provedores e filtros)")
             ed_date = today_in_tz()
             published = Edition.status.in_([EditionStatus.READY, "ARCHIVED"])
             number = (s.scalar(select(func.count(Edition.id)).where(published)) or 0) + 1
-            first = s.scalar(select(func.min(Edition.edition_date)).where(published))
-            year_n = (ed_date.year - first.year + 1) if first else 1
             edition = Edition(number=number, edition_date=ed_date, title=news.title,
                               status=EditionStatus.BUILDING, curated_by=curated_by, job_id=job_id)
             s.add(edition)
@@ -124,56 +121,23 @@ def run_generation_job(job_id: int) -> None:
                                      score=p.score))
             job = s.get(GenerationJob, job_id)
             job.edition_id = edition.id
-        lang = news.language
-        L = LABELS[lang]
-        out_dir = config.editions_dir / f"{ed_date.isoformat()}-{number:04d}"
+        out_dir = edition_dir(ed_date, number)
         if out_dir.exists():
             shutil.rmtree(out_dir)
         (out_dir / "img").mkdir(parents=True)
         log(f"Edição nº {number} com {len(picks)} matérias ({'IA' if curated_by == 'ai' else 'regras'}).")
-
-        # ------------------------------------------------------ article views
-        log.step("images", 0.5)
+        lang = news.language
         with session_scope() as s:
-            topics = {t.slug: t for t in s.scalars(select(Topic))}
-            items = list(s.scalars(select(EditionArticle).where(EditionArticle.edition_id == edition_id)
-                                   .order_by(EditionArticle.position)))
-            headline = None
-            sections: dict[str, dict] = {}
-            headlines_text: list[str] = []
-            same_lang_titles: list[str] = []
-            providers: dict[int, Provider] = {}
-            for it in items:
-                a = it.article
-                providers[a.provider_id] = a.provider
-                sec_name = topics[it.section].name if it.section in topics else it.section.title()
-                view = _article_view(a, sec_name, lang)
-                headlines_text.append(a.title)
-                if (a.language or lang) == lang:
-                    same_lang_titles.append(a.title)
-                if it.is_headline:
-                    headline = view
-                    continue
-                sec = sections.setdefault(it.section, {
-                    "slug": it.section, "name": sec_name, "file": f"sec_{it.section}.xhtml",
-                    "articles": [], "position": topics[it.section].position if it.section in topics else 99,
-                })
-                sec["articles"].append(view)
-            sources = [{"name": p.name, "license": p.license_name, "license_url": p.license_url}
-                       for p in providers.values()]
-        ordered_sections = sorted(sections.values(), key=lambda x: x["position"])
-        if news.include_images:
-            for v in ([headline] if headline else []) + [a for s_ in ordered_sections for a in s_["articles"]]:
-                if v.get("image_url"):
-                    path = prepare_photo(v["image_url"], out_dir / "img" / f"a{v['id']}.jpg",
-                                         device.image_max_width)
-                    if path:
-                        v["image_path"] = str(path)
+            rows = [(a.title, a.language) for a in s.scalars(
+                select(Article).join(EditionArticle, EditionArticle.article_id == Article.id)
+                .where(EditionArticle.edition_id == edition_id).order_by(EditionArticle.position))]
+        headlines_text = [t for t, _ in rows]
+        same_lang_titles = [t for t, lg in rows if (lg or lang) == lang]
 
         # ------------------------------------------------------------- games
-        games: list[dict] = []
         if news.include_games:
-            log.step("games", 0.6)
+            log.step("games", 0.55)
+            n_games = 0
             with session_scope() as s:
                 configs = list(s.scalars(select(Game).where(Game.enabled.is_(True)).order_by(Game.position)))
                 for g in configs:
@@ -193,16 +157,14 @@ def run_generation_job(job_id: int) -> None:
                                 cfg.get("theme", "news"), int(cfg.get("words", 10)),
                                 same_lang_titles, cfg.get("difficulty", "medium"))
                         title = GAME_TITLES[lang][g.kind] + (f" {n + 1}" if count > 1 else "")
-                        s.add(GameInstance(edition_id=edition_id, kind=g.kind, position=len(games),
+                        s.add(GameInstance(edition_id=edition_id, kind=g.kind, position=n_games,
                                            title=title, puzzle=puzzle, solution=solution))
-                        games.append({"kind": g.kind, "title": title, "puzzle": puzzle,
-                                      "solution": solution})
-            log(f"{len(games)} jogos gerados.")
+                        n_games += 1
+            log(f"{n_games} jogos gerados.")
 
         # ------------------------------------------------------------ charge
-        charge = None
         if news.include_charge:
-            log.step("charge", 0.7)
+            log.step("charge", 0.65)
             from ..charge.service import generate_charge
 
             with session_scope() as s:
@@ -211,68 +173,9 @@ def run_generation_job(job_id: int) -> None:
                     s.add(ChargeAsset(edition_id=edition_id, mode=result["mode"],
                                       status=JobStatus.SUCCEEDED, script=result["script"],
                                       image_path=result["image_path"], caption=result["caption"]))
-                    charge = {"image_path": result["image_path"], "caption": result["caption"]}
 
-        # ------------------------------------------------------------- cover
-        log.step("cover", 0.8)
-        lead = headline or (ordered_sections[0]["articles"][0] if ordered_sections else None)
-        secondary = [(a["section_name"], a["title"]) for s_ in ordered_sections for a in s_["articles"][:1]]
-        secondary += [(a["section_name"], a["title"]) for s_ in ordered_sections for a in s_["articles"][1:2]]
-        extras = []
-        if charge:
-            extras.append(L["charge"])
-        extras += [g["title"] for g in games]
-        source_line = None
-        if lead:
-            source_line = " | ".join(filter(None, [f"{L['by']} {lead['author']}" if lead.get("author") else None,
-                                                   lead["provider"]]))
-        cover_data = CoverData(
-            title=news.title, masthead_font=news.masthead_font, tagline=news.tagline,
-            long_date=long_date(ed_date, lang), number_label=f"{L['number']} {number}",
-            year_label=f"{L['year']} {roman(year_n)}", daily_label=L["daily"],
-            headline=lead["title"] if lead else news.title,
-            deck=lead.get("subtitle") if lead else None, headline_source=source_line,
-            image_path=Path(lead["image_path"]) if lead and lead.get("image_path") else None,
-            also_label=L["also"], secondary=secondary[:6],
-            lead_text=" ".join(lead["paragraphs"][:4]) if lead and lead["paragraphs"] else (lead or {}).get("excerpt"),
-            footer=" · ".join(extras),
-        )
-        cover_path = render_cover(cover_data, out_dir / "cover.png", device.cover_width, device.cover_height)
-
-        # -------------------------------------------------------------- epub
-        log.step("epub", 0.9)
-        identifier = f"dayfold-{ed_date.isoformat()}-{number}"
-        doc = EditionDoc(
-            identifier=identifier, lang=lang, title=news.title, tagline=news.tagline,
-            long_date=long_date(ed_date, lang), short_date=short_date(ed_date, lang),
-            iso_date=ed_date.isoformat(), number_label=f"{L['number']} {number}",
-            year_label=f"{L['year']} {roman(year_n)}", masthead_font=news.masthead_font,
-            typography=news.typography.model_dump(), cover_path=cover_path, headline=headline,
-            sections=ordered_sections, games=[dict(g) for g in games], charge=charge,
-            closing_order=news.closing_order, sources=sources, curated_by=curated_by,
-            generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
-        )
-        epub_path = build_epub(doc, out_dir / f"dayfold-{ed_date.isoformat()}.epub")
-        games_path = out_dir / f"dayfold-{ed_date.isoformat()}.games.json"
-        games_path.write_text(json.dumps({
-            "edition": identifier, "date": ed_date.isoformat(), "title": news.title, "language": lang,
-            "games": [{"index": i, "kind": g["kind"], "title": g["title"], "puzzle": g["puzzle"],
-                       "solution": g["solution"]} for i, g in enumerate(games)],
-        }, ensure_ascii=False))
-
+        epub_path = typeset(edition_id, log)
         with session_scope() as s:
-            edition = s.get(Edition, edition_id)
-            edition.status = EditionStatus.READY
-            edition.headline = lead["title"] if lead else None
-            edition.epub_path = str(epub_path)
-            edition.cover_path = str(cover_path)
-            edition.games_path = str(games_path)
-            edition.stats = {
-                "articles": len(picks), "sections": len(ordered_sections), "games": len(games),
-                "charge": bool(charge), "epub_kb": epub_path.stat().st_size // 1024,
-                "images": sum(1 for v in [headline, *[a for s_ in ordered_sections for a in s_["articles"]]]
-                              if v and v.get("image_path")),
-            }
             job = s.get(GenerationJob, job_id)
             job.status = JobStatus.SUCCEEDED
             job.step = "done"
@@ -291,6 +194,131 @@ def run_generation_job(job_id: int) -> None:
                 ed.status = EditionStatus.FAILED
         log(f"Falhou: {exc}")
         raise
+
+
+def edition_dir(ed_date: date, number: int) -> Path:
+    return config.editions_dir / f"{ed_date.isoformat()}-{number:04d}"
+
+
+def typeset(edition_id: int, log) -> Path:
+    """Images, cover, EPUB and games.json from what is stored for an edition.
+
+    Used by the generation job and to re-typeset an edition after layout changes
+    (no new collection, no AI calls)."""
+    if hasattr(log, "step"):
+        log.step("images", 0.75)
+    with session_scope() as s:
+        news = get_section(s, "newspaper")
+        device = get_section(s, "device")
+        ed = s.get(Edition, edition_id)
+        ed_date, number, curated_by = ed.edition_date, ed.number, ed.curated_by
+        published = Edition.status.in_([EditionStatus.READY, "ARCHIVED"])
+        first = s.scalar(select(func.min(Edition.edition_date)).where(published, Edition.id != edition_id))
+        year_n = (ed_date.year - first.year + 1) if first and first < ed_date else 1
+        lang = news.language
+        L = LABELS[lang]
+        topics = {t.slug: t for t in s.scalars(select(Topic))}
+        headline = None
+        sections: dict[str, dict] = {}
+        providers: dict[int, Provider] = {}
+        for it in sorted(ed.items, key=lambda i: i.position):
+            a = it.article
+            providers[a.provider_id] = a.provider
+            sec_name = topics[it.section].name if it.section in topics else it.section.title()
+            view = _article_view(a, sec_name, lang)
+            if it.is_headline:
+                headline = view
+                continue
+            sec = sections.setdefault(it.section, {
+                "slug": it.section, "name": sec_name, "file": f"sec_{it.section}.xhtml",
+                "articles": [], "position": topics[it.section].position if it.section in topics else 99,
+            })
+            sec["articles"].append(view)
+        sources = [{"name": p.name, "license": p.license_name, "license_url": p.license_url}
+                   for p in providers.values()]
+        games = [{"kind": g.kind, "title": g.title, "puzzle": g.puzzle, "solution": g.solution}
+                 for g in sorted(ed.games, key=lambda g: g.position)]
+        charge = ({"image_path": ed.charge.image_path, "caption": ed.charge.caption}
+                  if ed.charge and ed.charge.image_path and Path(ed.charge.image_path).exists() else None)
+    out_dir = edition_dir(ed_date, number)
+    (out_dir / "img").mkdir(parents=True, exist_ok=True)
+    ordered_sections = sorted(sections.values(), key=lambda x: x["position"])
+    all_views = ([headline] if headline else []) + [a for s_ in ordered_sections for a in s_["articles"]]
+    if news.include_images:
+        for v in all_views:
+            if v.get("image_url"):
+                dest = out_dir / "img" / f"a{v['id']}.jpg"
+                path = dest if dest.exists() else prepare_photo(v["image_url"], dest, device.image_max_width)
+                if path:
+                    v["image_path"] = str(path)
+
+    # cover
+    lead = headline or (ordered_sections[0]["articles"][0] if ordered_sections else None)
+    secondary = [(a["section_name"], a["title"]) for s_ in ordered_sections for a in s_["articles"][:1]]
+    secondary += [(a["section_name"], a["title"]) for s_ in ordered_sections for a in s_["articles"][1:2]]
+    extras = ([L["charge"]] if charge else []) + [g["title"] for g in games]
+    source_line = None
+    if lead:
+        source_line = " | ".join(filter(None, [f"{L['by']} {lead['author']}" if lead.get("author") else None,
+                                               lead["provider"]]))
+    cover_data = CoverData(
+        title=news.title, masthead_font=news.masthead_font, tagline=news.tagline,
+        long_date=long_date(ed_date, lang), number_label=f"{L['number']} {number}",
+        year_label=f"{L['year']} {roman(year_n)}", daily_label=L["daily"],
+        headline=lead["title"] if lead else news.title,
+        deck=lead.get("subtitle") if lead else None, headline_source=source_line,
+        image_path=Path(lead["image_path"]) if lead and lead.get("image_path") else None,
+        also_label=L["also"], secondary=secondary[:6],
+        lead_text=" ".join(lead["paragraphs"][:4]) if lead and lead["paragraphs"] else (lead or {}).get("excerpt"),
+        footer=" · ".join(extras),
+    )
+    if hasattr(log, "step"):
+        log.step("cover", 0.85)
+    cover_path = render_cover(cover_data, out_dir / "cover.png", device.cover_width, device.cover_height)
+
+    if hasattr(log, "step"):
+        log.step("epub", 0.92)
+    identifier = f"dayfold-{ed_date.isoformat()}-{number}"
+    doc = EditionDoc(
+        identifier=identifier, lang=lang, title=news.title, tagline=news.tagline,
+        long_date=long_date(ed_date, lang), short_date=short_date(ed_date, lang),
+        iso_date=ed_date.isoformat(), number_label=f"{L['number']} {number}",
+        year_label=f"{L['year']} {roman(year_n)}", masthead_font=news.masthead_font,
+        typography=news.typography.model_dump(), cover_path=cover_path, headline=headline,
+        sections=ordered_sections, games=[dict(g) for g in games], charge=charge,
+        closing_order=news.closing_order, sources=sources, curated_by=curated_by,
+        generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
+    )
+    epub_path = build_epub(doc, out_dir / f"dayfold-{ed_date.isoformat()}.epub")
+    games_path = out_dir / f"dayfold-{ed_date.isoformat()}.games.json"
+    games_path.write_text(json.dumps({
+        "edition": identifier, "date": ed_date.isoformat(), "title": news.title, "language": lang,
+        "games": [{"index": i, "kind": g["kind"], "title": g["title"], "puzzle": g["puzzle"],
+                   "solution": g["solution"]} for i, g in enumerate(games)],
+    }, ensure_ascii=False))
+    with session_scope() as s:
+        edition = s.get(Edition, edition_id)
+        edition.status = EditionStatus.READY
+        edition.title = news.title
+        edition.headline = lead["title"] if lead else None
+        edition.epub_path = str(epub_path)
+        edition.cover_path = str(cover_path)
+        edition.games_path = str(games_path)
+        edition.stats = {
+            "articles": len(all_views), "sections": len(ordered_sections), "games": len(games),
+            "charge": bool(charge), "epub_kb": epub_path.stat().st_size // 1024,
+            "images": sum(1 for v in all_views if v.get("image_path")),
+        }
+    return epub_path
+
+
+class _PrintLog:
+    def __call__(self, msg: str) -> None:
+        print(msg)
+
+
+def retypeset(edition_id: int) -> Path:
+    return typeset(edition_id, _PrintLog())
 
 
 def _prune() -> None:

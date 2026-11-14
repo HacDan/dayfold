@@ -297,7 +297,16 @@ def render_charge(script: ChargeScript, dest: Path) -> Path:
         sf = _font("OldStandard-Italic.ttf", 24)
         d.text((PANEL[0] + 18, PANEL[3] - 40), script.setting, font=sf, fill=60)
     inner_w = PANEL[2] - PANEL[0]
-    for p in script.props:
+    # keep objects apart from each other and from the characters
+    taken = [c.x for c in script.characters]
+    props = sorted(script.props, key=lambda p: p.x)
+    for p in props:
+        for _ in range(12):
+            if all(abs(p.x - t) >= 0.2 for t in taken):
+                break
+            p.x = min(0.95, p.x + 0.07) if p.x < 0.5 else max(0.05, p.x - 0.07)
+        taken.append(p.x)
+    for p in props:
         _prop(d, p, int(PANEL[0] + 60 + p.x * (inner_w - 120)))
     chars = sorted(script.characters, key=lambda c: c.x)
     heads = []

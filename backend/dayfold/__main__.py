@@ -12,6 +12,8 @@ def main() -> None:
     sub.add_parser("serve", help="run the web server, scheduler and worker (default)")
     sub.add_parser("generate", help="generate an edition now, in the foreground")
     sub.add_parser("init", help="create the database and default data")
+    rt = sub.add_parser("retypeset", help="rebuild cover and EPUB of an edition with current settings")
+    rt.add_argument("edition_id", type=int)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -20,6 +22,11 @@ def main() -> None:
     bootstrap()
     if args.cmd == "init":
         print("ok")
+        return
+    if args.cmd == "retypeset":
+        from .pipeline.generate import retypeset
+
+        print(retypeset(args.edition_id))
         return
     if args.cmd == "generate":
         from .db import session_scope

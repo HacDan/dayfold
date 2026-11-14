@@ -97,6 +97,20 @@ def edition_epub(eid: int, session: Session = Depends(get_session)) -> FileRespo
     return _file(e.epub_path, "application/epub+zip", Path(e.epub_path or "x.epub").name)
 
 
+@router.post("/editions/{eid}/retypeset")
+def retypeset_edition(eid: int, session: Session = Depends(get_session)) -> dict:
+    """Re-typeset cover and EPUB with the current newspaper settings (no collection, no AI)."""
+    from ..pipeline.generate import retypeset
+
+    e = _edition(session, eid)
+    if e.status not in (EditionStatus.READY, EditionStatus.FAILED) or not e.items:
+        raise HTTPException(400, "edição sem matérias para recompor")
+    session.commit()
+    retypeset(eid)
+    session.expire_all()
+    return edition_summary(_edition(session, eid))
+
+
 @router.delete("/editions/{eid}")
 def delete_edition(eid: int, session: Session = Depends(get_session)) -> dict:
     e = _edition(session, eid)
