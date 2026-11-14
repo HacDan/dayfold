@@ -86,7 +86,10 @@ def scrape_rss(spec: dict, *, max_items: int, language: str | None, want_body: b
     items: list[ScrapedItem] = []
     with net.client() as http:
         for entry in parsed.entries[:max_items]:
-            link = entry.get("link")
+            link = entry.get("link") or ""
+            if not link.startswith("http"):
+                guid = str(entry.get("id") or "")
+                link = guid if guid.startswith("http") else ""
             title = clean_text(entry.get("title"))
             if not link or not title:
                 continue

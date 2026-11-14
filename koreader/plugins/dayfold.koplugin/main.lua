@@ -67,6 +67,11 @@ function Dayfold:init()
     self:loadConfig()
     self.ui.menu:registerToMainMenu(self)
     if self.ui.document and self:isEdition(self.ui.document.file) then
+        -- Solutions and pocket-guess pages are non-linear: keep them out of the page flow,
+        -- reachable by links only, so the edition ends on the masthead page (no spoilers).
+        if self.ui.doc_settings and not self.ui.doc_settings:has("hide_nonlinear_flows") then
+            self.ui.doc_settings:saveSetting("hide_nonlinear_flows", true)
+        end
         self:hookReader()
     elseif not self.ui.document then
         -- File manager: fetch today's edition quietly if Wi-Fi is already on.

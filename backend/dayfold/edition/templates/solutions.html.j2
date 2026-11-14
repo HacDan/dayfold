@@ -3,10 +3,7 @@
 <div class="game{% if not loop.first %} pb{% endif %}" id="s{{ g.index }}">
 <h2>{{ g.title }}</h2>
 {% if g.kind == 'sudoku' %}
-<table class="sudoku">
-{% for r in range(9) %}<tr>{% for c in range(9) %}{% set i = r*9+c %}<td class="{% if c in (2,5) %}br {% endif %}{% if r in (2,5) %}bb {% endif %}{% if not g.puzzle.grid[i] %}sol{% endif %}">{{ g.solution.grid[i] }}</td>{% endfor %}</tr>
-{% endfor %}
-</table>
+<div class="puzzle-img"><img src="{{ g.solution_img }}" alt="Solução"/></div>
 {% elif g.kind == 'wordle' %}
 <div class="tiles">{% for ch in g.solution.answer %}<span class="tile correct">{{ ch }}</span>{% endfor %}</div>
 {% elif g.kind == 'wordsearch' %}

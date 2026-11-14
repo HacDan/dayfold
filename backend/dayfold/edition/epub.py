@@ -87,7 +87,12 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
                         content=css_text.encode())
     book.add_item(css)
 
-    # images referenced by articles and the cartoon
+    # images referenced by articles, games and the cartoon
+    def add_image_bytes(data: bytes, name: str) -> str:
+        book.add_item(epub.EpubItem(uid=f"img-{name}", file_name=f"images/{name}",
+                                    media_type="image/png", content=data))
+        return f"images/{name}"
+
     def add_image(local: str | Path, name: str) -> str:
         data = Path(local).read_bytes()
         mt = "image/png" if name.endswith(".png") else "image/jpeg"
@@ -111,6 +116,13 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
     for i, g in enumerate(doc.games):
         g["index"] = i
         g["file"] = f"game_{i}.xhtml"
+        if g["kind"] == "sudoku":
+            # Grids as images: thick 3x3 rules render the same in every reader.
+            from .puzzles import sudoku_png
+
+            g["grid_img"] = add_image_bytes(sudoku_png(g["puzzle"]["grid"]), f"sudoku_{i}.png")
+            g["solution_img"] = add_image_bytes(
+                sudoku_png(g["solution"]["grid"], givens=g["puzzle"]["grid"]), f"sudoku_{i}_sol.png")
 
     front = _page("front", "front.xhtml", L["front_page"], env.get_template("front.html.j2").render(
         ed=ed, L=L, headline=doc.headline, sections=doc.sections, games=doc.games,
@@ -190,7 +202,7 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
         sol = _page("solutions", "solutions.xhtml", L["solutions"],
                     env.get_template("solutions.html.j2").render(L=L, games=doc.games), doc.lang, css)
         book.add_item(sol)
-        spine.append(sol)
+        nonlinear.insert(0, sol)  # only reachable through "see solution" links: no spoilers
         toc.append(sol)
 
     for p in nonlinear:

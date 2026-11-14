@@ -96,12 +96,11 @@ DEFAULT_PROVIDERS: list[dict] = [
         license_note="Obras de servidores federais dos EUA são domínio público.",
     ),
     dict(
-        slug="us-census", name="U.S. Census Bureau", category="ciencia", language="en",
-        base_url="https://www.census.gov",
-        feed="https://www.census.gov/newsroom/press-releases.xml",
+        slug="nsf", name="U.S. National Science Foundation", category="ciencia", language="en",
+        base_url="https://www.nsf.gov/news", feed="https://www.nsf.gov/rss/rss_www_news.xml",
         usage_mode=FULL, license_name="Domínio público (governo dos EUA)",
-        license_url="https://www.census.gov/about/policies/citation.html",
-        license_note="Dados e releases públicos; citar a fonte.",
+        license_url="https://www.nsf.gov/policies/site-policies",
+        license_note="Textos de servidores federais dos EUA; imagens podem ter créditos de terceiros.",
     ),
     # Tecnologia
     dict(

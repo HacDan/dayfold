@@ -54,7 +54,7 @@ end
 function GameBase:flash(msg)
     self.message = msg
     self:refresh()
-    UIManager:scheduleIn(2.5, function()
+    UIManager:scheduleIn(4, function()
         if self.message == msg then
             self.message = nil
             self:refresh()

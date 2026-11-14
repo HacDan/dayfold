@@ -93,9 +93,15 @@ def _figure(d: ImageDraw.ImageDraw, c: Character, cx: int) -> tuple[int, int]:
     f = 1 if c.facing == "right" else -1
     # legs
     if sitting:
-        d.line([(cx, hip_y), (cx + f * leg // 2, hip_y), (cx + f * leg // 2, foot_y)], fill=INK, width=LINE)
-        d.line([(cx - f * 10, hip_y), (cx + f * leg // 2 - 10, hip_y + 4)], fill=INK, width=LINE)
-        d.rectangle([cx - 60, hip_y + 4, cx + 30 * f + 10, hip_y + 16], outline=INK, width=3)
+        knee = (cx + f * int(leg * 0.55), hip_y)
+        d.line([(cx, hip_y), knee, (knee[0], foot_y)], fill=INK, width=LINE, joint="curve")
+        d.line([(knee[0], foot_y), (knee[0] + f * 22, foot_y)], fill=INK, width=LINE)
+        seat_y = hip_y + 10
+        back_x = cx - f * 44
+        d.rectangle([min(back_x, cx + f * 40), seat_y, max(back_x, cx + f * 40), seat_y + 10], fill=INK)
+        d.line([(back_x, seat_y), (back_x, seat_y - int(body * 0.75))], fill=INK, width=LINE)
+        d.line([(back_x, seat_y + 10), (back_x, foot_y)], fill=INK, width=4)
+        d.line([(cx + f * 36, seat_y + 10), (cx + f * 36, foot_y)], fill=INK, width=4)
     elif c.pose == "running":
         d.line([(cx, hip_y), (cx + f * 55, hip_y + leg // 2), (cx + f * 20, foot_y)], fill=INK, width=LINE)
         d.line([(cx, hip_y), (cx - f * 45, hip_y + leg // 2 + 10), (cx - f * 90, foot_y - 20)], fill=INK, width=LINE)

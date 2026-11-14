@@ -32,6 +32,7 @@ from ..models import (
     utcnow,
 )
 from ..settings import get_section
+from ..sources.base import strip_author
 from .collect import collect_all
 from .curate import curate
 
@@ -69,8 +70,11 @@ def _short_url(url: str) -> str:
 
 def _article_view(a: Article, section_name: str, lang: str) -> dict:
     when = a.published_at or a.collected_at
+    author = strip_author(a.author)
+    if author and author.strip().lower() in a.provider.name.lower():
+        author = None  # "Por Agência Senado | Fonte: Agência Senado" says the same thing twice
     return {
-        "id": a.id, "title": a.title, "subtitle": a.subtitle, "author": a.author,
+        "id": a.id, "title": a.title, "subtitle": a.subtitle, "author": author,
         "date_label": short_date(when.date(), lang) + when.strftime(" · %H:%M UTC"),
         "provider": a.provider.name, "url": a.url, "url_short": _short_url(a.url),
         "paragraphs": _paragraphs(a.body), "excerpt": a.excerpt, "section_name": section_name,

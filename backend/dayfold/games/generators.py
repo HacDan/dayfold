@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+import re
 import string
 import unicodedata
 from collections.abc import Callable
@@ -135,7 +136,7 @@ DIRS_HARD = DIRS_MEDIUM + [(0, -1), (-1, 0), (-1, -1), (1, -1)]
 def news_words(headlines: list[str], language: str, size: int) -> list[str]:
     seen: list[str] = []
     for h in headlines:
-        for raw in h.split():
+        for raw in re.split(r"[^\w]+", h):
             w = plain(raw)
             if 4 <= len(w) <= min(size, 11) and w not in STOPWORDS and w not in seen:
                 seen.append(w)

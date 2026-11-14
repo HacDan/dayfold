@@ -4,7 +4,7 @@ import { Empty, Field, Loading, Modal, SectionTitle, Stamp, useAction, useLoad }
 
 const PRESETS: Record<string, Partial<AIProvider> & { label: string }> = {
   claude_cli: { label: "Claude Code (CLI)", name: "Claude CLI", kind: "cli", command: "claude -p --model claude-haiku-5-5 --output-format text" },
-  codex_cli: { label: "Codex (CLI)", name: "Codex CLI", kind: "cli", command: "codex exec --skip-git-repo-check -" },
+  codex_cli: { label: "Codex (CLI)", name: "Codex CLI", kind: "cli", command: "codex exec --skip-git-repo-check -s read-only --ephemeral -C /tmp -" },
   anthropic: { label: "Anthropic API", name: "Anthropic", kind: "anthropic", model: "claude-haiku-5-5" },
   openai: { label: "OpenAI API", name: "OpenAI", kind: "openai", base_url: "https://api.openai.com/v1", model: "gpt-5-mini", image_model: "gpt-image-1" },
   ollama: { label: "Ollama (local)", name: "Ollama", kind: "openai", base_url: "http://localhost:11434/v1", model: "llama3.2" },

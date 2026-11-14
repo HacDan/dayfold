@@ -1,6 +1,7 @@
 <div class="game">
 <h2>{{ g.title }}</h2>
 <div class="tiles">{% for ch in guess.word %}<span class="tile {{ guess.feedback[loop.index0] }}">{{ ch }}</span>{% endfor %}</div>
+<p class="marks">{% for f in guess.feedback %}{{ '■' if f == 'correct' else ('▣' if f == 'present' else '□') }}{% endfor %}</p>
 <p class="help">{{ L.wordle_legend }}</p>
 <p class="back"><a href="{{ g.file }}">← {{ L.back }}</a></p>
 </div>
