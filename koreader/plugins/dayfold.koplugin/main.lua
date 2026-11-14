@@ -35,6 +35,7 @@ local GAMES = {
     sudoku = require("dayfold_games/sudoku"),
     wordle = require("dayfold_games/wordle"),
     wordsearch = require("dayfold_games/wordsearch"),
+    crossword = require("dayfold_games/crossword"),
 }
 
 local Dayfold = WidgetContainer:extend{

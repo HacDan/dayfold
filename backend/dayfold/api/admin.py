@@ -289,6 +289,7 @@ GAME_SCHEMAS = {
     "wordsearch": {"language": ["pt", "en"], "size": [8, 10, 12, 14, 16],
                    "theme": ["news", *sorted({t for v in WORDSEARCH_THEMES.values() for t in v})],
                    "words": [6, 8, 10, 12, 15], "difficulty": ["easy", "medium", "hard"]},
+    "crossword": {"language": ["pt", "en"], "words": [6, 8, 10, 12, 14], "size": [11, 13, 15]},
 }
 
 
@@ -342,6 +343,9 @@ def preview_game(gid: int, session: Session = Depends(get_session)) -> dict:
     elif g.kind == "wordle":
         puzzle, solution = GENERATORS["wordle"](rng, cfg.get("language", "pt"), int(cfg.get("length", 5)),
                                                 int(cfg.get("attempts", 6)))
+    elif g.kind == "crossword":
+        puzzle, solution = GENERATORS["crossword"](rng, cfg.get("language", "pt"), int(cfg.get("words", 10)),
+                                                   int(cfg.get("size", 13)))
     else:
         titles = [t for t in session.scalars(select(Edition.headline).where(Edition.headline.is_not(None))
                                              .order_by(Edition.id.desc()).limit(10))]

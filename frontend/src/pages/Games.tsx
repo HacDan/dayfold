@@ -17,6 +17,7 @@ const DESCR: Record<string, string> = {
   sudoku: "Grade 9×9 com solução única garantida. No EPUB, para resolver de cabeça; no KOReader, toque nas casas para preencher.",
   wordle: "Descubra a palavra do dia. No EPUB, palpites de bolso com dicas por link; no KOReader, jogo completo com teclado.",
   wordsearch: "Palavras escondidas na grade. O tema “Notícias do dia” usa termos das manchetes da edição.",
+  crossword: "Grade livre montada por cruzamentos, com dicas horizontais e verticais. No KOReader, toque numa casa e digite as letras.",
 };
 
 function GameCard({ g, schema, onSaved, onMove, first, last }: {
@@ -32,7 +33,7 @@ function GameCard({ g, schema, onSaved, onMove, first, last }: {
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>
           <p className="kicker">{t("#{n} na ordem", { n: g.position + 1 })}</p>
-          <h3 style={{ fontSize: "1.6rem" }}>{g.name}</h3>
+          <h3 style={{ fontSize: "1.6rem" }}>{t(g.name)}</h3>
         </div>
         <div className="row">
           <button className="btn small" disabled={first} onClick={() => onMove(-1)} aria-label={t("Antes")}>↑</button>

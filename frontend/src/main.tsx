@@ -33,6 +33,27 @@ const NAV = [
   ["/kindle", "Kindle"],
 ] as const;
 
+/* Inline SVG flags: emoji flags do not render on Windows. */
+function Flag({ lang }: { lang: Lang }) {
+  if (lang === "pt") {
+    return (
+      <svg className="flag" viewBox="0 0 20 14" width="18" height="13" aria-hidden="true">
+        <rect width="20" height="14" fill="#009739"/>
+        <path d="M10 1.6 18.2 7 10 12.4 1.8 7Z" fill="#FEDD00"/>
+        <circle cx="10" cy="7" r="3.3" fill="#012169"/>
+        <path d="M6.9 6.3q3.2-.9 6.2.9" stroke="#fff" strokeWidth=".6" fill="none"/>
+      </svg>
+    );
+  }
+  return (
+    <svg className="flag" viewBox="0 0 19 13" width="18" height="13" aria-hidden="true">
+      <rect width="19" height="13" fill="#fff"/>
+      {[0, 2, 4, 6, 8, 10, 12].map((y) => <rect key={y} y={y} width="19" height="1" fill="#B22234"/>)}
+      <rect width="7.6" height="7" fill="#3C3B6E"/>
+    </svg>
+  );
+}
+
 function HeaderControls({ onLang }: { onLang: (l: Lang) => void }) {
   const [theme, setTheme] = useState<Theme>(effectiveTheme());
   const next: Theme = theme === "dark" ? "light" : "dark";
@@ -50,9 +71,11 @@ function HeaderControls({ onLang }: { onLang: (l: Lang) => void }) {
         <span>{theme === "dark" ? t("Tema claro") : t("Tema escuro")}</span>
       </button>
       <span className="lang-switch" role="group" aria-label={t("Idioma da dashboard")}>
-        {(["pt", "en"] as Lang[]).map((l) => (
+        {(["en", "pt"] as Lang[]).map((l) => (
           <button key={l} type="button" className={l === lang ? "on" : ""} aria-pressed={l === lang}
-            onClick={() => l !== lang && onLang(l)}>{l.toUpperCase()}</button>
+            onClick={() => l !== lang && onLang(l)} title={l === "pt" ? "Português" : "English"}>
+            <Flag lang={l} /><span>{l.toUpperCase()}</span>
+          </button>
         ))}
       </span>
     </span>

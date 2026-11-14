@@ -10,6 +10,7 @@ import string
 import unicodedata
 from collections.abc import Callable
 
+from .crossword_words import CROSSWORD
 from .words import STOPWORDS, WORDLE, WORDSEARCH_THEMES
 
 
@@ -191,4 +192,128 @@ def wordsearch(rng: random.Random, language: str = "pt", size: int = 12, theme: 
     )
 
 
-GENERATORS: dict[str, Callable] = {"sudoku": sudoku, "wordle": wordle, "wordsearch": wordsearch}
+# ------------------------------------------------------------------ crossword
+
+ACROSS, DOWN = (0, 1), (1, 0)
+
+
+def _cw_fits(grid: dict, dirs: dict, word: str, r0: int, c0: int, d: tuple[int, int],
+             size: int) -> int:
+    """Crossings the word makes at (r0, c0) going ``d``, or -1 when it cannot go there."""
+    dr, dc = d
+    n = len(word)
+    if not (0 <= r0 and 0 <= c0 and r0 + dr * (n - 1) < size and c0 + dc * (n - 1) < size):
+        return -1
+    if (r0 - dr, c0 - dc) in grid or (r0 + dr * n, c0 + dc * n) in grid:
+        return -1  # would touch another word end to end
+    crossings = 0
+    for k, ch in enumerate(word):
+        cell = (r0 + dr * k, c0 + dc * k)
+        if cell in grid:
+            if grid[cell] != ch or d in dirs[cell]:
+                return -1
+            crossings += 1
+            continue
+        # a new letter must not sit beside another word (that would spell junk)
+        side1, side2 = (cell[0] + dc, cell[1] + dr), (cell[0] - dc, cell[1] - dr)
+        if side1 in grid or side2 in grid:
+            return -1
+    return crossings
+
+
+def _cw_build(rng: random.Random, pool: list[tuple[str, str]], count: int, size: int) -> list[dict]:
+    grid: dict[tuple[int, int], str] = {}
+    dirs: dict[tuple[int, int], set] = {}
+    placed: list[dict] = []
+
+    def put(word: str, clue: str, r0: int, c0: int, d: tuple[int, int]) -> None:
+        for k, ch in enumerate(word):
+            cell = (r0 + d[0] * k, c0 + d[1] * k)
+            grid[cell] = ch
+            dirs.setdefault(cell, set()).add(d)
+        placed.append({"word": word, "clue": clue, "row": r0, "col": c0,
+                       "dir": "across" if d == ACROSS else "down"})
+
+    first = max(pool[:6], key=lambda wc: len(wc[0]))
+    put(first[0], first[1], size // 2, (size - len(first[0])) // 2, ACROSS)
+    for word, clue in pool:
+        if len(placed) >= count:
+            break
+        if word == first[0]:
+            continue
+        options = []
+        for (r, c), ch in list(grid.items()):
+            for k, wch in enumerate(word):
+                if wch != ch:
+                    continue
+                for d in (ACROSS, DOWN):
+                    r0, c0 = r - d[0] * k, c - d[1] * k
+                    x = _cw_fits(grid, dirs, word, r0, c0, d, size)
+                    if x > 0:
+                        options.append((x, rng.random(), r0, c0, d))
+        if options:
+            _, _, r0, c0, d = max(options)
+            put(word, clue, r0, c0, d)
+    return placed
+
+
+def crossword(rng: random.Random, language: str = "pt", words: int = 10,
+              size: int = 13) -> tuple[dict, dict]:
+    """Free-form crossword: words cross each other inside a ``size`` square, the best of
+    several tries is kept, then the grid is cropped to the words and numbered."""
+    bank = CROSSWORD.get(language, CROSSWORD["pt"])
+    size = max(9, min(size, 17))
+    bank = [(w, c) for w, c in bank if 3 <= len(w) <= size]
+    best: list[dict] = []
+    best_score = (-1, 0)
+    for _ in range(40):
+        pool = bank[:]
+        rng.shuffle(pool)
+        placed = _cw_build(rng, pool, words, size)
+        cells = {(p["row"] + (k if p["dir"] == "down" else 0), p["col"] + (k if p["dir"] == "across" else 0))
+                 for p in placed for k in range(len(p["word"]))}
+        letters = sum(len(p["word"]) for p in placed)
+        score = (len(placed), letters - len(cells))  # more words, then more crossings
+        if score > best_score:
+            best, best_score = placed, score
+        if len(placed) >= words and score[1] >= words:
+            break
+    top = min(p["row"] for p in best)
+    left = min(p["col"] for p in best)
+    for p in best:
+        p["row"] -= top
+        p["col"] -= left
+    rows = max(p["row"] + (len(p["word"]) if p["dir"] == "down" else 1) for p in best)
+    cols = max(p["col"] + (len(p["word"]) if p["dir"] == "across" else 1) for p in best)
+    solved = [["#"] * cols for _ in range(rows)]
+    for p in best:
+        for k, ch in enumerate(p["word"].upper()):
+            r = p["row"] + (k if p["dir"] == "down" else 0)
+            c = p["col"] + (k if p["dir"] == "across" else 0)
+            solved[r][c] = ch
+    starts = sorted({(p["row"], p["col"]) for p in best})
+    number = {cell: i + 1 for i, cell in enumerate(starts)}
+    entries: dict[str, list[dict]] = {"across": [], "down": []}
+    for p in best:
+        entries[p["dir"]].append({"n": number[(p["row"], p["col"])], "row": p["row"], "col": p["col"],
+                                  "len": len(p["word"]), "clue": p["clue"], "answer": p["word"].upper()})
+    for v in entries.values():
+        v.sort(key=lambda e: e["n"])
+    return (
+        {
+            "language": language, "rows": rows, "cols": cols,
+            "grid": ["".join("#" if ch == "#" else "." for ch in row) for row in solved],
+            "numbers": [[r, c, n] for (r, c), n in sorted(number.items(), key=lambda kv: kv[1])],
+            "across": [{k: e[k] for k in ("n", "row", "col", "len", "clue")} for e in entries["across"]],
+            "down": [{k: e[k] for k in ("n", "row", "col", "len", "clue")} for e in entries["down"]],
+        },
+        {
+            "grid": ["".join(row) for row in solved],
+            "across": [{"n": e["n"], "answer": e["answer"]} for e in entries["across"]],
+            "down": [{"n": e["n"], "answer": e["answer"]} for e in entries["down"]],
+        },
+    )
+
+
+GENERATORS: dict[str, Callable] = {"sudoku": sudoku, "wordle": wordle, "wordsearch": wordsearch,
+                                   "crossword": crossword}

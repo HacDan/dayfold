@@ -106,7 +106,7 @@ export type AIProvider = {
   can_generate_images: boolean;
 };
 
-export type Game = { id: number; kind: "sudoku" | "wordle" | "wordsearch"; name: string; enabled: boolean; position: number; config: Record<string, string | number> };
+export type Game = { id: number; kind: "sudoku" | "wordle" | "wordsearch" | "crossword"; name: string; enabled: boolean; position: number; config: Record<string, string | number> };
 
 export type Overview = {
   today: string; newspaper: Newspaper; latest_edition: EditionSummary | null; last_job: Job | null; next_run: string | null;

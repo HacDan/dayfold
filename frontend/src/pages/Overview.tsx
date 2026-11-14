@@ -130,7 +130,7 @@ export default function Overview() {
         </section>
         <section>
           <p className="kicker">{t("Jogos")}</p>
-          <h3>{data.games.filter((g) => g.enabled).map((g) => g.name).join(", ") || t("Nenhum")}</h3>
+          <h3>{data.games.filter((g) => g.enabled).map((g) => t(g.name)).join(", ") || t("Nenhum")}</h3>
           <p className="small muted">{t("Preparados no servidor e entregues dentro da edição.")}</p>
           <Link className="btn small" to="/jogos">{t("Jogos")}</Link>
         </section>

@@ -16,7 +16,7 @@ e-reader only reads an offline file.
                    │                                  │   (JSON, validated)        │
                    │                                  ▼                           │
                    │  edition/    cover (Pillow) + EPUB (EbookLib + Jinja2 + CSS)  │
-                   │  games/      sudoku, wordle, word search (seeded per day)     │
+                   │  games/      sudoku, wordle, word search, crossword (per day) │
                    │  charge/     structured cartoon (AI script ─▶ Pillow) or      │
                    │              illustrated (image API)                          │
                    │                                  │                           │
@@ -57,7 +57,7 @@ e-reader only reads an offline file.
 | `articles` | Collected items: title, subtitle, author, date, provider, URL, image, body, excerpt, hash, language. |
 | `editions` | One generated issue: number, date, title, status, files, stats. |
 | `edition_articles` | Which articles went into an edition, their section, order and priority. |
-| `games` | Game catalog (`sudoku`, `wordle`, `wordsearch`), enabled flag, order and per game config. |
+| `games` | Game catalog (`sudoku`, `wordle`, `wordsearch`, `crossword`), enabled flag, order and per game config. |
 | `game_instances` | Puzzles generated for an edition (puzzle and solution JSON). |
 | `generation_jobs` | Edition generations with step, progress and log lines. |
 | `charge_assets` | Cartoon for an edition: mode, script JSON, image path, status. |

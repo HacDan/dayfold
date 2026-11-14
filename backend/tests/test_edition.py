@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dayfold.edition.cover import CoverData, render_cover
 from dayfold.edition.epub import EditionDoc, build_epub
-from dayfold.games.generators import seeded, sudoku, wordle, wordsearch
+from dayfold.games.generators import crossword, seeded, sudoku, wordle, wordsearch
 
 
 def test_cover_and_epub(tmp_path: Path):
@@ -12,7 +12,8 @@ def test_cover_and_epub(tmp_path: Path):
                                    headline="Manchete de teste", secondary=[("Mundo", "Outra")]),
                          tmp_path / "cover.png")
     games = []
-    for kind, fn in (("sudoku", lambda r: sudoku(r)), ("wordle", lambda r: wordle(r)), ("wordsearch", lambda r: wordsearch(r))):
+    for kind, fn in (("sudoku", lambda r: sudoku(r)), ("wordle", lambda r: wordle(r)), ("wordsearch", lambda r: wordsearch(r)),
+                     ("crossword", lambda r: crossword(r))):
         p, s = fn(seeded("t", kind))
         games.append({"kind": kind, "title": kind, "puzzle": p, "solution": s})
     art = {"id": 1, "title": "Manchete", "subtitle": None, "author": "A", "date_label": "hoje", "provider": "P",
@@ -32,3 +33,4 @@ def test_cover_and_epub(tmp_path: Path):
         assert "EPUB/front.xhtml" in names and "EPUB/solutions.xhtml" in names
         assert any(n.endswith("Chomsky.otf") for n in names)
         assert "dayfold://game/0" in z.read("EPUB/game_0.xhtml").decode()
+        assert "crossword_3.png" in z.read("EPUB/game_3.xhtml").decode()

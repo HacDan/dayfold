@@ -174,6 +174,8 @@ DEFAULT_GAMES: list[dict] = [
          config={"language": "pt", "length": 5, "attempts": 6}),
     dict(kind="wordsearch", name="Caça-palavras", position=2,
          config={"language": "pt", "size": 12, "theme": "news", "words": 10}),
+    dict(kind="crossword", name="Palavras Cruzadas", position=3,
+         config={"language": "pt", "words": 10, "size": 13}),
 ]
 
 
@@ -182,8 +184,14 @@ def seed(session: Session) -> None:
         for i, t in enumerate(DEFAULT_TOPICS):
             session.add(Topic(position=i, **t))
 
-    if session.scalar(select(Game.id).limit(1)) is None:
-        for g in DEFAULT_GAMES:
+    # Games added in later versions are appended to the end of existing installs.
+    existing = {k: p for k, p in session.execute(select(Game.kind, Game.position))}
+    last = max(existing.values(), default=-1)
+    for g in DEFAULT_GAMES:
+        if g["kind"] not in existing:
+            if existing:
+                last += 1
+                g = {**g, "position": last}
             session.add(Game(**g))
 
     if session.scalar(select(Provider.id).limit(1)) is None:

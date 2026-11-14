@@ -37,8 +37,9 @@ from .collect import collect_all
 from .curate import curate
 
 GAME_TITLES = {
-    "pt": {"sudoku": "Sudoku", "wordle": "Palavra do Dia", "wordsearch": "Caça-palavras"},
-    "en": {"sudoku": "Sudoku", "wordle": "Word of the Day", "wordsearch": "Word Search"},
+    "pt": {"sudoku": "Sudoku", "wordle": "Palavra do Dia", "wordsearch": "Caça-palavras",
+           "crossword": "Palavras Cruzadas"},
+    "en": {"sudoku": "Sudoku", "wordle": "Word of the Day", "wordsearch": "Word Search", "crossword": "Crossword"},
 }
 
 
@@ -154,6 +155,10 @@ def run_generation_job(job_id: int) -> None:
                             puzzle, solution = GENERATORS["wordle"](
                                 rng, cfg.get("language", lang), int(cfg.get("length", 5)),
                                 int(cfg.get("attempts", 6)))
+                        elif g.kind == "crossword":
+                            puzzle, solution = GENERATORS["crossword"](
+                                rng, cfg.get("language", lang), int(cfg.get("words", 10)),
+                                int(cfg.get("size", 13)))
                         else:
                             puzzle, solution = GENERATORS["wordsearch"](
                                 rng, cfg.get("language", lang), int(cfg.get("size", 12)),

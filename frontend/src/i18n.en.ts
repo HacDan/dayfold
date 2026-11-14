@@ -1,6 +1,12 @@
 // English translations for the dashboard. Keys are the Portuguese source strings (see i18n.ts).
 export const en: Record<string, string> = {
   "nunca": "never",
+  "Horizontais": "Across",
+  "Verticais": "Down",
+  "Palavras Cruzadas": "Crossword",
+  "Palavra do Dia": "Word of the Day",
+  "Caça-palavras": "Word Search",
+  "Grade livre montada por cruzamentos, com dicas horizontais e verticais. No KOReader, toque numa casa e digite as letras.": "Free-form grid built from crossing words, with across and down clues. In KOReader, tap a square and type the letters.",
   "pistas": "clues",
   "Resposta:": "Answer:",
   ". Palpites de bolso do EPUB:": ". EPUB pocket guesses:",

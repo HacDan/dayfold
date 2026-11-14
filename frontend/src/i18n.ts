@@ -10,7 +10,7 @@ function initial(): Lang {
     const saved = localStorage.getItem(KEY);
     if (saved === "pt" || saved === "en") return saved;
   } catch { /* storage unavailable */ }
-  return navigator.language?.toLowerCase().startsWith("pt") ? "pt" : "en";
+  return "en";
 }
 
 let current: Lang = initial();

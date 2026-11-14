@@ -1,4 +1,12 @@
-from dayfold.games.generators import _sudoku_solve, seeded, sudoku, wordle, wordle_feedback, wordsearch
+from dayfold.games.generators import (
+    _sudoku_solve,
+    crossword,
+    seeded,
+    sudoku,
+    wordle,
+    wordle_feedback,
+    wordsearch,
+)
 
 
 def test_sudoku_has_unique_solution():
@@ -51,3 +59,32 @@ def test_todays_games_rotate():
     assert len(pairs) == 3 and all(len(p) == 2 for p in pairs)
     assert [g.name for g in todays_games(games, 3, day)] == ["A", "B", "C"]
     assert len(todays_games(games[:1], 3, day)) == 1
+
+
+def test_crossword_grid_matches_entries():
+    for lang in ("pt", "en"):
+        for n in range(20):
+            puzzle, solution = crossword(seeded(str(n), "cw"), lang, 10, 13)
+            grid = solution["grid"]
+            assert puzzle["rows"] == len(grid) <= 13 and puzzle["cols"] == len(grid[0]) <= 13
+            answers = {(d, e["n"]): e["answer"] for d in ("across", "down") for e in solution[d]}
+            assert len(answers) >= 8
+            for d in ("across", "down"):
+                for e in puzzle[d]:
+                    dr, dc = (0, 1) if d == "across" else (1, 0)
+                    word = "".join(grid[e["row"] + dr * k][e["col"] + dc * k] for k in range(e["len"]))
+                    assert word == answers[(d, e["n"])]
+                    before = (e["row"] - dr, e["col"] - dc)
+                    after = (e["row"] + dr * e["len"], e["col"] + dc * e["len"])
+                    for r, c in (before, after):
+                        assert not (0 <= r < len(grid) and 0 <= c < len(grid[0])) or grid[r][c] == "#"
+            # every run of 2+ letters in the grid is a real entry (no junk words)
+            starts = {(d, e["row"], e["col"]) for d in ("across", "down") for e in puzzle[d]}
+            for r, row in enumerate(grid):
+                for c, ch in enumerate(row):
+                    if ch == "#":
+                        continue
+                    if (c == 0 or row[c - 1] == "#") and c + 1 < len(row) and row[c + 1] != "#":
+                        assert ("across", r, c) in starts
+                    if (r == 0 or grid[r - 1][c] == "#") and r + 1 < len(grid) and grid[r + 1][c] != "#":
+                        assert ("down", r, c) in starts

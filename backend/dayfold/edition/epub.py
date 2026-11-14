@@ -127,6 +127,13 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
             g["grid_img"] = add_image_bytes(sudoku_png(g["puzzle"]["grid"]), f"sudoku_{i}.png")
             g["solution_img"] = add_image_bytes(
                 sudoku_png(g["solution"]["grid"], givens=g["puzzle"]["grid"]), f"sudoku_{i}_sol.png")
+        elif g["kind"] == "crossword":
+            from .puzzles import crossword_png
+
+            pz = g["puzzle"]
+            g["grid_img"] = add_image_bytes(crossword_png(pz["grid"], pz["numbers"]), f"crossword_{i}.png")
+            g["solution_img"] = add_image_bytes(
+                crossword_png(pz["grid"], pz["numbers"], g["solution"]["grid"]), f"crossword_{i}_sol.png")
 
     front = _page("front", "front.xhtml", L["front_page"], env.get_template("front.html.j2").render(
         ed=ed, L=L, headline=doc.headline, sections=doc.sections, games=doc.games,
@@ -172,6 +179,8 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
                                doc.lang, css)
                     book.add_item(gp)
                     nonlinear.append(gp)
+            elif g["kind"] == "crossword":
+                body = env.get_template("games_crossword.html.j2").render(ed=ed, L=L, g=g, first=first)
             else:
                 help_ = L["wordsearch_help"].format(theme=g["puzzle"]["theme"])
                 body = env.get_template("games_wordsearch.html.j2").render(ed=ed, L=L, g=g, first=first,

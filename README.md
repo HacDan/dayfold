@@ -30,7 +30,7 @@ downloads one file a day and reads it offline.
 * **Classic newspaper design** everywhere: blackletter masthead (Chomsky, an open font in the
   spirit of the New York Times nameplate), Playfair Display headlines and Literata body text,
   rules, kickers, bylines and columns. The dashboard looks like a newsroom, not a SaaS, with light and
-  dark themes and a Portuguese/English switch (both remembered by the browser).
+  dark themes and an English/Portuguese switch with flags (English by default; both remembered by the browser).
 * **Front page cover** rendered for e-ink (16 gray levels): masthead, date, edition number,
   headline, deck, lead photo or lead text in columns, and "also in this edition".
 * **Sources you control**: RSS/Atom first, generic article extraction (Trafilatura) when there
@@ -46,8 +46,9 @@ downloads one file a day and reads it offline.
   draws a newspaper style ink illustration. Works with Codex CLI (image generation with your
   ChatGPT account, no API key) or any OpenAI compatible image API. Without an image model it
   falls back to a simple line drawing rendered by the server.
-* **Games** prepared on the server: Sudoku (unique solution), Word of the Day (Wordle style) and
-  Word Search (themes or words from the day's headlines), in Portuguese or English.
+* **Games** prepared on the server: Sudoku (unique solution), Word of the Day (Wordle style),
+  Word Search (themes or words from the day's headlines) and a free-form Crossword with clues, in
+  Portuguese or English.
 * **KOReader plugin**: sync over Wi-Fi, interactive games with saved progress, and a continuous
   flow from the news to the cartoon and the puzzles.
 * **Sleep screen** (optional, off by default): the latest front page as the Kindle sleep screen,
@@ -131,7 +132,7 @@ cd backend && uv run dayfold retypeset 12   # re-typeset edition 12 with the cur
    Anthropic, OpenAI, Ollama and OpenRouter. For illustrated cartoons, set an image model (API) or an
    image command (CLI agent that can draw, e.g. `codex exec --skip-git-repo-check -s workspace-write --ephemeral -`).
    Each edition page has **Refazer charge** to draw a new cartoon and **Recompor** to re-typeset.
-6. **Jogos**: enable, order and configure Sudoku, Word of the Day and Word Search, with previews.
+6. **Jogos**: enable, order and configure Sudoku, Word of the Day, Word Search and Crossword, with previews.
 7. **Registros**: every generation with its steps and log. **Gerar jornal agora** works from the
    overview or from here.
 

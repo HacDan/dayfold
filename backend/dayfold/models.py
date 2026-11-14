@@ -233,7 +233,7 @@ class EditionArticle(Base):
 class Game(Base):
     __tablename__ = "games"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    kind: Mapped[str] = mapped_column(String(20), unique=True)  # sudoku | wordle | wordsearch
+    kind: Mapped[str] = mapped_column(String(20), unique=True)  # sudoku | wordle | wordsearch | crossword
     name: Mapped[str] = mapped_column(String(60))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
