@@ -97,7 +97,7 @@ cd dayfold/deploy
 DAYFOLD_PASSWORD=choose-one docker compose up -d --build
 ```
 
-Open `http://SERVER:8422`, press **Gerar jornal agora** and download the EPUB.
+Open `http://SERVER:8422`, press **Print today's paper** and download the EPUB.
 
 ### From source (systemd user service)
 
@@ -131,21 +131,21 @@ cd backend && uv run dayfold retypeset 12   # re-typeset edition 12 with the cur
 
 ## Using it
 
-1. **Jornal**: name of the newspaper (also the EPUB title), masthead font, type sizes (limited to
+1. **Newspaper**: name of the newspaper (also the EPUB title), masthead font, type sizes (limited to
    ranges that keep the Kindle layout intact), number of stories, sections, schedule, cartoon and games,
    closing order (news, cartoon, games). The cover preview renders with unsaved settings.
-2. **Seções**: sections and their keywords. Keywords drive the rule based curation and guide the AI.
-3. **Provedores**: enable sources, set their usage mode and license notes, test them, add new ones
+2. **Sections**: sections and their keywords. Keywords drive the rule based curation and guide the AI.
+3. **Providers**: enable sources, set their usage mode and license notes, test them, add new ones
    manually (feed, generic extraction or CSS selectors) or with assisted creation.
 4. **Scrapers**: every version with its state (`PENDING`, `GENERATING`, `TESTING`, `READY`,
    `FAILED`, `DISABLED`). A new version replaces the active one only after it passes its test.
-5. **IA**: add a provider, test it, activate it. Presets for Claude Code CLI, Codex CLI,
+5. **AI**: add a provider, test it, activate it. Presets for Claude Code CLI, Codex CLI,
    Anthropic, OpenAI, Ollama and OpenRouter. For illustrated cartoons, set an image model (API) or an
    image command (CLI agent that can draw, e.g. `codex exec --skip-git-repo-check -s workspace-write --ephemeral -`).
-   Each edition page has **Refazer charge** to draw a new cartoon and **Recompor** to re-typeset.
-6. **Jogos**: enable, order and configure Sudoku, Word of the Day, Word Search and Crossword, with previews.
-7. **Registros**: every generation with its steps and log. **Gerar jornal agora** works from the
-   overview or from here.
+   Each edition page has **Redo cartoon** to draw a new cartoon and **Re-typeset** to rebuild the cover and EPUB with the current settings.
+6. **Games**: enable, order and configure Sudoku, Word of the Day, Word Search and Crossword, with previews.
+7. **Logs**: every generation with its steps and log. **Print today's paper** works from the
+   front page or from here.
 
 ## Connecting the e-reader
 
@@ -159,7 +159,7 @@ make kindle-agent                                      # optional: new editions 
 ```
 
 With `kindle-library`, each edition shows up in the Kindle library with its front page as cover
-("Dayfold · 13 nov. 2026") and opens in KOReader. Otherwise open KOReader on the Kindle: menu › **Tools** › **Dayfold** › **Baixar edição de hoje**.
+("Dayfold · Nov. 13, 2026") and opens in KOReader. Otherwise open KOReader on the Kindle: menu › **Tools** › **Dayfold** › **Download today's edition**.
 OPDS and direct download also work with any reader. **Kindle without jailbreak:** choose "No
 jailbreak" on the dashboard Kindle page and fill in your Gmail and `@kindle.com` addresses; each
 edition is e-mailed to Send to Kindle. The full guide, including manual install
