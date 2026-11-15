@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import shutil
 from dataclasses import replace
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 
+from .. import clock
 from ..config import config
 from ..db import session_scope
 from ..edition.cover import CoverData, render_cover
@@ -55,9 +55,10 @@ def game_name(lang: str, kind: str, fallback: str) -> str:
 class JobLog:
     def __init__(self, job_id: int):
         self.job_id = job_id
+        self.tz = clock.zone()  # read once: one job, one zone
 
     def __call__(self, msg: str) -> None:
-        stamp = datetime.now().strftime("%H:%M:%S")
+        stamp = clock.now(self.tz).strftime("%H:%M:%S")
         with session_scope() as s:
             job = s.get(GenerationJob, self.job_id)
             job.log = [*job.log, f"[{stamp}] {msg}"]
@@ -78,14 +79,16 @@ def _short_url(url: str) -> str:
     return u if len(u) <= 70 else u[:67] + "…"
 
 
-def _article_view(a: Article, section_name: str, lang: str) -> dict:
-    when = a.published_at or a.collected_at
+def _article_view(a: Article, section_name: str, lang: str, tz: str | None = None) -> dict:
+    # Publication times are stored in UTC; the paper prints them in the operator's zone, the
+    # same one the schedule runs on.
+    when = clock.in_zone(a.published_at or a.collected_at, tz)
     author = strip_author(a.author)
     if author and author.strip().lower() in a.provider.name.lower():
         author = None  # "Por Agência Senado | Fonte: Agência Senado" says the same thing twice
     return {
         "id": a.id, "title": a.title, "subtitle": a.subtitle, "author": author,
-        "date_label": short_date(when.date(), lang) + when.strftime(" · %H:%M UTC"),
+        "date_label": short_date(when.date(), lang) + when.strftime(" · %H:%M"),
         "provider": a.provider.name, "url": a.url, "url_short": _short_url(a.url),
         "paragraphs": _paragraphs(a.body), "excerpt": a.excerpt, "section_name": section_name,
         "image_url": a.image_url, "language": a.language,
@@ -93,9 +96,7 @@ def _article_view(a: Article, section_name: str, lang: str) -> dict:
 
 
 def today_in_tz() -> date:
-    with session_scope() as s:
-        tz = get_section(s, "schedule").timezone
-    return datetime.now(ZoneInfo(tz)).date()
+    return clock.now().date()
 
 
 def run_generation_job(job_id: int) -> None:
@@ -298,6 +299,7 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         log.step("images", 0.75)
     with session_scope() as s:
         news = get_section(s, "newspaper")
+        tz = get_section(s, "schedule").timezone
         device = get_section(s, "device")
         ed = s.get(Edition, edition_id)
         ed_date, number, curated_by = ed.edition_date, ed.number, ed.curated_by
@@ -314,7 +316,7 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
             a = it.article
             providers[a.provider_id] = a.provider
             sec_name = topics[it.section].name if it.section in topics else it.section.title()
-            view = _article_view(a, sec_name, lang)
+            view = _article_view(a, sec_name, lang, tz)
             if it.is_headline:
                 headline = view
                 continue
@@ -379,7 +381,7 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         typography=news.typography.model_dump(), cover_path=cover_path, headline=headline,
         sections=ordered_sections, games=[dict(g) for g in games], charge=charge,
         closing_order=news.closing_order, sources=sources, curated_by=curated_by,
-        generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
+        generated_at=clock.now(tz).strftime("%m/%d/%Y %H:%M" if lang == "en" else "%d/%m/%Y %H:%M"),
     )
     # One file name per edition, so a second edition on the same day is a new book on the device
     # (and lands on top of the library) instead of overwriting the first one.

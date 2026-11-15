@@ -83,8 +83,12 @@ On the Kindle:
 ```bash
 git clone https://github.com/JonathanLemes/dayfold.git
 cd dayfold/deploy
-DAYFOLD_PASSWORD=choose-one docker compose up -d --build
+DAYFOLD_PASSWORD=choose-one DAYFOLD_LANGUAGE=en docker compose up -d --build
 ```
+
+`DAYFOLD_LANGUAGE` picks the server's own language (`pt` or `en`, default `pt`); without it the
+compose file reads the variable from your shell or from a `.env` file next to `docker-compose.yml`.
+The full list is in the table below.
 
 Open `http://SERVER:8422`, press **Gerar jornal agora** and download the EPUB.
 

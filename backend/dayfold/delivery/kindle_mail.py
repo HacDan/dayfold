@@ -7,13 +7,13 @@ from __future__ import annotations
 
 import smtplib
 import ssl
-from datetime import datetime
 from email.message import EmailMessage
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from ..i18n import tr
+from .. import clock
+from ..i18n import language, tr
 from ..settings import KindleSettings, get_section, set_section
 
 GMAIL_HOST = "smtp.gmail.com"
@@ -68,7 +68,7 @@ def send_and_record(session: Session, epub: Path, subject: str) -> str:
     cfg = get_section(session, "kindle")
     if missing_fields(cfg):
         send_epub(cfg, epub, subject)  # raises the "configure first" error, nothing to record
-    stamp = datetime.now().strftime("%d/%m/%Y %H:%M")
+    stamp = clock.now().strftime("%m/%d/%Y %H:%M" if language() == "en" else "%d/%m/%Y %H:%M")
     try:
         send_epub(cfg, epub, subject)
     except KindleMailError as exc:
