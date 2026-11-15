@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { t } from "../i18n";
 import { get, put, type Newspaper as NewspaperT, type Settings, type Typography } from "../api";
-import { Field, Loading, SectionTitle, useAction, useLoad } from "../components/ui";
+import { Field, Loading, OptionalNumber, SectionTitle, useAction, useLoad } from "../components/ui";
 
 const TYPE_LABEL: Record<keyof Typography, string> = {
   masthead: "Nome do jornal (masthead)", headline: "Manchete principal", title: "Título das matérias",
@@ -133,7 +133,14 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
             <div className="grid cols-2" style={{ gap: 14 }}>
               <Field label={t("Máximo de matérias")}><input type="number" min={3} max={60} value={news.max_articles} onChange={(e) => setNews({ max_articles: Number(e.target.value) })} /></Field>
               <Field label={t("Palavras no excerto")}><input type="number" min={20} max={200} value={news.excerpt_words} onChange={(e) => setNews({ excerpt_words: Number(e.target.value) })} /></Field>
+              <Field label={t("Máximo de palavras por matéria")} hint={t("Só para texto integral. Vazio: matéria inteira.")}>
+                <OptionalNumber value={news.article_max_words} min={50} max={5000} placeholder={t("sem limite")} onChange={(v) => setNews({ article_max_words: v })} />
+              </Field>
+              <Field label={t("Máximo de parágrafos por matéria")} hint={t("Seções e provedores podem ter limites próprios.")}>
+                <OptionalNumber value={news.article_max_paragraphs} min={1} max={100} placeholder={t("sem limite")} onChange={(v) => setNews({ article_max_paragraphs: v })} />
+              </Field>
             </div>
+            <p className="small muted">{t("Uma matéria cortada termina na última frase que cabe e ganha a nota “A matéria continua na fonte” com o link.")}</p>
             <label className="check"><input type="checkbox" checked={news.include_images} onChange={(e) => setNews({ include_images: e.target.checked })} />{" "}{t("Incluir fotos (só de fontes com texto integral liberado)")}</label>
             <label className="check" title={meta.ai_available ? "" : "Configure uma IA para habilitar"}>
               <input type="checkbox" disabled={!meta.ai_available} checked={news.include_charge} onChange={(e) => setNews({ include_charge: e.target.checked })} />

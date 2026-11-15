@@ -146,6 +146,9 @@ def rotate_token(session: Session = Depends(get_session)) -> dict:
 # ---------------------------------------------------------------- topics
 
 
+LENGTH_FIELDS = {"max_words", "max_paragraphs"}
+
+
 class TopicIn(BaseModel):
     slug: str = Field(pattern=r"^[a-z0-9-]{2,40}$")
     name: str = Field(min_length=1, max_length=80)
@@ -153,11 +156,14 @@ class TopicIn(BaseModel):
     weight: float = Field(1.0, ge=0.1, le=3)
     enabled: bool = True
     max_articles: int = Field(4, ge=1, le=20)
+    max_words: int | None = Field(None, ge=50, le=5000)
+    max_paragraphs: int | None = Field(None, ge=1, le=100)
 
 
 def topic_out(t: Topic) -> dict:
     return {"id": t.id, "slug": t.slug, "name": t.name, "keywords": t.keywords, "weight": t.weight,
-            "enabled": t.enabled, "max_articles": t.max_articles, "position": t.position}
+            "enabled": t.enabled, "max_articles": t.max_articles, "position": t.position,
+            "max_words": t.max_words, "max_paragraphs": t.max_paragraphs}
 
 
 @router.get("/topics")
@@ -179,7 +185,8 @@ def create_topic(body: TopicIn, session: Session = Depends(get_session)) -> dict
 @router.put("/topics/{topic_id}")
 def update_topic(topic_id: int, body: TopicIn, session: Session = Depends(get_session)) -> dict:
     t = session.get(Topic, topic_id) or _404()
-    for k, v in body.model_dump().items():
+    # length caps left out of the request keep their value (older clients do not send them)
+    for k, v in body.model_dump(exclude=LENGTH_FIELDS - body.model_fields_set).items():
         setattr(t, k, v)
     return topic_out(t)
 

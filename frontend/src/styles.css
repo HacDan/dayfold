@@ -316,6 +316,9 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
 .header-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 640px) { .header-controls .ctl span { display: none; } }
 
+/* two small number inputs stacked in a table cell (section length caps) */
+.stack-inputs { display: grid; gap: 4px; }
+
 /* Section chips (provider form) */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { font-family: var(--caps); font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; cursor: pointer;

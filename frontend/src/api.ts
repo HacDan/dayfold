@@ -53,7 +53,7 @@ export type Typography = { masthead: number; headline: number; title: number; su
 
 export type Newspaper = {
   title: string; tagline: string; masthead_font: string; language: "pt" | "en"; max_articles: number;
-  excerpt_words: number; include_images: boolean; include_charge: boolean; include_games: boolean; games_per_edition: number;
+  excerpt_words: number; article_max_words: number | null; article_max_paragraphs: number | null; include_images: boolean; include_charge: boolean; include_games: boolean; games_per_edition: number;
   closing_order: ("news" | "charge" | "games")[]; typography: Typography;
 };
 
@@ -99,12 +99,12 @@ export type ScraperJob = {
 export type Provider = {
   id: number; slug: string; name: string; base_url: string; source_type: string; category: string; categories: string[]; language: string;
   enabled: boolean; usage_mode: string; license_name: string; license_url: string | null; license_note: string;
-  is_default: boolean; max_items: number; active_version_id: number | null; active_version: Version | null;
+  is_default: boolean; max_items: number; max_words: number | null; max_paragraphs: number | null; active_version_id: number | null; active_version: Version | null;
   latest_status: string | null; latest_version: number | null; last_run_at: string | null; last_run_ok: boolean | null;
   last_run_message: string | null; last_run_count: number | null; versions?: Version[]; jobs?: ScraperJob[];
 };
 
-export type Topic = { id: number; slug: string; name: string; keywords: string[]; weight: number; enabled: boolean; max_articles: number; position: number };
+export type Topic = { id: number; slug: string; name: string; keywords: string[]; weight: number; enabled: boolean; max_articles: number; position: number; max_words: number | null; max_paragraphs: number | null };
 
 export type AIProvider = {
   id: number; name: string; kind: "openai" | "anthropic" | "cli"; base_url: string | null; model: string | null;

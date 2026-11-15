@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { t } from "../i18n";
 import { del, get, post, put, type Topic } from "../api";
-import { Field, Loading, SectionTitle, useAction, useLoad } from "../components/ui";
+import { Field, Loading, OptionalNumber, SectionTitle, useAction, useLoad } from "../components/ui";
 
 function TopicRow({ topic: tp, onSaved, onMove, first, last }: { topic: Topic; onSaved: () => void; onMove: (d: -1 | 1) => void; first: boolean; last: boolean }) {
   const { run } = useAction();
   const [f, setF] = useState({ ...tp, kw: tp.keywords.join(", ") });
-  const dirty = f.name !== tp.name || f.kw !== tp.keywords.join(", ") || f.weight !== tp.weight || f.max_articles !== tp.max_articles || f.enabled !== tp.enabled;
+  const dirty = f.name !== tp.name || f.kw !== tp.keywords.join(", ") || f.weight !== tp.weight || f.max_articles !== tp.max_articles || f.enabled !== tp.enabled || f.max_words !== tp.max_words || f.max_paragraphs !== tp.max_paragraphs;
   const save = () => run(() => put(`/api/topics/${tp.id}`, {
     slug: tp.slug, name: f.name, keywords: f.kw.split(",").map((k) => k.trim()).filter(Boolean),
-    weight: f.weight, max_articles: f.max_articles, enabled: f.enabled,
+    weight: f.weight, max_articles: f.max_articles, enabled: f.enabled, max_words: f.max_words, max_paragraphs: f.max_paragraphs,
   }), t("Seção salva")).then(onSaved);
   return (
     <tr style={{ opacity: f.enabled ? 1 : 0.55 }}>
@@ -21,6 +21,12 @@ function TopicRow({ topic: tp, onSaved, onMove, first, last }: { topic: Topic; o
       <td style={{ minWidth: 280 }}><textarea style={{ minHeight: 60 }} value={f.kw} onChange={(e) => setF({ ...f, kw: e.target.value })} /></td>
       <td style={{ width: 90 }}><input type="number" step={0.1} min={0.1} max={3} value={f.weight} onChange={(e) => setF({ ...f, weight: Number(e.target.value) })} /></td>
       <td style={{ width: 80 }}><input type="number" min={1} max={20} value={f.max_articles} onChange={(e) => setF({ ...f, max_articles: Number(e.target.value) })} /></td>
+      <td style={{ minWidth: 140 }}>
+        <div className="stack-inputs">
+          <OptionalNumber value={f.max_words} min={50} max={5000} placeholder={t("palavras")} label={t("Máximo de palavras por matéria")} onChange={(v) => setF({ ...f, max_words: v })} />
+          <OptionalNumber value={f.max_paragraphs} min={1} max={100} placeholder={t("parágrafos")} label={t("Máximo de parágrafos por matéria")} onChange={(v) => setF({ ...f, max_paragraphs: v })} />
+        </div>
+      </td>
       <td><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} aria-label={t("Ativa")} /></td>
       <td style={{ whiteSpace: "nowrap" }}>
         <button className="btn small primary" disabled={!dirty} onClick={save}>{t("Salvar")}</button>{" "}
@@ -44,11 +50,12 @@ export default function Sections() {
     <div>
       <SectionTitle kicker={t("Pauta")} title={t("Seções e temas")} />
       <p className="small muted" style={{ maxWidth: 760 }}>
-        {t("As palavras-chave definem os temas da curadoria: sem IA, elas pontuam e classificam as matérias; com IA, guiam a seleção. A ordem aqui é a ordem das seções no jornal. Peso maior dá mais destaque; o limite controla quantas matérias cada seção recebe.")}
+        {t("As palavras-chave definem os temas da curadoria: sem IA, elas pontuam e classificam as matérias; com IA, guiam a seleção. A ordem aqui é a ordem das seções no jornal. Peso maior dá mais destaque; o limite controla quantas matérias cada seção recebe.")}{" "}
+        {t("Tamanho limita palavras e parágrafos de cada matéria com texto integral; vazio usa o padrão do jornal.")}
       </p>
       <div className="table-wrap">
         <table className="ledger">
-          <thead><tr><th>{t("Ordem")}</th><th>{t("Seção")}</th><th>{t("Palavras-chave")}</th><th>{t("Peso")}</th><th>{t("Máx.")}</th><th>{t("Ativa")}</th><th></th></tr></thead>
+          <thead><tr><th>{t("Ordem")}</th><th>{t("Seção")}</th><th>{t("Palavras-chave")}</th><th>{t("Peso")}</th><th>{t("Máx.")}</th><th title={t("Limite de tamanho das matérias da seção (vazio: padrão do jornal)")}>{t("Tamanho")}</th><th>{t("Ativa")}</th><th></th></tr></thead>
           <tbody>{data.map((x, i) => <TopicRow key={`${x.id}-${x.position}`} topic={x} onSaved={reload} onMove={(d) => move(i, d)} first={i === 0} last={i === data.length - 1} />)}</tbody>
         </table>
       </div>

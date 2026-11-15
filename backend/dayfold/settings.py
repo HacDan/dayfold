@@ -85,6 +85,10 @@ class NewspaperSettings(BaseModel):
     language: Literal["pt", "en"] = "en"
     max_articles: int = Field(16, ge=3, le=60)
     excerpt_words: int = Field(70, ge=20, le=200)
+    # Default length cap for full text stories (None = whole story). Sections and providers can
+    # set their own; the most specific one wins.
+    article_max_words: int | None = Field(None, ge=50, le=5000)
+    article_max_paragraphs: int | None = Field(None, ge=1, le=100)
     include_images: bool = True
     include_charge: bool = False
     include_games: bool = True

@@ -89,6 +89,9 @@ class Topic(Base):
     position: Mapped[int] = mapped_column(Integer, default=0)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     max_articles: Mapped[int] = mapped_column(Integer, default=4)
+    # Length cap for full text stories (None = no limit); see edition.length.
+    max_words: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_paragraphs: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class Provider(Base):
@@ -109,6 +112,9 @@ class Provider(Base):
     license_note: Mapped[str] = mapped_column(Text, default="")
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     max_items: Mapped[int] = mapped_column(Integer, default=15)
+    # Length cap for full text stories (None = no limit); see edition.length.
+    max_words: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_paragraphs: Mapped[int | None] = mapped_column(Integer, nullable=True)
     active_version_id: Mapped[int | None] = mapped_column(
         ForeignKey("scraper_versions.id", use_alter=True, ondelete="SET NULL"), nullable=True
     )

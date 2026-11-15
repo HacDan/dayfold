@@ -38,6 +38,10 @@ downloads one file a day and reads it offline.
   isolated process before activation, and can be rolled back.
 * **License aware**: every provider declares how its content may be used
   (`metadata_only`, `excerpt_and_link`, `full_content_allowed`) and Dayfold stores only what that mode allows.
+* **Story length caps**: full text stories can be capped by words and/or paragraphs for the
+  whole paper, per section or per provider (the most specific wins). A capped story ends at the
+  last sentence that fits, with a "The story continues online" note and the link. Caps apply when
+  the edition is typeset, so `retypeset` reshapes an existing edition without collecting again.
 * **Curation without AI** by section keywords, recency, deduplication and per source limits.
 * **Optional AI** (OpenAI compatible APIs, Ollama, Anthropic, or a local CLI such as Claude Code or Codex) for:
   editorial selection over pre-filtered candidates, the daily cartoon, and AI assisted scraper generation.

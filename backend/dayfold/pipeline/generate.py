@@ -25,6 +25,8 @@ from ..edition.i18n import (
     short_date,
 )
 from ..edition.images import prepare_photo
+from ..edition.length import cap as cap_length
+from ..edition.length import resolve as resolve_limits
 from ..games.generators import GENERATORS, seeded
 from ..models import (
     Article,
@@ -317,6 +319,8 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
             sec_name = (section_name(it.section, topics[it.section].name, lang) if it.section in topics
                         else it.section.title())
             view = _article_view(a, sec_name, lang)
+            view["paragraphs"], view["truncated"] = cap_length(
+                view["paragraphs"], resolve_limits(a.provider, topics.get(it.section), news))
             if it.is_headline:
                 headline = view
                 continue
