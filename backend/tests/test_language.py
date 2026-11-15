@@ -105,6 +105,26 @@ def test_filtered_reasons_follow_the_language(monkeypatch):
         ["idioma", "palavra bloqueada", "sem seção"]
 
 
+def test_scraper_worker_runs_in_the_server_language(monkeypatch):
+    from dayfold.config import config
+    from dayfold.sources import runner
+
+    monkeypatch.setattr(config, "language", "en")
+    refused = runner.run_isolated("not-a-strategy", {})
+    assert refused.ok is False and refused.error == "strategy not allowed: not-a-strategy"
+
+    seen = {}
+
+    def fake_run(cmd, **kwargs):
+        seen.update(kwargs)
+        raise runner.subprocess.TimeoutExpired(cmd, 1)
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    timed_out = runner.run_isolated("rss", {"feed_url": "https://example.test/feed"}, timeout=30)
+    assert timed_out.error == "timed out (30s)"
+    assert seen["env"]["DAYFOLD_LANGUAGE"] == "en"
+
+
 def test_wordsearch_theme_label_follows_the_paper_language():
     from dayfold.games.generators import seeded, wordsearch
 

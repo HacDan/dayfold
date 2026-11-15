@@ -26,7 +26,8 @@ def recover_interrupted() -> None:
             s.execute(
                 update(model)
                 .where(model.status == JobStatus.RUNNING)
-                .values(status=JobStatus.FAILED, error="interrompido por reinício do servidor",
+                .values(status=JobStatus.FAILED,
+                        error=tr("interrompido por reinício do servidor", "interrupted by a server restart"),
                         finished_at=utcnow())
             )
 

@@ -9,6 +9,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 
+from ..config import config
 from ..i18n import tr
 from .base import ScrapedItem
 from .strategies import ALLOWED_STRATEGIES
@@ -33,23 +34,28 @@ def _limits() -> None:  # pragma: no cover - runs in the child
 def run_isolated(strategy: str, spec: dict, *, max_items: int = 15, language: str | None = None,
                  want_body: bool = True, timeout: int = TIMEOUT_S) -> RunOutcome:
     if strategy not in ALLOWED_STRATEGIES:
-        return RunOutcome(ok=False, error=f"estratégia não permitida: {strategy}")
+        return RunOutcome(ok=False, error=tr(f"estratégia não permitida: {strategy}",
+                                             f"strategy not allowed: {strategy}"))
     job = json.dumps({"strategy": strategy, "spec": spec, "max_items": max_items,
                       "language": language, "want_body": want_body})
     try:
         proc = subprocess.run(
             [sys.executable, "-I", "-m", "dayfold.sources.worker"],
             input=job, capture_output=True, text=True, timeout=timeout,
-            preexec_fn=_limits, env={"PATH": os.environ.get("PATH", ""), "HOME": "/tmp"},
+            preexec_fn=_limits,
+            # The worker builds the log lines shown in the dashboard: let it read the same language.
+            env={"PATH": os.environ.get("PATH", ""), "HOME": "/tmp", "DAYFOLD_LANGUAGE": config.language},
         )
     except subprocess.TimeoutExpired:
-        return RunOutcome(ok=False, error=f"tempo esgotado ({timeout}s)")
+        return RunOutcome(ok=False, error=tr(f"tempo esgotado ({timeout}s)", f"timed out ({timeout}s)"))
     if proc.returncode != 0 or not proc.stdout.strip():
-        return RunOutcome(ok=False, error=(proc.stderr or "worker sem saída").strip()[-800:])
+        return RunOutcome(ok=False, error=(proc.stderr or tr("worker sem saída",
+                                                             "worker produced no output")).strip()[-800:])
     try:
         data = json.loads(proc.stdout)
     except json.JSONDecodeError:
-        return RunOutcome(ok=False, error="saída inválida do worker")
+        return RunOutcome(ok=False, error=tr("saída inválida do worker",
+                                             "invalid output from the worker"))
     if not data.get("ok"):
         return RunOutcome(ok=False, error=data.get("error"), log=[data.get("trace", "")])
     items = [ScrapedItem(**i) for i in data.get("items", [])]

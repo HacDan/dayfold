@@ -80,7 +80,8 @@ def scrape_rss(spec: dict, *, max_items: int, language: str | None, want_body: b
     resp = net.fetch(feed_url)
     parsed = feedparser.parse(resp.content)
     if parsed.bozo and not parsed.entries:
-        raise net.FetchError(f"feed inválido: {parsed.bozo_exception}")
+        raise net.FetchError(tr(f"feed inválido: {parsed.bozo_exception}",
+                                f"invalid feed: {parsed.bozo_exception}"))
     feed_lang = (parsed.feed.get("language") or language or "")[:2].lower() or None
     log.append(tr(f"Feed com {len(parsed.entries)} itens ({feed_url}).",
                   f"Feed with {len(parsed.entries)} items ({feed_url})."))

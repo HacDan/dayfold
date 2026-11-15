@@ -253,4 +253,4 @@ def run_scraper_job(job_id: int) -> None:
             job.status = JobStatus.SUCCEEDED if ok else JobStatus.FAILED
             job.finished_at = utcnow()
             if not ok and not job.error:
-                job.error = "validação falhou"
+                job.error = tr("validação falhou", "validation failed")
