@@ -9,6 +9,8 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
+from .i18n import tr
+
 USER_AGENT = "Mozilla/5.0 (compatible; Dayfold/0.1; +https://github.com/JonathanLemes/dayfold)"
 MAX_BYTES = 6 * 1024 * 1024
 DEFAULT_TIMEOUT = httpx.Timeout(20.0, connect=10.0)
@@ -56,7 +58,7 @@ def _throttle(url: str) -> None:
 def fetch(url: str, *, http: httpx.Client | None = None, check_robots: bool = False,
           max_bytes: int = MAX_BYTES) -> Fetched:
     if check_robots and not allowed_by_robots(url):
-        raise FetchError(f"robots.txt não permite {url}")
+        raise FetchError(tr(f"robots.txt não permite {url}", f"robots.txt disallows {url}"))
     _throttle(url)
     own = http is None
     http = http or client()
@@ -67,15 +69,17 @@ def fetch(url: str, *, http: httpx.Client | None = None, check_robots: bool = Fa
             for chunk in resp.iter_bytes():
                 size += len(chunk)
                 if size > max_bytes:
-                    raise FetchError(f"resposta maior que {max_bytes // 1024 // 1024} MB: {url}")
+                    raise FetchError(tr(f"resposta maior que {max_bytes // 1024 // 1024} MB: {url}",
+                                        f"response larger than {max_bytes // 1024 // 1024} MB: {url}"))
                 chunks.append(chunk)
             if resp.status_code >= 400:
-                raise FetchError(f"HTTP {resp.status_code} em {url}")
+                raise FetchError(tr(f"HTTP {resp.status_code} em {url}", f"HTTP {resp.status_code} at {url}"))
             content = b"".join(chunks)
             return Fetched(str(resp.url), resp.status_code, resp.headers, content,
                            resp.charset_encoding)
     except httpx.HTTPError as exc:
-        raise FetchError(f"{type(exc).__name__} em {url}: {exc}") from exc
+        raise FetchError(tr(f"{type(exc).__name__} em {url}: {exc}",
+                            f"{type(exc).__name__} at {url}: {exc}")) from exc
     finally:
         if own:
             http.close()

@@ -19,9 +19,20 @@ document.documentElement.lang = current === "pt" ? "pt-BR" : "en";
 export const getLang = () => current;
 export const locale = () => (current === "pt" ? "pt-BR" : "en-US");
 
-export function setLang(lang: Lang) {
+/** Did the operator ever pick a language? Without a choice the dashboard follows the server. */
+export function hasSavedLang(): boolean {
+  try {
+    const saved = localStorage.getItem(KEY);
+    return saved === "pt" || saved === "en";
+  } catch { return false; }
+}
+
+/** ``persist: false`` applies a language without remembering it, so a later change to the
+    server's language still shows up for someone who never picked one. */
+export function setLang(lang: Lang, persist = true) {
   current = lang;
   document.documentElement.lang = lang === "pt" ? "pt-BR" : "en";
+  if (!persist) return;
   try { localStorage.setItem(KEY, lang); } catch { /* ignore */ }
 }
 

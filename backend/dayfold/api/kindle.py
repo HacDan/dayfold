@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..db import get_session
 from ..delivery.kindle_mail import KindleMailError, send_and_record
 from ..edition.i18n import book_title
+from ..i18n import tr
 from ..models import Edition, EditionStatus
 from ..pipeline.generate import kindle_epub_path, kindle_test_epub, retypeset
 from ..settings import get_section
@@ -28,7 +29,7 @@ def _latest(session: Session) -> Edition:
     e = session.scalar(select(Edition).where(Edition.status == EditionStatus.READY)
                        .order_by(Edition.edition_date.desc(), Edition.id.desc()).limit(1))
     if not e or not e.epub_path:
-        raise HTTPException(404, "nenhuma edição pronta")
+        raise HTTPException(404, tr("nenhuma edição pronta", "no edition is ready"))
     return e
 
 
@@ -54,7 +55,7 @@ class SendIn(BaseModel):
 def send(body: SendIn, session: Session = Depends(get_session)) -> dict:
     e = session.get(Edition, body.edition_id) if body.edition_id else _latest(session)
     if not e or not e.epub_path:
-        raise HTTPException(404, "edição não encontrada")
+        raise HTTPException(404, tr("edição não encontrada", "edition not found"))
     path = native_epub(session, e)
     try:
         return {"message": send_and_record(session, path, _subject(session, e))}
@@ -72,7 +73,7 @@ def test_edition(body: TestIn, session: Session = Depends(get_session)) -> dict:
     path = kindle_test_epub(e.id)
     out = {"download": "/api/kindle/test.epub", "file": path.name, "message": None}
     if body.send:
-        subject = _subject(session, e) + " (teste)"
+        subject = _subject(session, e) + tr(" (teste)", " (test)")
         try:
             out["message"] = send_and_record(session, path, subject)
         except KindleMailError as exc:
@@ -85,7 +86,7 @@ def download_test(session: Session = Depends(get_session)) -> FileResponse:
     e = _latest(session)
     path = Path(e.epub_path).with_name(Path(e.epub_path).stem + ".kindle-test.epub")
     if not path.exists():
-        raise HTTPException(404, "gere a edição de teste antes")
+        raise HTTPException(404, tr("gere a edição de teste antes", "generate the test edition first"))
     return FileResponse(path, media_type=EPUB, filename=path.name)
 
 

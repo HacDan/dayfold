@@ -21,6 +21,7 @@ import feedparser
 from lxml import html as lxml_html
 
 from .. import net
+from ..i18n import tr
 from .base import (
     ScrapedItem,
     ScrapeResult,
@@ -43,7 +44,7 @@ def run_strategy(strategy: str, spec: dict, *, max_items: int = 15, language: st
         return scrape_generic(spec, max_items=max_items, language=language)
     if strategy == "selectors":
         return scrape_selectors(spec, max_items=max_items, language=language)
-    raise ValueError(f"estratégia desconhecida: {strategy}")
+    raise ValueError(tr(f"estratégia desconhecida: {strategy}", f"unknown strategy: {strategy}"))
 
 
 # ---------------------------------------------------------------- RSS / Atom
@@ -81,7 +82,8 @@ def scrape_rss(spec: dict, *, max_items: int, language: str | None, want_body: b
     if parsed.bozo and not parsed.entries:
         raise net.FetchError(f"feed inválido: {parsed.bozo_exception}")
     feed_lang = (parsed.feed.get("language") or language or "")[:2].lower() or None
-    log.append(f"Feed com {len(parsed.entries)} itens ({feed_url}).")
+    log.append(tr(f"Feed com {len(parsed.entries)} itens ({feed_url}).",
+                  f"Feed with {len(parsed.entries)} items ({feed_url})."))
     fetch_full = want_body and spec.get("fetch_full", True)
     items: list[ScrapedItem] = []
     with net.client() as http:
@@ -122,13 +124,13 @@ def scrape_rss(spec: dict, *, max_items: int, language: str | None, want_body: b
                         if full.subtitle and full.subtitle != item.title:
                             item.subtitle = full.subtitle
                 except net.FetchError as exc:
-                    log.append(f"Página não extraída: {exc}")
+                    log.append(tr(f"Página não extraída: {exc}", f"Page not extracted: {exc}"))
             if item.excerpt and item.body and item.body.startswith(item.excerpt[:80]):
                 item.excerpt = None
             if not item.subtitle and item.excerpt and len(item.excerpt) < 260:
                 item.subtitle = item.excerpt
             items.append(item)
-    log.append(f"{len(items)} matérias normalizadas.")
+    log.append(tr(f"{len(items)} matérias normalizadas.", f"{len(items)} stories normalised."))
     return ScrapeResult(items=items, log=log)
 
 
@@ -165,7 +167,8 @@ def scrape_generic(spec: dict, *, max_items: int, language: str | None) -> Scrap
     resp = net.fetch(list_url, check_robots=True)
     links = _candidate_links(list_url, resp.text, spec.get("link_pattern"),
                              int(spec.get("min_title_len", 25)))
-    log.append(f"{len(links)} links candidatos em {list_url}.")
+    log.append(tr(f"{len(links)} links candidatos em {list_url}.",
+                  f"{len(links)} candidate links at {list_url}."))
     items: list[ScrapedItem] = []
     with net.client() as http:
         for link in links[: max_items * 2]:
@@ -179,7 +182,7 @@ def scrape_generic(spec: dict, *, max_items: int, language: str | None) -> Scrap
             item = extract_article(link, page.text, language=language)
             if item and item.body and len(item.body) >= MIN_BODY_CHARS:
                 items.append(item)
-    log.append(f"{len(items)} matérias extraídas.")
+    log.append(tr(f"{len(items)} matérias extraídas.", f"{len(items)} stories extracted."))
     return ScrapeResult(items=items, log=log)
 
 
@@ -229,7 +232,7 @@ def scrape_selectors(spec: dict, *, max_items: int, language: str | None) -> Scr
     try:
         nodes = root.cssselect(spec["item_selector"])
     except Exception as exc:
-        raise ValueError(f"item_selector inválido: {exc}") from exc
+        raise ValueError(tr(f"item_selector inválido: {exc}", f"invalid item_selector: {exc}")) from exc
     links: list[str] = []
     for node in nodes:
         a = node
@@ -242,7 +245,8 @@ def scrape_selectors(spec: dict, *, max_items: int, language: str | None) -> Scr
         href = a.get("href") if a is not None else None
         if href and href.startswith("http") and href not in links:
             links.append(urldefrag(href)[0])
-    log.append(f"{len(nodes)} itens e {len(links)} links com '{spec['item_selector']}'.")
+    log.append(tr(f"{len(nodes)} itens e {len(links)} links com '{spec['item_selector']}'.",
+                  f"{len(nodes)} items and {len(links)} links with '{spec['item_selector']}'."))
     article_spec = spec.get("article") or {}
     items: list[ScrapedItem] = []
     with net.client() as http:
@@ -290,5 +294,5 @@ def scrape_selectors(spec: dict, *, max_items: int, language: str | None) -> Scr
                     language=language,
                 )
             )
-    log.append(f"{len(items)} matérias extraídas.")
+    log.append(tr(f"{len(items)} matérias extraídas.", f"{len(items)} stories extracted."))
     return ScrapeResult(items=items, log=log)

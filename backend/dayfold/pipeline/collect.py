@@ -12,6 +12,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from sqlalchemy import select
 
 from ..db import session_scope
+from ..i18n import tr
 from ..models import Article, Provider, ScraperStatus, ScraperVersion, UsageMode, utcnow
 from ..settings import get_section
 from ..sources.base import ScrapedItem, first_words
@@ -86,7 +87,7 @@ def _collect_provider(pid: int, log: Callable[[str], None], excerpt_words: int) 
         p = s.get(Provider, pid)
         v = s.get(ScraperVersion, p.active_version_id) if p.active_version_id else None
         if v is None or v.status != ScraperStatus.READY:
-            log(f"{p.name}: sem scraper pronto, ignorado.")
+            log(tr(f"{p.name}: sem scraper pronto, ignorado.", f"{p.name}: no ready scraper, skipped."))
             return 0
         job = dict(strategy=v.strategy, spec=dict(v.spec), max_items=p.max_items,
                    language=p.language, want_body=p.usage_mode == UsageMode.FULL_CONTENT_ALLOWED)
@@ -100,7 +101,7 @@ def _collect_provider(pid: int, log: Callable[[str], None], excerpt_words: int) 
         p.last_run_message = outcome.error or (outcome.log[-1] if outcome.log else None)
         p.last_run_count = len(outcome.items)
         if not outcome.ok:
-            log(f"{name}: falhou ({outcome.error}).")
+            log(tr(f"{name}: falhou ({outcome.error}).", f"{name}: failed ({outcome.error})."))
             return 0
         for item in outcome.items:
             h = url_hash(item.url)
@@ -117,7 +118,8 @@ def _collect_provider(pid: int, log: Callable[[str], None], excerpt_words: int) 
                 category=category, **data,
             ))
             new += 1
-    log(f"{name}: {len(outcome.items)} lidas, {new} novas.")
+    log(tr(f"{name}: {len(outcome.items)} lidas, {new} novas.",
+           f"{name}: {len(outcome.items)} read, {new} new."))
     return new
 
 
@@ -125,9 +127,9 @@ def collect_all(log: Callable[[str], None]) -> int:
     with session_scope() as s:
         news = get_section(s, "newspaper")
         ids = list(s.scalars(select(Provider.id).where(Provider.enabled.is_(True))))
-    log(f"Coletando {len(ids)} provedores ativos...")
+    log(tr(f"Coletando {len(ids)} provedores ativos...", f"Collecting {len(ids)} active providers..."))
     with ThreadPoolExecutor(max_workers=4) as pool:
         counts = list(pool.map(lambda pid: _collect_provider(pid, log, news.excerpt_words), ids))
     total = sum(counts)
-    log(f"Coleta concluída: {total} matérias novas.")
+    log(tr(f"Coleta concluída: {total} matérias novas.", f"Collection done: {total} new stories."))
     return total

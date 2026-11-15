@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..ai.client import AIError, active_client
 from ..edition.images import to_eink_png
+from ..i18n import tr
 from ..settings import ChargeSettings
 from .render import ChargeScript, render_charge
 
@@ -59,7 +60,8 @@ def generate_charge(session: Session, headlines: list[str], newspaper_title: str
                     settings: ChargeSettings, dest_dir: Path, log: Callable[[str], None]) -> dict | None:
     ai = active_client(session)
     if ai is None:
-        log("Charge habilitada, mas nenhuma IA ativa: charge omitida.")
+        log(tr("Charge habilitada, mas nenhuma IA ativa: charge omitida.",
+               "Cartoon is on but no AI is active: cartoon skipped."))
         return None
     lang = "português do Brasil" if language == "pt" else "English"
     lines = "\n".join(f"- {h}" for h in headlines[:6])
@@ -68,7 +70,8 @@ def generate_charge(session: Session, headlines: list[str], newspaper_title: str
         if settings.mode == "illustrated" and ai.can_generate_images:
             ip = ai.complete_json(IMAGE_PROMPT.format(style=settings.style, language=lang,
                                                       headlines=lines), _ImagePrompt, max_tokens=500)
-            log("Gerando charge ilustrada (pode levar 1 a 2 minutos)...")
+            log(tr("Gerando charge ilustrada (pode levar 1 a 2 minutos)...",
+                   "Drawing the illustrated cartoon (may take 1 to 2 minutes)..."))
             raw = ai.generate_image(ip.prompt)
             img = Image.open(io.BytesIO(raw)).convert("L")
             img = ImageOps.autocontrast(img, cutoff=0.5)
@@ -77,16 +80,17 @@ def generate_charge(session: Session, headlines: list[str], newspaper_title: str
             return {"mode": "illustrated", "image_path": str(dest), "caption": ip.caption,
                     "script": {"prompt": ip.prompt}}
         if settings.mode == "illustrated":
-            log("A IA ativa não gera imagens: usando a charge roteirizada.")
+            log(tr("A IA ativa não gera imagens: usando a charge roteirizada.",
+                   "The active AI does not produce images: using the scripted cartoon."))
         script = ai.complete_json(
             SCRIPT_PROMPT.format(title=newspaper_title, style=settings.style, language=lang,
                                  headlines=lines),
             ChargeScript, max_tokens=700,
         )
         render_charge(script, dest)
-        log(f"Charge desenhada: {script.title}.")
+        log(tr(f"Charge desenhada: {script.title}.", f"Cartoon drawn: {script.title}."))
         return {"mode": "structured", "image_path": str(dest), "caption": None,
                 "script": script.model_dump()}
     except AIError as exc:
-        log(f"Charge falhou: {exc}")
+        log(tr(f"Charge falhou: {exc}", f"Cartoon failed: {exc}"))
         return None

@@ -1,5 +1,5 @@
 import { StrictMode, useEffect, useState } from "react";
-import { getLang, setLang, t, type Lang } from "./i18n";
+import { getLang, hasSavedLang, setLang, t, type Lang } from "./i18n";
 import { applyTheme, effectiveTheme, type Theme } from "./theme";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, NavLink, Route, Routes, Link, useLocation } from "react-router-dom";
@@ -104,14 +104,18 @@ function Masthead({ title, onLang }: { title: string; onLang: (l: Lang) => void 
 }
 
 function App() {
-  const [auth, setAuth] = useState<{ required: boolean; authenticated: boolean } | null>(null);
+  const [auth, setAuth] = useState<{ required: boolean; authenticated: boolean; language?: Lang } | null>(null);
   const [title, setTitle] = useState("Dayfold");
   const [lang, setLangState] = useState<Lang>(getLang());
   const changeLang = (l: Lang) => { setLang(l); setLangState(l); };
   const loc = useLocation();
 
   useEffect(() => {
-    get<{ required: boolean; authenticated: boolean }>("/api/auth/status").then(setAuth).catch(() => setAuth({ required: false, authenticated: true }));
+    get<{ required: boolean; authenticated: boolean; language?: Lang }>("/api/auth/status").then((s) => {
+      // Never picked a language: start in the server's own (DAYFOLD_LANGUAGE) without saving it.
+      if (s.language && !hasSavedLang()) { setLang(s.language, false); setLangState(s.language); }
+      setAuth(s);
+    }).catch(() => setAuth({ required: false, authenticated: true }));
     const onUnauth = () => setAuth((a) => (a ? { ...a, authenticated: false } : a));
     window.addEventListener("dayfold:unauthorized", onUnauth);
     return () => window.removeEventListener("dayfold:unauthorized", onUnauth);

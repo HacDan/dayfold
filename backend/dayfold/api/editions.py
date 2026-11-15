@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
+from ..i18n import tr
 from ..jobs.queue import enqueue_generation
 from ..models import Edition, EditionStatus, GenerationJob, Topic
 from ..settings import get_section
@@ -25,13 +26,13 @@ feed = APIRouter(tags=["feed"])
 def _edition(session: Session, eid: int) -> Edition:
     e = session.get(Edition, eid)
     if not e:
-        raise HTTPException(404, "edição não encontrada")
+        raise HTTPException(404, tr("edição não encontrada", "edition not found"))
     return e
 
 
 def _file(path: str | None, media: str, filename: str | None = None) -> FileResponse:
     if not path or not Path(path).exists():
-        raise HTTPException(404, "arquivo indisponível")
+        raise HTTPException(404, tr("arquivo indisponível", "file unavailable"))
     return FileResponse(path, media_type=media, filename=filename)
 
 
@@ -49,7 +50,7 @@ def list_jobs(limit: int = 30, session: Session = Depends(get_session)) -> list[
 def get_job(job_id: int, session: Session = Depends(get_session)) -> dict:
     j = session.get(GenerationJob, job_id)
     if not j:
-        raise HTTPException(404, "job não encontrado")
+        raise HTTPException(404, tr("job não encontrado", "job not found"))
     return job_out(j)
 
 
@@ -105,7 +106,7 @@ def retypeset_edition(eid: int, session: Session = Depends(get_session)) -> dict
 
     e = _edition(session, eid)
     if e.status not in (EditionStatus.READY, EditionStatus.FAILED) or not e.items:
-        raise HTTPException(400, "edição sem matérias para recompor")
+        raise HTTPException(400, tr("edição sem matérias para recompor", "edition has no stories to typeset again"))
     session.commit()
     retypeset(eid)
     session.expire_all()
@@ -129,7 +130,8 @@ def redo_charge(eid: int, session: Session = Depends(get_session)) -> dict:
     result = generate_charge(session, titles, news.title, news.language, get_section(session, "charge"),
                              out, logs.append)
     if not result:
-        raise HTTPException(400, "; ".join(logs) or "não foi possível gerar a charge")
+        raise HTTPException(400, "; ".join(logs) or tr("não foi possível gerar a charge",
+                                                       "could not generate the cartoon"))
     if e.charge:
         session.delete(e.charge)
         session.flush()
@@ -157,7 +159,7 @@ def _latest(session: Session) -> Edition:
     e = session.scalar(select(Edition).where(Edition.status == EditionStatus.READY)
                        .order_by(Edition.edition_date.desc(), Edition.id.desc()).limit(1))
     if not e:
-        raise HTTPException(404, "nenhuma edição pronta")
+        raise HTTPException(404, tr("nenhuma edição pronta", "no edition is ready"))
     return e
 
 

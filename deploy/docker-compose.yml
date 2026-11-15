@@ -9,6 +9,7 @@ services:
       - dayfold-data:/data
     environment:
       - DAYFOLD_PASSWORD=${DAYFOLD_PASSWORD:-}
+      - DAYFOLD_LANGUAGE=${DAYFOLD_LANGUAGE:-pt}
     restart: unless-stopped
 volumes:
   dayfold-data:

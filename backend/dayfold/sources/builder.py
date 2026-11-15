@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from ..ai.client import AIError, active_client
 from ..db import session_scope
+from ..i18n import tr
 from ..models import (
     JobStatus,
     Provider,
@@ -77,7 +78,8 @@ def next_version_number(session: Session, provider_id: int) -> int:
 
 def _test(version_id: int, strategy: str, spec: dict, provider: dict, log: _Logger) -> dict:
     _set_version(version_id, status=ScraperStatus.TESTING, strategy=strategy, spec=spec)
-    log(f"Testando estratégia '{strategy}' em processo isolado...")
+    log(tr(f"Testando estratégia '{strategy}' em processo isolado...",
+           f"Testing strategy '{strategy}' in an isolated process..."))
     outcome = run_isolated(strategy, spec, max_items=5, language=provider["language"],
                            want_body=provider["usage_mode"] == UsageMode.FULL_CONTENT_ALLOWED)
     for line in outcome.log[-6:]:
@@ -86,9 +88,10 @@ def _test(version_id: int, strategy: str, spec: dict, provider: dict, log: _Logg
     report = validate(outcome, min_items=2, need_body=strategy != "rss")
     _set_version(version_id, test_report=report)
     if report["ok"]:
-        log(f"Teste aprovado: {report['count']} matérias, {report['with_body']} com corpo.")
+        log(tr(f"Teste aprovado: {report['count']} matérias, {report['with_body']} com corpo.",
+               f"Test passed: {report['count']} stories, {report['with_body']} with body text."))
     else:
-        log("Teste reprovado: " + "; ".join(report["reasons"]))
+        log(tr("Teste reprovado: ", "Test failed: ") + "; ".join(report["reasons"]))
     return report
 
 
@@ -102,7 +105,7 @@ def _activate(version_id: int, provider_id: int, log: _Logger) -> None:
             p.source_type = "rss"
         else:
             p.source_type = "html"
-    log("Versão ativada.")
+    log(tr("Versão ativada.", "Version activated."))
 
 
 AI_PROMPT = """Crie um scraper declarativo (seletores CSS) para o site de notícias abaixo.
@@ -130,7 +133,8 @@ def _ai_attempt(job_id: int, version_id: int, provider: dict, extra_prompt: str 
     with session_scope() as s:
         ai = active_client(s)
     if ai is None:
-        log("IA não configurada: criação assistida indisponível.")
+        log(tr("IA não configurada: criação assistida indisponível.",
+               "AI not configured: assisted creation is unavailable."))
         return None
     sitemaps: list[str] = []
     sitemap_urls(provider["base_url"], sitemaps)
@@ -138,13 +142,14 @@ def _ai_attempt(job_id: int, version_id: int, provider: dict, extra_prompt: str 
     try:
         sample = trimmed_html(list_url)
     except Exception as exc:  # noqa: BLE001
-        log(f"Não foi possível ler {list_url}: {exc}")
+        log(tr(f"Não foi possível ler {list_url}: {exc}", f"Could not read {list_url}: {exc}"))
         return None
     previous = ""
     report: dict | None = None
     for attempt in (1, 2):
         _set_version(version_id, status=ScraperStatus.GENERATING)
-        log(f"Pedindo seletores à IA ({ai.label}), tentativa {attempt}...")
+        log(tr(f"Pedindo seletores à IA ({ai.label}), tentativa {attempt}...",
+               f"Asking the AI for selectors ({ai.label}), attempt {attempt}..."))
         prompt = AI_PROMPT.format(
             name=provider["name"], base_url=provider["base_url"], list_url=list_url,
             sitemaps=", ".join(sitemaps) or "nenhum",
@@ -154,9 +159,10 @@ def _ai_attempt(job_id: int, version_id: int, provider: dict, extra_prompt: str 
         try:
             spec = ai.complete_json(prompt, SelectorSpec, max_tokens=800)
         except AIError as exc:
-            log(f"Falha da IA: {exc}")
+            log(tr(f"Falha da IA: {exc}", f"AI failure: {exc}"))
             return report
-        log(f"Spec recebida: item='{spec.item_selector}'. {spec.notes or ''}".strip())
+        log(tr(f"Spec recebida: item='{spec.item_selector}'. {spec.notes or ''}",
+               f"Spec received: item='{spec.item_selector}'. {spec.notes or ''}").strip())
         if spec.list_url != list_url and not spec.list_url.startswith("http"):
             spec.list_url = list_url
         report = _test(version_id, "selectors", spec.model_dump(exclude={"notes"}), provider, log)
@@ -206,12 +212,14 @@ def run_scraper_job(job_id: int) -> None:
                 _activate(version_id, pdata["id"], log)
             elif is_active:
                 _set_version(version_id, status=ScraperStatus.READY)
-                log("A versão ativa falhou no teste agora, mas continua ativa (pode ser instabilidade da fonte).")
+                log(tr("A versão ativa falhou no teste agora, mas continua ativa (pode ser instabilidade da fonte).",
+                       "The active version just failed its test but stays active (the source may be unstable)."))
             else:
                 _set_version(version_id, status=ScraperStatus.FAILED)
             return
         if not (extra and use_ai):
-            log(f"Procurando feeds RSS/Atom em {pdata['base_url']}...")
+            log(tr(f"Procurando feeds RSS/Atom em {pdata['base_url']}...",
+                   f"Looking for RSS/Atom feeds at {pdata['base_url']}..."))
             feeds = discover_feeds(pdata["base_url"], [])
             for url, _n in feeds[:2]:
                 report = _test(version_id, "rss", {"feed_url": url}, pdata, log)
@@ -220,8 +228,9 @@ def run_scraper_job(job_id: int) -> None:
                     break
             if not ok:
                 if not feeds:
-                    log("Nenhum feed encontrado.")
-                log("Tentando extração genérica (links + Trafilatura)...")
+                    log(tr("Nenhum feed encontrado.", "No feed found."))
+                log(tr("Tentando extração genérica (links + Trafilatura)...",
+                       "Trying generic extraction (links + Trafilatura)..."))
                 report = _test(version_id, "generic", {"list_url": pdata["base_url"]}, pdata, log)
                 ok = report["ok"]
         if not ok and use_ai:
@@ -231,10 +240,12 @@ def run_scraper_job(job_id: int) -> None:
             _activate(version_id, pdata["id"], log)
         else:
             _set_version(version_id, status=ScraperStatus.FAILED)
-            log("Nenhuma estratégia passou na validação. A versão anterior (se houver) segue ativa.")
+            log(tr("Nenhuma estratégia passou na validação. A versão anterior (se houver) segue ativa.",
+                   "No strategy passed validation. The previous version (if any) stays active."))
     except Exception as exc:
         _set_version(version_id, status=ScraperStatus.FAILED)
-        log(f"Erro inesperado: {type(exc).__name__}: {exc}")
+        log(tr(f"Erro inesperado: {type(exc).__name__}: {exc}",
+               f"Unexpected error: {type(exc).__name__}: {exc}"))
         raise
     finally:
         with session_scope() as s:

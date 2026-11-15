@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
+from ..i18n import tr
 from ..jobs.queue import enqueue_scraper
 from ..models import Provider, ScraperJob, ScraperStatus, ScraperVersion, UsageMode
 from ..sources.builder import next_version_number
@@ -39,13 +40,13 @@ class ProviderIn(BaseModel):
         if not cats and self.category:
             cats = [self.category.strip()]
         if not cats:
-            raise ValueError("escolha ao menos uma seção")
+            raise ValueError(tr("escolha ao menos uma seção", "choose at least one section"))
         self.categories = list(dict.fromkeys(cats))[:12]
         self.category = self.categories[0]
         return self
     language: str = Field("pt", max_length=8)
     usage_mode: UsageMode = UsageMode.EXCERPT_AND_LINK
-    license_name: str = Field("Verificar termos", max_length=120)
+    license_name: str = Field(tr("Verificar termos", "Check terms"), max_length=120)
     license_url: str | None = None
     license_note: str = ""
     enabled: bool = True
@@ -63,7 +64,7 @@ class ProviderCreate(ProviderIn):
 def _get(session: Session, pid: int) -> Provider:
     p = session.get(Provider, pid)
     if not p:
-        raise HTTPException(404, "provedor não encontrado")
+        raise HTTPException(404, tr("provedor não encontrado", "provider not found"))
     return p
 
 
@@ -94,9 +95,11 @@ def create_provider(body: ProviderCreate, session: Session = Depends(get_session
     session.flush()
     if body.mode == "manual":
         if body.strategy not in ALLOWED_STRATEGIES or not body.spec:
-            raise HTTPException(422, "criação manual exige estratégia e spec")
+            raise HTTPException(422, tr("criação manual exige estratégia e spec",
+                                        "manual creation requires a strategy and a spec"))
         v = ScraperVersion(provider_id=p.id, version=1, strategy=body.strategy, spec=body.spec,
-                           status=ScraperStatus.PENDING, origin="manual", log=["Criada manualmente."])
+                           status=ScraperStatus.PENDING, origin="manual",
+                           log=[tr("Criada manualmente.", "Created manually.")])
         session.add(v)
         session.flush()
         session.commit()
@@ -129,7 +132,7 @@ def delete_provider(pid: int, session: Session = Depends(get_session)) -> dict:
 def test_provider(pid: int, session: Session = Depends(get_session)) -> dict:
     p = _get(session, pid)
     if not p.active_version_id:
-        raise HTTPException(400, "provedor sem scraper ativo")
+        raise HTTPException(400, tr("provedor sem scraper ativo", "provider has no active scraper"))
     session.commit()
     job_id = enqueue_scraper(pid, kind="test", use_ai=False, version_id=p.active_version_id)
     return {"job_id": job_id}
@@ -146,7 +149,8 @@ def regenerate(pid: int, body: RegenerateIn, session: Session = Depends(get_sess
     running = session.scalar(select(ScraperJob.id).where(ScraperJob.provider_id == pid,
                                                          ScraperJob.status.in_(["QUEUED", "RUNNING"])))
     if running:
-        raise HTTPException(409, "já existe uma geração em andamento para este provedor")
+        raise HTTPException(409, tr("já existe uma geração em andamento para este provedor",
+                                    "a generation is already running for this provider"))
     session.commit()
     job_id = enqueue_scraper(pid, kind="generate", use_ai=body.use_ai, extra_prompt=body.extra_prompt)
     return {"job_id": job_id}
@@ -161,9 +165,10 @@ class ManualVersionIn(BaseModel):
 def add_manual_version(pid: int, body: ManualVersionIn, session: Session = Depends(get_session)) -> dict:
     _get(session, pid)
     if body.strategy not in ALLOWED_STRATEGIES:
-        raise HTTPException(422, "estratégia inválida")
+        raise HTTPException(422, tr("estratégia inválida", "invalid strategy"))
     v = ScraperVersion(provider_id=pid, version=next_version_number(session, pid), strategy=body.strategy,
-                       spec=body.spec, status=ScraperStatus.PENDING, origin="manual", log=["Criada manualmente."])
+                       spec=body.spec, status=ScraperStatus.PENDING, origin="manual",
+                           log=[tr("Criada manualmente.", "Created manually.")])
     session.add(v)
     session.flush()
     session.commit()
@@ -192,14 +197,14 @@ def list_scraper_jobs(provider_id: int | None = None, session: Session = Depends
 def get_scraper_job(job_id: int, session: Session = Depends(get_session)) -> dict:
     j = session.get(ScraperJob, job_id)
     if not j:
-        raise HTTPException(404, "job não encontrado")
+        raise HTTPException(404, tr("job não encontrado", "job not found"))
     return scraper_job_out(j)
 
 
 def _version(session: Session, vid: int) -> ScraperVersion:
     v = session.get(ScraperVersion, vid)
     if not v:
-        raise HTTPException(404, "versão não encontrada")
+        raise HTTPException(404, tr("versão não encontrada", "version not found"))
     return v
 
 
@@ -209,7 +214,8 @@ def activate_version(vid: int, session: Session = Depends(get_session)) -> dict:
     v = _version(session, vid)
     report = v.test_report or {}
     if v.status not in (ScraperStatus.READY, ScraperStatus.DISABLED) or (v.origin != "default" and not report.get("ok")):
-        raise HTTPException(400, "só versões validadas podem ser ativadas")
+        raise HTTPException(400, tr("só versões validadas podem ser ativadas",
+                                    "only validated versions can be activated"))
     v.status = ScraperStatus.READY
     v.provider.active_version_id = v.id
     return version_out(v, v.id)
@@ -236,6 +242,7 @@ def enable_version(vid: int, session: Session = Depends(get_session)) -> dict:
 def delete_version(vid: int, session: Session = Depends(get_session)) -> dict:
     v = _version(session, vid)
     if v.provider.active_version_id == v.id:
-        raise HTTPException(400, "desative ou troque a versão ativa antes de excluir")
+        raise HTTPException(400, tr("desative ou troque a versão ativa antes de excluir",
+                                    "disable or switch the active version before deleting"))
     session.delete(v)
     return {"ok": True}

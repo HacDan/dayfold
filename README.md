@@ -107,6 +107,7 @@ Settings live in `~/.config/dayfold/env` (see `deploy/env.example`):
 | `DAYFOLD_DATA_DIR` | `~/.local/share/dayfold` | Database and editions |
 | `DAYFOLD_PASSWORD` | unset | Dashboard password. Without it the dashboard is open to your network |
 | `DAYFOLD_DISABLE_SCHEDULER` | unset | `1` disables the daily schedule |
+| `DAYFOLD_LANGUAGE` | `pt` | `pt` or `en`. Language of the server's own text (API errors, labels, job logs) and of the newspaper on a fresh install. From then on the newspaper's language is a setting of its own |
 
 Other commands:
 

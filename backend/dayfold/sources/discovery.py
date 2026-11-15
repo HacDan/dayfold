@@ -9,6 +9,7 @@ import feedparser
 from lxml import html as lxml_html
 
 from .. import net
+from ..i18n import tr
 
 COMMON_PATHS = [
     "/feed", "/feed/", "/rss", "/rss.xml", "/feed.xml", "/atom.xml", "/index.xml",
@@ -35,7 +36,8 @@ def discover_feeds(base_url: str, log: list[str]) -> list[tuple[str, int]]:
         seen.add(url)
         n = _is_feed(url)
         if n:
-            log.append(f"Feed encontrado via {why}: {url} ({n} itens).")
+            log.append(tr(f"Feed encontrado via {why}: {url} ({n} itens).",
+                          f"Feed found via {why}: {url} ({n} items)."))
             found.append((url, n))
 
     try:
@@ -48,11 +50,11 @@ def discover_feeds(base_url: str, log: list[str]) -> list[tuple[str, int]]:
         for a in root.xpath("//a[@href]"):
             href = a.get("href", "")
             if re.search(r"(rss|atom|feed)(\.xml)?/?$", href, re.IGNORECASE):
-                consider(urljoin(page.url, href), "link na página")
+                consider(urljoin(page.url, href), tr("link na página", "a link on the page"))
                 if len(seen) > 12:
                     break
     except (net.FetchError, ValueError) as exc:
-        log.append(f"Página inicial não lida: {exc}")
+        log.append(tr(f"Página inicial não lida: {exc}", f"Home page not read: {exc}"))
 
     if not found:
         p = urlparse(base_url)
@@ -60,8 +62,8 @@ def discover_feeds(base_url: str, log: list[str]) -> list[tuple[str, int]]:
         prefix = p.path.rstrip("/")
         for path in COMMON_PATHS:
             if prefix:
-                consider(origin + prefix + path, "caminho comum")
-            consider(origin + path, "caminho comum")
+                consider(origin + prefix + path, tr("caminho comum", "a common path"))
+            consider(origin + path, tr("caminho comum", "a common path"))
             if found:
                 break
     found.sort(key=lambda x: -x[1])
@@ -77,7 +79,8 @@ def sitemap_urls(base_url: str, log: list[str]) -> list[str]:
         return []
     maps = re.findall(r"(?im)^sitemap:\s*(\S+)", robots)
     if maps:
-        log.append(f"Sitemaps no robots.txt: {', '.join(maps[:3])}")
+        log.append(tr(f"Sitemaps no robots.txt: {', '.join(maps[:3])}",
+                      f"Sitemaps in robots.txt: {', '.join(maps[:3])}"))
     return maps[:5]
 
 

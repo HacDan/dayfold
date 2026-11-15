@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from .api import admin, auth, editions, kindle, providers
 from .bootstrap import bootstrap
 from .config import FONTS_DIR, config
+from .i18n import tr
 from .jobs.queue import recover_interrupted, start_worker, stop_worker
 from .jobs.scheduler import start_scheduler, stop_scheduler
 
@@ -65,11 +66,12 @@ if (config.web_dir / "assets").exists():
 @app.get("/{path:path}", include_in_schema=False)
 def spa(path: str):
     if path.startswith(("api/", "feed/", "opds")):
-        raise HTTPException(404, "não encontrado")
+        raise HTTPException(404, tr("não encontrado", "not found"))
     candidate = (config.web_dir / path).resolve()
     if path and candidate.is_file() and config.web_dir.resolve() in candidate.parents:
         return FileResponse(candidate)
     index = _spa_index()
     if index is None:
-        return JSONResponse({"detail": "dashboard não compilado: rode `make build` (frontend)"}, status_code=503)
+        return JSONResponse({"detail": tr("dashboard não compilado: rode `make build` (frontend)",
+                                         "dashboard not built: run `make build` (frontend)")}, status_code=503)
     return FileResponse(index)

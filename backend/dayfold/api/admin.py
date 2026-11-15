@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from ..ai.client import AIClient, test_provider, usage
 from ..db import get_session
 from ..games.generators import GENERATORS, seeded
-from ..games.words import WORDLE, WORDSEARCH_THEMES
+from ..games.words import WORDLE, wordsearch_themes
+from ..i18n import tr
 from ..jobs import scheduler
 from ..models import (
     AIProvider,
@@ -104,7 +105,9 @@ def read_settings(session: Session = Depends(get_session)) -> dict:
     return {
         "values": {k: _masked(k, v) for k, v in all_settings(session).items()},
         "meta": {
-            "masthead_fonts": [{"key": k, **v} for k, v in MASTHEAD_FONTS.items()],
+            "masthead_fonts": [{"key": k, "label": tr(v["label"], v["label_en"]), "family": v["family"],
+                                "file": v["file"], "license": v["license"]}
+                               for k, v in MASTHEAD_FONTS.items()],
             "type_ranges": {k: {"min": lo, "default": d, "max": hi} for k, (lo, d, hi) in TYPE_RANGES.items()},
             "ai_available": ai_available(session),
         },
@@ -114,11 +117,13 @@ def read_settings(session: Session = Depends(get_session)) -> dict:
 @router.put("/settings/{section}")
 def write_settings(section: str, body: dict, session: Session = Depends(get_session)) -> dict:
     if section not in SECTIONS:
-        raise HTTPException(404, "seção desconhecida")
+        raise HTTPException(404, tr("seção desconhecida", "unknown section"))
     if section == "newspaper" and body.get("include_charge") and not ai_available(session):
-        raise HTTPException(400, "a charge exige uma IA configurada e ativa")
+        raise HTTPException(400, tr("a charge exige uma IA configurada e ativa",
+                                    "the cartoon needs a configured, active AI provider"))
     if section == "curation" and body.get("use_ai") and not ai_available(session):
-        raise HTTPException(400, "a curadoria com IA exige uma IA configurada e ativa")
+        raise HTTPException(400, tr("a curadoria com IA exige uma IA configurada e ativa",
+                                    "AI curation needs a configured, active AI provider"))
     for k in SECRET_FIELDS.get(section, []):
         if not body.get(k):
             body.pop(k, None)  # blank in the form keeps the stored secret
@@ -169,7 +174,7 @@ def list_topics(session: Session = Depends(get_session)) -> list[dict]:
 @router.post("/topics")
 def create_topic(body: TopicIn, session: Session = Depends(get_session)) -> dict:
     if session.scalar(select(Topic).where(Topic.slug == body.slug)):
-        raise HTTPException(409, "slug já existe")
+        raise HTTPException(409, tr("slug já existe", "slug already exists"))
     pos = (session.scalar(select(func.max(Topic.position))) or 0) + 1
     t = Topic(position=pos, **body.model_dump())
     session.add(t)
@@ -199,7 +204,7 @@ def update_topic(topic_id: int, body: TopicIn, session: Session = Depends(get_se
     if body.slug != old_slug and session.scalar(
         select(Topic.id).where(Topic.slug == body.slug, Topic.id != topic_id)
     ):
-        raise HTTPException(409, "slug já existe")
+        raise HTTPException(409, tr("slug já existe", "slug already exists"))
     for k, v in body.model_dump().items():
         setattr(t, k, v)
     if body.slug != old_slug:
@@ -224,13 +229,15 @@ def delete_topic(topic_id: int, session: Session = Depends(get_session)) -> dict
     t = session.get(Topic, topic_id) or _404()
     fed_by = [p for p in session.scalars(select(Provider)) if t.slug in p.sections]
     if fed_by:
-        raise HTTPException(409, f"{len(fed_by)} provedor(es) usam esta seção; mova-os para outra antes de excluir")
+        n = len(fed_by)
+        raise HTTPException(409, tr(f"{n} provedor(es) usam esta seção; mova-os para outra antes de excluir",
+                                    f"{n} provider(s) feed this section; move them to another one first"))
     session.delete(t)
     return {"ok": True}
 
 
 def _404():
-    raise HTTPException(404, "não encontrado")
+    raise HTTPException(404, tr("não encontrado", "not found"))
 
 
 # ---------------------------------------------------------------- AI providers
@@ -329,27 +336,44 @@ def delete_ai(pid: int, session: Session = Depends(get_session)) -> dict:
 # ---------------------------------------------------------------- games
 
 
-def game_out(g: Game) -> dict:
+def game_schemas(lang: str) -> dict:
+    """Options the Games page may offer. Word search themes exist per language, so this follows
+    the paper's language: an English edition must not offer Portuguese themes."""
+    return {
+        "sudoku": {"difficulty": ["easy", "medium", "hard"], "count": [1, 2, 3, 4]},
+        # No language option: puzzles are generated in the newspaper's language, so a per-game
+        # choice could only produce an edition that mixes languages.
+        "wordle": {"length": [4, 5, 6], "attempts": [4, 5, 6, 7, 8]},
+        "wordsearch": {"size": [8, 10, 12, 14, 16], "theme": wordsearch_themes(lang),
+                       "words": [6, 8, 10, 12, 15], "difficulty": ["easy", "medium", "hard"]},
+        "crossword": {"words": [6, 8, 10, 12, 14], "size": [11, 13, 15]},
+    }
+
+
+def _config_for(g: Game, lang: str) -> dict:
+    """The stored options as the paper would honour them: retired options and themes saved for
+    another language are replaced by what actually gets printed."""
+    schema = game_schemas(lang).get(g.kind)
+    if schema is None:
+        return dict(g.config)  # a kind this version does not know: hand its config back as stored
+    config = {k: v for k, v in g.config.items() if k in schema}
+    if g.kind == "wordsearch" and config.get("theme") not in wordsearch_themes(lang):
+        config["theme"] = "news"
+    return config
+
+
+def game_out(g: Game, lang: str) -> dict:
     return {"id": g.id, "kind": g.kind, "name": g.name, "enabled": g.enabled,
-            "position": g.position, "config": g.config}
-
-
-GAME_SCHEMAS = {
-    "sudoku": {"difficulty": ["easy", "medium", "hard"], "count": [1, 2, 3, 4]},
-    "wordle": {"language": ["pt", "en"], "length": [4, 5, 6], "attempts": [4, 5, 6, 7, 8]},
-    "wordsearch": {"language": ["pt", "en"], "size": [8, 10, 12, 14, 16],
-                   "theme": ["news", *sorted({t for v in WORDSEARCH_THEMES.values() for t in v})],
-                   "words": [6, 8, 10, 12, 15], "difficulty": ["easy", "medium", "hard"]},
-    "crossword": {"language": ["pt", "en"], "words": [6, 8, 10, 12, 14], "size": [11, 13, 15]},
-}
+            "position": g.position, "config": _config_for(g, lang)}
 
 
 @router.get("/games")
 def list_games(session: Session = Depends(get_session)) -> dict:
+    lang = get_section(session, "newspaper").language
     return {
-        "games": [game_out(g) for g in session.scalars(select(Game).order_by(Game.position))],
-        "schemas": GAME_SCHEMAS,
-        "wordle_sizes": {lang: {n: len(w) for n, w in v.items()} for lang, v in WORDLE.items()},
+        "games": [game_out(g, lang) for g in session.scalars(select(Game).order_by(Game.position))],
+        "schemas": game_schemas(lang),
+        "wordle_sizes": {lg: {n: len(w) for n, w in v.items()} for lg, v in WORDLE.items()},
     }
 
 
@@ -362,16 +386,22 @@ class GameIn(BaseModel):
 @router.put("/games/{gid}")
 def update_game(gid: int, body: GameIn, session: Session = Depends(get_session)) -> dict:
     g = session.get(Game, gid) or _404()
-    schema = GAME_SCHEMAS[g.kind]
+    lang = get_section(session, "newspaper").language
+    schema = game_schemas(lang).get(g.kind)
+    if schema is None:
+        raise HTTPException(400, tr(f"tipo de jogo desconhecido: {g.kind}",
+                                    f"unknown game kind: {g.kind}"))
     clean = {}
     for k, v in body.config.items():
         if k in schema and v in schema[k]:
             clean[k] = v
-    g.config = {**g.config, **clean}
+    # Saving normalises what is stored: a retired per-game language or a theme from another
+    # language must not survive next to options the paper actually honours.
+    g.config = {**_config_for(g, lang), **clean}
     g.enabled = body.enabled
     if body.name:
         g.name = body.name[:60]
-    return game_out(g)
+    return game_out(g, lang)
 
 
 @router.put("/games-order")
@@ -388,19 +418,23 @@ def order_games(ids: list[int], session: Session = Depends(get_session)) -> dict
 def preview_game(gid: int, session: Session = Depends(get_session)) -> dict:
     g = session.get(Game, gid) or _404()
     rng = seeded(date.today().isoformat(), f"preview-{g.kind}")
-    cfg = g.config
+    lang = get_section(session, "newspaper").language  # the preview shows what the paper gets
+    if g.kind not in game_schemas(lang):
+        raise HTTPException(400, tr(f"tipo de jogo desconhecido: {g.kind}",
+                                    f"unknown game kind: {g.kind}"))
+    cfg = _config_for(g, lang)  # same normalisation the Games page sees
     if g.kind == "sudoku":
         puzzle, solution = GENERATORS["sudoku"](rng, cfg.get("difficulty", "medium"))
     elif g.kind == "wordle":
-        puzzle, solution = GENERATORS["wordle"](rng, cfg.get("language", "pt"), int(cfg.get("length", 5)),
+        puzzle, solution = GENERATORS["wordle"](rng, lang, int(cfg.get("length", 5)),
                                                 int(cfg.get("attempts", 6)))
     elif g.kind == "crossword":
-        puzzle, solution = GENERATORS["crossword"](rng, cfg.get("language", "pt"), int(cfg.get("words", 10)),
+        puzzle, solution = GENERATORS["crossword"](rng, lang, int(cfg.get("words", 10)),
                                                    int(cfg.get("size", 13)))
     else:
         titles = [t for t in session.scalars(select(Edition.headline).where(Edition.headline.is_not(None))
                                              .order_by(Edition.id.desc()).limit(10))]
-        puzzle, solution = GENERATORS["wordsearch"](rng, cfg.get("language", "pt"), int(cfg.get("size", 12)),
+        puzzle, solution = GENERATORS["wordsearch"](rng, lang, int(cfg.get("size", 12)),
                                                     cfg.get("theme", "news"), int(cfg.get("words", 10)),
                                                     titles, cfg.get("difficulty", "medium"))
     return {"kind": g.kind, "puzzle": puzzle, "solution": solution}
@@ -414,6 +448,7 @@ def preview_cover(body: dict, session: Session = Depends(get_session)) -> Respon
     """Render the cover with unsaved newspaper settings (dashboard live preview)."""
     from ..edition.cover import CoverData, render_cover
     from ..edition.i18n import LABELS, long_date, roman
+    from ..pipeline.generate import game_name
     from ..settings import NewspaperSettings
 
     current = get_section(session, "newspaper").model_dump()
@@ -448,7 +483,9 @@ def preview_cover(body: dict, session: Session = Depends(get_session)) -> Respon
             long_date=long_date(date.today(), news.language), number_label=f"{L['number']} {latest.number + 1 if latest else 1}",
             year_label=f"{L['year']} {roman(1)}", daily_label=L["daily"], headline=headline, deck=deck,
             also_label=L["also"], secondary=secondary, lead_text=lead,
-            footer=" · ".join(g.name for g in session.scalars(select(Game).where(Game.enabled.is_(True)).order_by(Game.position))),
+            footer=" · ".join(game_name(news.language, g.kind, g.name)
+                              for g in session.scalars(select(Game).where(Game.enabled.is_(True))
+                                                       .order_by(Game.position))),
         ), dest, device.cover_width // 2, device.cover_height // 2)
         data = dest.read_bytes()
     return Response(data, media_type="image/png", headers={"Cache-Control": "no-store"})

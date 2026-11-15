@@ -17,6 +17,14 @@ FONTS_DIR = ASSETS_DIR / "fonts"
 TEMPLATES_DIR = PACKAGE_DIR / "edition" / "templates"
 
 
+LANGUAGES = ("pt", "en")
+
+
+def _default_language() -> str:
+    raw = (os.environ.get("DAYFOLD_LANGUAGE") or "").strip().lower()
+    return raw[:2] if raw[:2] in LANGUAGES else "pt"
+
+
 def _default_data_dir() -> Path:
     xdg = os.environ.get("XDG_DATA_HOME")
     base = Path(xdg) if xdg else Path.home() / ".local" / "share"
@@ -40,6 +48,8 @@ class Config:
         default_factory=lambda: Path(os.environ.get("DAYFOLD_WEB_DIR") or _default_web_dir())
     )
     public_url: str | None = field(default_factory=lambda: os.environ.get("DAYFOLD_PUBLIC_URL"))
+    # Language of the server's own text (API errors, labels, logs), not of the newspaper.
+    language: str = field(default_factory=_default_language)
     disable_scheduler: bool = field(
         default_factory=lambda: os.environ.get("DAYFOLD_DISABLE_SCHEDULER", "") == "1"
     )

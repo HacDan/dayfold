@@ -24,6 +24,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..i18n import tr
 from ..models import AIProvider
 
 
@@ -60,8 +61,9 @@ def extract_json(text: str) -> dict:
         try:
             return json.loads(text[start : end + 1])
         except json.JSONDecodeError as exc:
-            raise AIError(f"JSON inválido na resposta da IA: {exc}") from exc
-    raise AIError("a IA não retornou JSON")
+            raise AIError(tr(f"JSON inválido na resposta da IA: {exc}",
+                             f"Invalid JSON in the AI response: {exc}")) from exc
+    raise AIError(tr("a IA não retornou JSON", "the AI did not return JSON"))
 
 
 class AIClient:
@@ -84,7 +86,8 @@ class AIClient:
         elif self.p.kind == "cli":
             out = self._cli(prompt, system)
         else:
-            raise AIError(f"tipo de IA desconhecido: {self.p.kind}")
+            raise AIError(tr(f"tipo de IA desconhecido: {self.p.kind}",
+                             f"unknown AI kind: {self.p.kind}"))
         usage.completion_chars += len(out)
         return out
 
@@ -102,7 +105,8 @@ class AIClient:
                     f"{prompt}\n\nSua resposta anterior era inválida ({str(exc)[:300]}). "
                     "Responda novamente apenas com o JSON no formato pedido."
                 )
-        raise AIError(f"resposta da IA não validou: {last}")
+        raise AIError(tr(f"resposta da IA não validou: {last}",
+                         f"the AI response failed validation: {last}"))
 
     def _openai(self, prompt: str, system: str, max_tokens: int) -> str:
         base = (self.p.base_url or "https://api.openai.com/v1").rstrip("/")
@@ -117,7 +121,8 @@ class AIClient:
             r = httpx.post(f"{base}/chat/completions", json=body, headers=headers,
                            timeout=self.p.timeout_s)
         except httpx.HTTPError as exc:
-            raise AIError(f"falha de conexão com {base}: {exc}") from exc
+            raise AIError(tr(f"falha de conexão com {base}: {exc}",
+                             f"connection to {base} failed: {exc}")) from exc
         if r.status_code >= 400:
             raise AIError(f"HTTP {r.status_code}: {r.text[:300]}")
         return r.json()["choices"][0]["message"]["content"] or ""
@@ -139,24 +144,28 @@ class AIClient:
             r = httpx.post(f"{base}/v1/messages", json=body, headers=headers,
                            timeout=self.p.timeout_s)
         except httpx.HTTPError as exc:
-            raise AIError(f"falha de conexão com {base}: {exc}") from exc
+            raise AIError(tr(f"falha de conexão com {base}: {exc}",
+                             f"connection to {base} failed: {exc}")) from exc
         if r.status_code >= 400:
             raise AIError(f"HTTP {r.status_code}: {r.text[:300]}")
         return "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
 
     def _cli(self, prompt: str, system: str) -> str:
         if not self.p.command:
-            raise AIError("comando da CLI não configurado")
+            raise AIError(tr("comando da CLI não configurado", "the CLI command is not configured"))
         argv = shlex.split(self.p.command)
         try:
             proc = subprocess.run(argv, input=f"{system}\n\n{prompt}", capture_output=True,
                                   text=True, timeout=self.p.timeout_s)
         except FileNotFoundError as exc:
-            raise AIError(f"comando não encontrado: {argv[0]}") from exc
+            raise AIError(tr(f"comando não encontrado: {argv[0]}",
+                             f"command not found: {argv[0]}")) from exc
         except subprocess.TimeoutExpired as exc:
-            raise AIError(f"a CLI passou de {self.p.timeout_s}s") from exc
+            raise AIError(tr(f"a CLI passou de {self.p.timeout_s}s",
+                             f"the CLI took longer than {self.p.timeout_s}s")) from exc
         if proc.returncode != 0:
-            raise AIError(f"CLI saiu com código {proc.returncode}: {proc.stderr[-300:]}")
+            raise AIError(tr(f"CLI saiu com código {proc.returncode}: {proc.stderr[-300:]}",
+                             f"the CLI exited with code {proc.returncode}: {proc.stderr[-300:]}"))
         return proc.stdout
 
     # -- images -------------------------------------------------------------
@@ -166,7 +175,8 @@ class AIClient:
 
     def generate_image(self, prompt: str, size: str = "1536x1024") -> bytes:
         if not self.can_generate_images:
-            raise AIError("este provedor de IA não gera imagens")
+            raise AIError(tr("este provedor de IA não gera imagens",
+                             "this AI provider does not generate images"))
         if self.p.image_command:
             return _cli_image(self, prompt)
         base = (self.p.base_url or "https://api.openai.com/v1").rstrip("/")
@@ -183,7 +193,7 @@ class AIClient:
             return base64.b64decode(data["b64_json"])
         if data.get("url"):
             return httpx.get(data["url"], timeout=60).content
-        raise AIError("resposta de imagem vazia")
+        raise AIError(tr("resposta de imagem vazia", "empty image response"))
 
 
 IMAGE_CLI_PROMPT = """Use your image generation tool to create this image:
@@ -204,13 +214,15 @@ def _cli_image(self: AIClient, prompt: str) -> bytes:
             proc = subprocess.run(argv, input=IMAGE_CLI_PROMPT.format(prompt=prompt), cwd=tmp,
                                   capture_output=True, text=True, timeout=max(self.p.timeout_s, 420))
         except FileNotFoundError as exc:
-            raise AIError(f"comando não encontrado: {argv[0] if argv else '?'}") from exc
+            raise AIError(tr(f"comando não encontrado: {argv[0] if argv else '?'}",
+                             f"command not found: {argv[0] if argv else '?'}")) from exc
         except subprocess.TimeoutExpired as exc:
-            raise AIError("a geração de imagem passou do tempo limite") from exc
+            raise AIError(tr("a geração de imagem passou do tempo limite", "image generation timed out")) from exc
         images = sorted((p for p in Path(tmp).rglob("*") if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")),
                         key=lambda p: p.stat().st_size, reverse=True)
         if not images:
-            raise AIError(f"a CLI não gerou imagem (código {proc.returncode}): {proc.stderr[-300:]}")
+            raise AIError(tr(f"a CLI não gerou imagem (código {proc.returncode}): {proc.stderr[-300:]}",
+                             f"the CLI produced no image (code {proc.returncode}): {proc.stderr[-300:]}"))
         return images[0].read_bytes()
 
 

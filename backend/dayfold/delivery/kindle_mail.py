@@ -13,6 +13,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from ..i18n import tr
 from ..settings import KindleSettings, get_section, set_section
 
 GMAIL_HOST = "smtp.gmail.com"
@@ -31,17 +32,21 @@ def missing_fields(cfg: KindleSettings) -> list[str]:
 def send_epub(cfg: KindleSettings, epub: Path, subject: str) -> None:
     missing = missing_fields(cfg)
     if missing:
-        labels = {"kindle_email": "e-mail do Kindle", "gmail_address": "Gmail", "gmail_app_password": "senha de app"}
-        raise KindleMailError("configure antes: " + ", ".join(labels[k] for k in missing))
+        labels = {"kindle_email": ("e-mail do Kindle", "Kindle e-mail"),
+                  "gmail_address": ("Gmail", "Gmail"),
+                  "gmail_app_password": ("senha de app", "app password")}
+        raise KindleMailError(tr("configure antes: " + ", ".join(labels[k][0] for k in missing),
+                                 "configure first: " + ", ".join(labels[k][1] for k in missing)))
     if not epub.exists():
-        raise KindleMailError(f"arquivo não encontrado: {epub.name}")
+        raise KindleMailError(tr(f"arquivo não encontrado: {epub.name}", f"file not found: {epub.name}"))
     if epub.stat().st_size > MAX_BYTES:
-        raise KindleMailError(f"{epub.name} passa de 25 MB, o limite de anexo do Gmail")
+        raise KindleMailError(tr(f"{epub.name} passa de 25 MB, o limite de anexo do Gmail",
+                                 f"{epub.name} is over 25 MB, the Gmail attachment limit"))
     msg = EmailMessage()
     msg["From"] = cfg.gmail_address
     msg["To"] = cfg.kindle_email
     msg["Subject"] = subject
-    msg.set_content("Dayfold: edição enviada para o Kindle.")
+    msg.set_content(tr("Dayfold: edição enviada para o Kindle.", "Dayfold: edition sent to your Kindle."))
     msg.add_attachment(epub.read_bytes(), maintype="application", subtype="epub+zip", filename=epub.name)
     try:
         with smtplib.SMTP(GMAIL_HOST, GMAIL_PORT, timeout=60) as smtp:
@@ -49,10 +54,12 @@ def send_epub(cfg: KindleSettings, epub: Path, subject: str) -> None:
             smtp.login(cfg.gmail_address, cfg.gmail_app_password)
             smtp.send_message(msg)
     except smtplib.SMTPAuthenticationError as exc:
-        raise KindleMailError("o Gmail recusou o login: confira o endereço e a senha de app "
-                              "(a verificação em duas etapas precisa estar ativa)") from exc
+        raise KindleMailError(tr("o Gmail recusou o login: confira o endereço e a senha de app "
+                                 "(a verificação em duas etapas precisa estar ativa)",
+                                 "Gmail rejected the login: check the address and the app password "
+                                 "(two-step verification must be on)")) from exc
     except (smtplib.SMTPException, OSError) as exc:
-        raise KindleMailError(f"falha no envio pelo Gmail: {exc}") from exc
+        raise KindleMailError(tr(f"falha no envio pelo Gmail: {exc}", f"Gmail send failed: {exc}")) from exc
 
 
 def send_and_record(session: Session, epub: Path, subject: str) -> str:
@@ -69,7 +76,7 @@ def send_and_record(session: Session, epub: Path, subject: str) -> str:
                                         "last_send_message": str(exc)})
         session.commit()
         raise
-    message = f"{epub.name} enviado para {cfg.kindle_email}"
+    message = tr(f"{epub.name} enviado para {cfg.kindle_email}", f"{epub.name} sent to {cfg.kindle_email}")
     set_section(session, "kindle", {"last_send_at": stamp, "last_send_ok": True, "last_send_message": message})
     session.commit()
     return message

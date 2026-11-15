@@ -14,36 +14,42 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
-from .config import FONTS_DIR
+from .config import FONTS_DIR, config
+from .i18n import tr
 from .models import Setting
 
 MASTHEAD_FONTS: dict[str, dict] = {
     "chomsky": {
         "label": "Chomsky (blackletter clássico)",
+        "label_en": "Chomsky (classic blackletter)",
         "family": "Chomsky",
         "file": "Chomsky.otf",
         "license": "SIL OFL 1.1",
     },
     "unifraktur-maguntia": {
         "label": "UnifrakturMaguntia (gótica)",
+        "label_en": "UnifrakturMaguntia (gothic)",
         "family": "UnifrakturMaguntia",
         "file": "UnifrakturMaguntia-Book.ttf",
         "license": "SIL OFL 1.1",
     },
     "unifraktur-cook": {
         "label": "UnifrakturCook (gótica negrito)",
+        "label_en": "UnifrakturCook (gothic bold)",
         "family": "UnifrakturCook",
         "file": "UnifrakturCook-Bold.ttf",
         "license": "SIL OFL 1.1",
     },
     "old-standard": {
         "label": "Old Standard TT (romana vitoriana)",
+        "label_en": "Old Standard TT (Victorian roman)",
         "family": "Old Standard TT",
         "file": "OldStandard-Bold.ttf",
         "license": "SIL OFL 1.1",
     },
     "playfair": {
         "label": "Playfair Display Black (didone)",
+        "label_en": "Playfair Display Black (didone)",
         "family": "Playfair Display",
         "file": "PlayfairDisplay-Black.ttf",
         "license": "SIL OFL 1.1",
@@ -78,9 +84,15 @@ class Typography(BaseModel):
 
 class NewspaperSettings(BaseModel):
     title: str = Field("Dayfold", min_length=1, max_length=40)
-    tagline: str = Field("Notícias do dia, dobradas para ler com calma.", max_length=120)
+    tagline: str = Field(
+        default_factory=lambda: tr("Notícias do dia, dobradas para ler com calma.",
+                                   "Today's news, folded to read at your own pace."),
+        max_length=120,
+    )
     masthead_font: str = "chomsky"
-    language: Literal["pt", "en"] = "pt"
+    # Fresh installs follow the server's language (DAYFOLD_LANGUAGE); an English setup should not
+    # typeset a Portuguese paper on first run. Stored settings keep whatever the user saved.
+    language: Literal["pt", "en"] = Field(default_factory=lambda: config.language)
     max_articles: int = Field(16, ge=3, le=60)
     excerpt_words: int = Field(70, ge=20, le=200)
     include_images: bool = True
@@ -180,7 +192,7 @@ class KindleSettings(BaseModel):
     def _email(cls, v: str) -> str:
         v = v.strip()
         if v and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
-            raise ValueError("e-mail inválido")
+            raise ValueError(tr("e-mail inválido", "invalid e-mail address"))
         return v
 
     @field_validator("gmail_app_password")

@@ -9,6 +9,7 @@ import traceback
 from sqlalchemy import select, update
 
 from ..db import session_scope
+from ..i18n import tr
 from ..models import GenerationJob, JobStatus, ScraperJob, utcnow
 
 log = logging.getLogger("dayfold.jobs")
@@ -39,7 +40,8 @@ def enqueue_generation(trigger: str = "manual") -> int:
         )
         if running:
             return running
-        job = GenerationJob(trigger=trigger, log=[f"Geração solicitada ({trigger})."])
+        job = GenerationJob(trigger=trigger,
+                            log=[tr(f"Geração solicitada ({trigger}).", f"Generation requested ({trigger}).")])
         s.add(job)
         s.flush()
         job_id = job.id

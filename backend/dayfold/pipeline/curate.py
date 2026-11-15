@@ -14,6 +14,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..ai.client import AIError, active_client
+from ..i18n import tr
 from ..models import Article, Edition, EditionArticle, EditionStatus, Provider, Topic, utcnow
 from ..settings import CurationSettings, NewspaperSettings
 
@@ -108,7 +109,8 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
         score += 0.1 if a.author else 0
         out.append(Candidate(a, best.slug, round(score, 3), best_hits))
     if skipped:
-        log("Filtradas: " + ", ".join(f"{n} por {k}" for k, n in skipped.items()) + ".")
+        log(tr("Filtradas: ", "Filtered out: ")
+            + ", ".join(f"{n} ({k})" for k, n in skipped.items()) + ".")
     # dedupe by title similarity, keep the best scored
     out.sort(key=lambda c: -c.score)
     kept: list[Candidate] = []
@@ -120,7 +122,8 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
         kept.append(c)
         toks.append(tk)
     if len(kept) < len(out):
-        log(f"Duplicadas removidas por título: {len(out) - len(kept)}.")
+        log(tr(f"Duplicadas removidas por título: {len(out) - len(kept)}.",
+               f"Duplicates removed by title: {len(out) - len(kept)}."))
     _ = by_slug
     return kept
 
@@ -180,7 +183,8 @@ def ai_select(session: Session, cands: list[Candidate], news: NewspaperSettings,
               cur: CurationSettings, log: Callable[[str], None]) -> list[Pick] | None:
     ai = active_client(session)
     if ai is None:
-        log("Curadoria com IA ligada, mas nenhuma IA está ativa: usando regras.")
+        log(tr("Curadoria com IA ligada, mas nenhuma IA está ativa: usando regras.",
+               "AI curation is on but no AI provider is active: using rules."))
         return None
     pool = cands[: cur.ai_candidates]
     topics = list(session.scalars(select(Topic).where(Topic.enabled.is_(True)).order_by(Topic.position)))
@@ -194,11 +198,12 @@ def ai_select(session: Session, cands: list[Candidate], news: NewspaperSettings,
         title=news.title, sections=sections, max_articles=news.max_articles,
         per_section=max(t.max_articles for t in topics), lines="\n".join(lines),
     )
-    log(f"Enviando {len(pool)} candidatas para {ai.label} (~{len(prompt) // 4} tokens).")
+    log(tr(f"Enviando {len(pool)} candidatas para {ai.label} (~{len(prompt) // 4} tokens).",
+           f"Sending {len(pool)} candidates to {ai.label} (~{len(prompt) // 4} tokens)."))
     try:
         result = ai.complete_json(prompt, AISelection, max_tokens=1200)
     except AIError as exc:
-        log(f"IA falhou ({exc}): usando regras.")
+        log(tr(f"IA falhou ({exc}): usando regras.", f"AI failed ({exc}): using rules."))
         return None
     valid_ids = {c.article.id: c for c in pool}
     slugs = {t.slug for t in topics}
@@ -214,18 +219,19 @@ def ai_select(session: Session, cands: list[Candidate], news: NewspaperSettings,
         if len(picks) >= news.max_articles:
             break
     if len(picks) < 3:
-        log("IA devolveu poucas matérias válidas: usando regras.")
+        log(tr("IA devolveu poucas matérias válidas: usando regras.",
+               "AI returned too few valid stories: using rules."))
         return None
     if not any(p.is_headline for p in picks):
         min(picks, key=lambda p: (p.priority, -p.score)).is_headline = True
-    log(f"IA selecionou {len(picks)} matérias.")
+    log(tr(f"IA selecionou {len(picks)} matérias.", f"AI selected {len(picks)} stories."))
     return picks
 
 
 def curate(session: Session, news: NewspaperSettings, cur: CurationSettings,
            log: Callable[[str], None]) -> tuple[list[Pick], str]:
     cands = candidates(session, cur, log)
-    log(f"{len(cands)} candidatas após filtros.")
+    log(tr(f"{len(cands)} candidatas após filtros.", f"{len(cands)} candidates after filters."))
     if not cands:
         return [], "rules"
     if cur.use_ai:
