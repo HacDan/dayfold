@@ -58,6 +58,7 @@ e-reader only reads an offline file.
 | `articles` | Collected items: title, subtitle, author, date, provider, URL, image, body, excerpt, hash, language. |
 | `editions` | One generated issue: number, date, title, status, files, stats. |
 | `edition_articles` | Which articles went into an edition, their section, order and priority. |
+| `article_ratings` | Reader ratings from "Rate edition" (-1, 0, 1), with provider, section and title copied so they outlive the edition. |
 | `games` | Game catalog (`sudoku`, `wordle`, `wordsearch`, `crossword`), enabled flag, order and per game config. |
 | `game_instances` | Puzzles generated for an edition (puzzle and solution JSON). |
 | `generation_jobs` | Edition generations with step, progress and log lines. |
@@ -72,7 +73,9 @@ e-reader only reads an offline file.
    keeps a short excerpt (default 60 words), `full_content_allowed` keeps the body.
 4. **Dedupe** by normalized URL, then by title similarity (token Jaccard).
 5. **Filter** by maximum age, language, active sections and blocked keywords.
-6. **Curate**: deterministic score (section keywords, recency, has body, has image).
+6. **Curate**: deterministic score (section keywords, recency, has body, has image), plus a
+   bonus learned from the reader ratings (`pipeline/feedback.py`: provider, section and title
+   words, smoothed and decayed with a 60 day half life).
    With AI on, only the top N candidates go to the model as compact lines
    (`id | section guess | title | 30 word excerpt`), and the model returns
    `{"selected": [{"id", "section", "priority"}], "headline_id"}`. Invalid answers fall

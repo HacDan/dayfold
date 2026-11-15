@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { locale, t } from "../i18n";
 import { del, get, post, fmtDateTime, USAGE_LABEL, type EditionSummary, type Job } from "../api";
 import { GamePreview } from "../components/games";
@@ -32,6 +32,7 @@ export default function EditionDetail() {
     <div>
       <SectionTitle kicker={`${t("Edição nº {n}", { n: data.number })} · ${new Date(data.date + "T12:00").toLocaleDateString(locale(), { dateStyle: "full" })}`} title={data.headline ?? data.title}>
         {data.epub_url && <a className="btn primary" href={data.epub_url}>{t("Baixar EPUB")}</a>}
+        {data.status === "READY" && <Link className="btn" to={`/edicoes/${data.id}/avaliar`}>{t("Avaliar edição")}</Link>}
         <button className="btn" disabled={busy} onClick={() => run(() => post(`/api/editions/${data.id}/charge`), t("Nova charge desenhada")).then((r) => r && reload())}>{busy ? t("Desenhando…") : t("Refazer charge")}</button>
         <button className="btn" onClick={() => run(() => post(`/api/editions/${data.id}/retypeset`), t("Edição recomposta com as configurações atuais")).then((r) => r && reload())}>{t("Recompor")}</button>
         <button className="btn danger" onClick={() => {

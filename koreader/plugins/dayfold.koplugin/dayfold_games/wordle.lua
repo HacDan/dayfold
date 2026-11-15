@@ -1,6 +1,7 @@
 --[[ Word of the day: on screen keyboard, feedback per letter, progress saved. ]]
 local GameBase = require("dayfold_games/base")
 local D = require("dayfold_games/draw")
+local _ = require("dayfold_l10n")
 
 local Wordle = GameBase:extend{ name = "dayfold_wordle" }
 
@@ -138,7 +139,7 @@ function Wordle:draw(bb, x, top, w, h)
         local won = self.state.guesses[#self.state.guesses] == self.answer
         local mf = D.face(math.floor(w * 0.035), "tfont")
         local my = top + self.attempts * (s + gap) + math.floor(gap * 2)
-        D.center(bb, mf, won and "Acertou!" or ("Resposta: " .. self.answer), x + math.floor(w / 2), my, true)
+        D.center(bb, mf, won and _("Got it!") or string.format(_("Answer: %s"), self.answer), x + math.floor(w / 2), my, true)
     end
 end
 
@@ -150,7 +151,7 @@ function Wordle:tap(px, py)
                 self.current = self.current:sub(1, -2)
             elseif k.key == "ENTER" then
                 if #self.current < self.length then
-                    self:flash(string.format("A palavra tem %d letras", self.length))
+                    self:flash(string.format(_("The word has %d letters"), self.length))
                     return
                 end
                 table.insert(self.state.guesses, self.current)
@@ -158,7 +159,7 @@ function Wordle:tap(px, py)
                 self:save()
                 if self:finished() then
                     local won = self.state.guesses[#self.state.guesses] == self.answer
-                    self:flash(won and "Parabéns! Palavra descoberta." or ("Fim de jogo: " .. self.answer))
+                    self:flash(won and _("Well done! You found the word.") or string.format(_("Game over: %s"), self.answer))
                 end
             elseif #self.current < self.length then
                 self.current = self.current .. k.key

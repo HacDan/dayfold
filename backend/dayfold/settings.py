@@ -84,17 +84,17 @@ class Typography(BaseModel):
 
 class NewspaperSettings(BaseModel):
     title: str = Field("Dayfold", min_length=1, max_length=40)
-    tagline: str = Field(
-        default_factory=lambda: tr("Notícias do dia, dobradas para ler com calma.",
-                                   "Today's news, folded to read at your own pace."),
-        max_length=120,
-    )
+    tagline: str = Field("The day's news, folded for an unhurried read.", max_length=120)
     masthead_font: str = "chomsky"
     # Fresh installs follow the server's language (DAYFOLD_LANGUAGE); an English setup should not
     # typeset a Portuguese paper on first run. Stored settings keep whatever the user saved.
     language: Literal["pt", "en"] = Field(default_factory=lambda: config.language)
     max_articles: int = Field(16, ge=3, le=60)
     excerpt_words: int = Field(70, ge=20, le=200)
+    # Default length cap for full text stories (None = whole story). Sections and providers can
+    # set their own; the most specific one wins.
+    article_max_words: int | None = Field(None, ge=50, le=5000)
+    article_max_paragraphs: int | None = Field(None, ge=1, le=100)
     include_images: bool = True
     include_charge: bool = False
     include_games: bool = True
@@ -146,6 +146,9 @@ class CurationSettings(BaseModel):
     blocked_keywords: list[str] = []
     ai_candidates: int = Field(40, ge=10, le=120)
     per_provider_limit: int = Field(4, ge=1, le=20)
+    # Reader ratings ("Rate edition") nudge the score of similar stories; 0 = ignore them.
+    use_feedback: bool = True
+    feedback_weight: float = Field(1.0, ge=0, le=3)
 
 
 class ChargeSettings(BaseModel):

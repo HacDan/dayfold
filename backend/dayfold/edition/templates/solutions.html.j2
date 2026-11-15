@@ -3,7 +3,7 @@
 <div class="game{% if not loop.first %} pb{% endif %}" id="s{{ g.index }}">
 <h2>{{ g.title }}</h2>
 {% if g.kind in ('sudoku', 'crossword') %}
-<div class="puzzle-img"><img src="{{ g.solution_img }}" alt="Solução"/></div>
+<div class="puzzle-img"><img src="{{ g.solution_img }}" alt="{{ L.solutions }}"/></div>
 {% elif g.kind == 'wordle' %}
 <div class="tiles">{% for ch in g.solution.answer %}<span class="tile correct">{{ ch }}</span>{% endfor %}</div>
 {% elif g.kind == 'wordsearch' %}

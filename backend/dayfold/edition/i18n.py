@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 WEEKDAYS = {
     "pt": ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira",
@@ -18,7 +18,8 @@ LABELS = {
     "pt": {
         "edition": "Edição", "number": "Nº", "year": "Ano", "by": "Por", "source": "Fonte",
         "in_this_edition": "Nesta edição", "front_page": "Primeira página",
-        "read_more": "Leia a íntegra na fonte", "excerpt_note": "Excerto. Texto integral em",
+        "read_more": "Leia a íntegra na fonte", "continues": "A matéria continua na fonte",
+        "excerpt_note": "Excerto. Texto integral em",
         "metadata_note": "Somente título e dados. Matéria completa em",
         "charge": "A Charge", "charge_kicker": "Humor", "games": "Passatempos",
         "solutions": "Soluções", "see_solution": "Ver solução", "back": "Voltar",
@@ -64,7 +65,8 @@ LABELS = {
     "en": {
         "edition": "Edition", "number": "No.", "year": "Vol.", "by": "By", "source": "Source",
         "in_this_edition": "In this edition", "front_page": "Front page",
-        "read_more": "Read the full story at the source", "excerpt_note": "Excerpt. Full text at",
+        "read_more": "Read the full story at the source", "continues": "The story continues online",
+        "excerpt_note": "Excerpt. Full text at",
         "metadata_note": "Headline and metadata only. Full story at",
         "charge": "The Cartoon", "charge_kicker": "Humor", "games": "Puzzles",
         "solutions": "Solutions", "see_solution": "See solution", "back": "Back",
@@ -108,6 +110,36 @@ LABELS = {
                          "Display, Literata and Old Standard TT.",
     },
 }
+
+
+# Defaults that ship with Dayfold. While the user keeps them, the edition shows them in its own
+# language; anything the user typed is printed as is.
+DEFAULT_TAGLINES = {
+    "pt": "Notícias do dia, dobradas para ler com calma.",
+    "en": "The day's news, folded for an unhurried read.",
+}
+DEFAULT_SECTION_NAMES = {
+    "brasil": {"pt": "Brasil", "en": "Brazil"},
+    "mundo": {"pt": "Mundo", "en": "World"},
+    "ciencia": {"pt": "Ciência", "en": "Science"},
+    "espaco": {"pt": "Espaço", "en": "Space"},
+    "saude": {"pt": "Saúde", "en": "Health"},
+    "tecnologia": {"pt": "Tecnologia", "en": "Technology"},
+    "cultura": {"pt": "Cultura", "en": "Culture"},
+}
+
+
+def localized_tagline(tagline: str, lang: str) -> str:
+    return DEFAULT_TAGLINES[lang] if tagline in DEFAULT_TAGLINES.values() else tagline
+
+
+def section_name(slug: str, name: str, lang: str) -> str:
+    names = DEFAULT_SECTION_NAMES.get(slug)
+    return names[lang] if names and name in names.values() else name
+
+
+def generated_stamp(dt: datetime, lang: str) -> str:
+    return short_date(dt.date(), lang) + dt.strftime(", %H:%M")
 
 
 def long_date(d: date, lang: str) -> str:

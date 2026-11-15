@@ -1,5 +1,6 @@
-local _ = require("gettext")
+local ok, _ = pcall(require, "dayfold_l10n")
+if not ok then _ = require("gettext") end
 return {
     fullname = _("Dayfold"),
-    description = _([[Baixa o jornal diário do seu servidor Dayfold e abre os jogos da edição (Sudoku, Palavra do Dia e Caça-palavras) no fluxo de leitura.]]),
+    description = _([[Downloads the daily paper from your Dayfold server and opens the edition's puzzles (Sudoku, Word of the Day, Word Search and Crossword) right in the reading flow.]]),
 }

@@ -90,6 +90,16 @@ jobs:
         working-directory: backend
         run: uv run pytest -q
 
+      - name: Install LuaJIT
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends luajit
+
+      # Fails, rather than skipping, when LuaJIT is unavailable: the plugin's catalogue and
+      # reader hooks are only covered here.
+      - name: KOReader plugin tests
+        run: make test-koreader
+
   build:
     needs: [check, verify]
     if: needs.check.outputs.build == 'true'

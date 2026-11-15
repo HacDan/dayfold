@@ -1,0 +1,170 @@
+# Portuguese (Brazil) translation of the Dayfold KOReader plugin.
+# msgids are the English messages used in the Lua source.
+msgid ""
+msgstr ""
+"Language: pt_BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Dayfold: invalid response from the server"
+msgstr "Dayfold: resposta inválida do servidor"
+
+msgid "%s No. %s (%s) is ready.\n\n%s\n\nOpen it now?"
+msgstr "%s nº %s (%s) pronto.\n\n%s\n\nAbrir agora?"
+
+msgid "Open"
+msgstr "Abrir"
+
+msgid "Downloading today's edition…"
+msgstr "Baixando a edição de hoje…"
+
+msgid "No edition on this device. Download one now?"
+msgstr "Nenhuma edição no aparelho. Baixar agora?"
+
+msgid "Dayfold server"
+msgstr "Servidor Dayfold"
+
+msgid "Server address"
+msgstr "Endereço do servidor"
+
+msgid "Feed token (dashboard › Kindle)"
+msgstr "Token do feed (dashboard › Kindle)"
+
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgid "Save"
+msgstr "Salvar"
+
+msgid "Server saved."
+msgstr "Servidor salvo."
+
+msgid "The puzzles of this edition were not downloaded. Sync again."
+msgstr "Os jogos desta edição não foram baixados. Sincronize de novo."
+
+msgid "Puzzle not found."
+msgstr "Jogo não encontrado."
+
+msgid "This edition has no puzzles."
+msgstr "Esta edição não tem jogos."
+
+msgid "Back to the paper"
+msgstr "Voltar ao jornal"
+
+msgid "Puzzles"
+msgstr "Passatempos"
+
+msgid "Play the puzzles"
+msgstr "Jogar os passatempos"
+
+msgid "Back to the front page"
+msgstr "Voltar à primeira página"
+
+msgid "Look for a new edition"
+msgstr "Buscar edição nova"
+
+msgid "Library"
+msgstr "Biblioteca"
+
+msgid "Keep reading"
+msgstr "Continuar lendo"
+
+msgid "End of edition"
+msgstr "Fim da edição"
+
+msgid "Download today's edition"
+msgstr "Baixar edição de hoje"
+
+msgid "Open latest edition"
+msgstr "Abrir última edição"
+
+msgid "Puzzles of this edition"
+msgstr "Passatempos da edição"
+
+msgid "Download automatically (when Wi-Fi is already on)"
+msgstr "Baixar automaticamente (se o Wi-Fi já estiver ligado)"
+
+msgid "Set up server"
+msgstr "Configurar servidor"
+
+msgid "Last sync: %s"
+msgstr "Última sincronização: %s"
+
+msgid "never"
+msgstr "nunca"
+
+msgid "network unavailable (%s)"
+msgstr "rede indisponível (%s)"
+
+msgid "invalid token"
+msgstr "token inválido"
+
+msgid "no edition ready on the server"
+msgstr "nenhuma edição pronta no servidor"
+
+msgid "CHECK"
+msgstr "VERIFICAR"
+
+msgid "RESTART"
+msgstr "RECOMEÇAR"
+
+msgid "Tap an empty cell first"
+msgstr "Toque numa casa vazia primeiro"
+
+msgid "Perfect! Sudoku solved."
+msgstr "Perfeito! Sudoku resolvido."
+
+msgid "All good so far. %d cells to go."
+msgstr "Tudo certo até aqui. Faltam %d casas."
+
+msgid "%d wrong cell(s) marked in gray."
+msgstr "%d casa(s) errada(s) marcadas em cinza."
+
+msgid "Well done! Sudoku solved."
+msgstr "Parabéns! Sudoku resolvido."
+
+msgid "Well done! Crossword complete."
+msgstr "Parabéns! Cruzadas completas."
+
+msgid "Grid full, but %d wrong letter(s)."
+msgstr "Grade cheia, mas %d letra(s) errada(s)."
+
+msgid "Across"
+msgstr "Horizontal"
+
+msgid "Down"
+msgstr "Vertical"
+
+msgid "Got it!"
+msgstr "Acertou!"
+
+msgid "Answer: %s"
+msgstr "Resposta: %s"
+
+msgid "The word has %d letters"
+msgstr "A palavra tem %d letras"
+
+msgid "Well done! You found the word."
+msgstr "Parabéns! Palavra descoberta."
+
+msgid "Game over: %s"
+msgstr "Fim de jogo: %s"
+
+msgid "%d of %d words · theme: %s"
+msgstr "%d de %d palavras · tema: %s"
+
+msgid "Well done! All words found."
+msgstr "Parabéns! Todas as palavras encontradas."
+
+# Single letter on the crossword key that switches to across entries.
+msgid "A"
+msgstr "H"
+
+# Single letter on the crossword key that switches to down entries.
+msgid "D"
+msgstr "V"
+
+msgid "Dayfold"
+msgstr "Dayfold"
+
+msgid "Downloads the daily paper from your Dayfold server and opens the edition's puzzles (Sudoku, Word of the Day, Word Search and Crossword) right in the reading flow."
+msgstr "Baixa o jornal diário do seu servidor Dayfold e abre os jogos da edição (Sudoku, Palavra do Dia, Caça-palavras e Palavras Cruzadas) no fluxo de leitura."

@@ -1,6 +1,7 @@
 --[[ Crossword: tap a square (tap it again to switch across/down), type on the keyboard. ]]
 local GameBase = require("dayfold_games/base")
 local D = require("dayfold_games/draw")
+local _ = require("dayfold_l10n")
 
 local Crossword = GameBase:extend{ name = "dayfold_crossword" }
 
@@ -102,7 +103,7 @@ function Crossword:draw(bb, x, top, w, h)
     -- current clue
     if entry then
         local cf = D.face(math.floor(w * 0.03))
-        local label = string.format("%d %s: %s (%d)", entry.n, entry.dir == "across" and "Horizontal" or "Vertical",
+        local label = string.format("%d %s: %s (%d)", entry.n, entry.dir == "across" and _("Across") or _("Down"),
             entry.clue, entry.len)
         local lines = wrap(cf, label, w - 2 * pad)
         local lh = math.floor(w * 0.042)
@@ -127,7 +128,7 @@ function Crossword:draw(bb, x, top, w, h)
         if r == 3 then
             local turn = { x = rx, y = ry, w = math.floor(kw * 1.5), h = kh, key = "TURN" }
             table.insert(self.keys, turn)
-            D.button(bb, turn, self.dir == "across" and "H" or "V", kf, true)
+            D.button(bb, turn, self.dir == "across" and _("A") or _("D"), kf, true)
             rx = rx + turn.w + kgap
         end
         for i = 1, n do
@@ -171,9 +172,9 @@ function Crossword:checkComplete()
             self.state.done = true
             self:save()
         end
-        self:flash("Parabéns! Cruzadas completas.")
+        self:flash(_("Well done! Crossword complete."))
     else
-        self:flash(string.format("Grade cheia, mas %d letra(s) errada(s).", wrong))
+        self:flash(string.format(_("Grid full, but %d wrong letter(s)."), wrong))
     end
 end
 

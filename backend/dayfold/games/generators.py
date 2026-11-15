@@ -129,6 +129,12 @@ THEME_LABELS = {
     "city": "City", "kitchen": "Kitchen",
 }
 
+# The same word search theme in each language, so a theme picked for one still works when the
+# puzzle follows an edition in the other.
+THEME_EQUIVALENTS = {"animais": "animals", "natureza": "nature", "espaco": "space", "cidade": "city",
+                     "cozinha": "kitchen"}
+THEME_EQUIVALENTS |= {v: k for k, v in THEME_EQUIVALENTS.items()}
+
 DIRS_EASY = [(0, 1), (1, 0)]
 DIRS_MEDIUM = [(0, 1), (1, 0), (1, 1), (-1, 1)]
 DIRS_HARD = DIRS_MEDIUM + [(0, -1), (-1, 0), (-1, -1), (1, -1)]
@@ -155,6 +161,7 @@ def wordsearch(rng: random.Random, language: str = "pt", size: int = 12, theme: 
         theme_label = "Notícias do dia" if language == "pt" else "Today's news"
     if len(pool) < count:
         themes = WORDSEARCH_THEMES.get(language, WORDSEARCH_THEMES["pt"])
+        theme = theme if theme in themes else THEME_EQUIVALENTS.get(theme, theme)
         key = theme if theme in themes else rng.choice(sorted(themes))
         if not pool:  # no headlines to draw from: label the theme itself
             theme_label = THEME_LABELS.get(key, key.capitalize())

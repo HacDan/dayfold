@@ -70,6 +70,13 @@ pre { background: var(--paper-2); padding: .8em 1em; overflow: auto; border-left
 .mast { text-align: center; padding-top: 18px; }
 .mast .ears { display: flex; justify-content: space-between; font-family: var(--caps); font-size: .78rem;
   letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+/* edition language notice, right under the dashboard language switch */
+.mast .lang-hint { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin: 6px 0 0; font-size: .82rem; font-style: italic; color: var(--ink-2); text-align: right; }
+.mast .lang-hint .ctl { font-size: 1rem; line-height: 1; padding: 2px 6px; color: var(--ink-2); }
+.mast .lang-hint .ctl:hover { color: var(--ink); }
+.mast .lang-hint button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 640px) { .mast .lang-hint { justify-content: center; text-align: center; } }
 .mast .name { font-family: var(--masthead); font-weight: normal; font-size: clamp(2.8rem, 8vw, 5.4rem);
   line-height: 1; margin: .08em 0 0; letter-spacing: .01em; }
 .mast .name a { text-decoration: none; }
@@ -314,6 +321,9 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
 .header-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 640px) { .header-controls .ctl span { display: none; } }
 
+/* two small number inputs stacked in a table cell (section length caps) */
+.stack-inputs { display: grid; gap: 4px; }
+
 /* Section chips (provider form) */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { font-family: var(--caps); font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
@@ -321,3 +331,34 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
 .chip.on { background: var(--ink); color: var(--paper); border-color: var(--ink); font-weight: 700; }
 .chip.off:not(.on) { opacity: .55; }
 .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* rate edition */
+.rate-progress { margin: 6px 0 18px; }
+.rate-progress .byline { margin-top: 6px; }
+.rate-section { margin-bottom: 22px; }
+.rate-section h3 { border-bottom: 1px solid var(--rule); padding-bottom: 4px; }
+.rate-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--rule-soft); }
+.rate-title { font-family: var(--display); font-weight: 700; font-size: 1.05rem; line-height: 1.2; }
+.rate-title a { text-decoration: none; }
+.rate-title a:hover { text-decoration: underline; }
+.rate-deck { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 2px 0; }
+.rate { display: inline-flex; border: 1px solid var(--rule); background: var(--card); }
+.rate button { font-family: var(--caps); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; background: none;
+  border: 0; padding: 7px 10px; color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  transition: background-color 150ms ease, color 150ms ease; }
+.rate button + button { border-left: 1px solid var(--rule-soft); }
+.rate button:hover { background: var(--paper-2); color: var(--ink); }
+.rate button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rate button[aria-pressed="true"] { color: var(--paper); font-weight: 700; }
+.rate button.down[aria-pressed="true"] { background: var(--bad); }
+.rate button.meh[aria-pressed="true"] { background: var(--ink-3); }
+.rate button.up[aria-pressed="true"] { background: var(--ok); }
+.rate button svg { transition: transform 160ms var(--ease-out); }
+.rate button:active svg { transform: scale(0.85); }
+.learned-h { font-family: var(--caps); font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; margin: 12px 0 2px; }
+@media (max-width: 640px) {
+  .rate-row { grid-template-columns: 1fr; gap: 8px; }
+  .rate { width: 100%; }
+  .rate button { flex: 1; justify-content: center; padding: 9px 6px; }
+}

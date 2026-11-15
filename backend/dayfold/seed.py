@@ -171,11 +171,11 @@ DEFAULT_GAMES: list[dict] = [
     dict(kind="sudoku", name="Sudoku", position=0,
          config={"difficulty": "medium", "count": 1}),
     dict(kind="wordle", name="Palavra do Dia", position=1,
-         config={"language": "pt", "length": 5, "attempts": 6}),
+         config={"language": "auto", "length": 5, "attempts": 6}),
     dict(kind="wordsearch", name="Caça-palavras", position=2,
-         config={"language": "pt", "size": 12, "theme": "news", "words": 10}),
+         config={"language": "auto", "size": 12, "theme": "news", "words": 10}),
     dict(kind="crossword", name="Palavras Cruzadas", position=3,
-         config={"language": "pt", "words": 10, "size": 13}),
+         config={"language": "auto", "words": 10, "size": 13}),
 ]
 
 
@@ -201,6 +201,25 @@ def _mark_seeded(session: Session, name: str) -> None:
     session.flush()
 
 
+def _migrate(session: Session) -> None:
+    """One-off data changes for existing installs, each recorded so it runs once."""
+    row = session.get(Setting, "migrations")
+    done = set((row.value or {}).get("done", [])) if row else set()
+    if "games_language_auto" not in done:
+        # Word games used to be seeded with "pt" and had no way to follow the edition language,
+        # so an English edition still got Portuguese puzzles. "auto" keeps Portuguese editions
+        # exactly as they were.
+        for g in session.scalars(select(Game)):
+            if g.config.get("language") == "pt":
+                g.config = {**g.config, "language": "auto"}
+        done.add("games_language_auto")
+    value = {"done": sorted(done)}
+    if row is None:
+        session.add(Setting(key="migrations", value=value))
+    elif row.value != value:
+        row.value = value
+
+
 def seed(session: Session) -> None:
     state = _seed_state(session)
     if not state.get("topics"):
@@ -218,6 +237,8 @@ def seed(session: Session) -> None:
                 last += 1
                 g = {**g, "position": last}
             session.add(Game(**g))
+
+    _migrate(session)
 
     if session.scalar(select(Provider.id).limit(1)) is None:
         for p in DEFAULT_PROVIDERS:

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { t } from "../i18n";
 import { get, put, type Newspaper as NewspaperT, type Settings, type Typography } from "../api";
-import { Field, Loading, SectionTitle, useAction, useLoad } from "../components/ui";
+import { Field, Loading, OptionalNumber, SectionTitle, useAction, useLoad } from "../components/ui";
 
 const TYPE_LABEL: Record<keyof Typography, string> = {
   masthead: "Nome do jornal (masthead)", headline: "Manchete principal", title: "Título das matérias",
@@ -41,6 +41,10 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
   useEffect(() => { if (data) setV(structuredClone(data.values)); }, [data]);
+  useEffect(() => {
+    window.addEventListener("dayfold:settings", reload);
+    return () => window.removeEventListener("dayfold:settings", reload);
+  }, [reload]);
   const family = useMemo(() => data?.meta.masthead_fonts.find((f) => f.key === v?.newspaper.masthead_font)?.family ?? "Chomsky", [data, v?.newspaper.masthead_font]);
   if (!data || !v) return <Loading />;
   const meta = data.meta;
@@ -100,7 +104,7 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
                 </button>
               ))}
             </div>
-            <Field label={t("Idioma da edição")}>
+            <Field label={t("Idioma da edição")} hint={t("Rótulos, datas, nomes padrão das seções e os jogos com idioma “Igual à edição”. Independe do idioma da dashboard.")}>
               <select value={news.language} onChange={(e) => setNews({ language: e.target.value as "pt" | "en" })}>
                 <option value="pt">{t("Português")}</option><option value="en">{t("English")}</option>
               </select>
@@ -129,7 +133,14 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
             <div className="grid cols-2" style={{ gap: 14 }}>
               <Field label={t("Máximo de matérias")}><input type="number" min={3} max={60} value={news.max_articles} onChange={(e) => setNews({ max_articles: Number(e.target.value) })} /></Field>
               <Field label={t("Palavras no excerto")}><input type="number" min={20} max={200} value={news.excerpt_words} onChange={(e) => setNews({ excerpt_words: Number(e.target.value) })} /></Field>
+              <Field label={t("Máximo de palavras por matéria")} hint={t("Só para texto integral. Vazio: matéria inteira.")}>
+                <OptionalNumber value={news.article_max_words} min={50} max={5000} placeholder={t("sem limite")} onChange={(v) => setNews({ article_max_words: v })} />
+              </Field>
+              <Field label={t("Máximo de parágrafos por matéria")} hint={t("Seções e provedores podem ter limites próprios.")}>
+                <OptionalNumber value={news.article_max_paragraphs} min={1} max={100} placeholder={t("sem limite")} onChange={(v) => setNews({ article_max_paragraphs: v })} />
+              </Field>
             </div>
+            <p className="small muted">{t("Uma matéria cortada termina na última frase que cabe e ganha a nota “A matéria continua na fonte” com o link.")}</p>
             <label className="check"><input type="checkbox" checked={news.include_images} onChange={(e) => setNews({ include_images: e.target.checked })} />{" "}{t("Incluir fotos (só de fontes com texto integral liberado)")}</label>
             <label className="check" title={meta.ai_available ? "" : "Configure uma IA para habilitar"}>
               <input type="checkbox" disabled={!meta.ai_available} checked={news.include_charge} onChange={(e) => setNews({ include_charge: e.target.checked })} />
@@ -185,6 +196,13 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
               </Field>
               <Field label={t("Candidatas enviadas à IA")}><input type="number" min={10} max={120} value={v.curation.ai_candidates} onChange={(e) => setV({ ...v, curation: { ...v.curation, ai_candidates: Number(e.target.value) } })} /></Field>
             </div>
+            <label className="check">
+              <input type="checkbox" checked={v.curation.use_feedback} onChange={(e) => setV({ ...v, curation: { ...v.curation, use_feedback: e.target.checked } })} />
+              {t("Usar as avaliações das edições na curadoria")}
+            </label>
+            <Field label={t("Peso das avaliações")} hint={t("0 ignora as avaliações; 1 é o padrão; 3 deixa o seu gosto pesar mais que a relevância do dia")}>
+              <input type="number" min={0} max={3} step={0.25} disabled={!v.curation.use_feedback} value={v.curation.feedback_weight} onChange={(e) => setV({ ...v, curation: { ...v.curation, feedback_weight: Number(e.target.value) } })} />
+            </Field>
             <Field label={t("Palavras bloqueadas")} hint={t("matérias com estes termos são descartadas")}>
               <input type="text" value={v.curation.blocked_keywords.join(", ")} onChange={(e) => setV({ ...v, curation: { ...v.curation, blocked_keywords: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } })} />
             </Field>

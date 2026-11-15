@@ -51,6 +51,8 @@ class ProviderIn(BaseModel):
     license_note: str = ""
     enabled: bool = True
     max_items: int = Field(15, ge=1, le=50)
+    max_words: int | None = Field(None, ge=50, le=5000)
+    max_paragraphs: int | None = Field(None, ge=1, le=100)
 
 
 class ProviderCreate(ProviderIn):
@@ -114,7 +116,9 @@ def create_provider(body: ProviderCreate, session: Session = Depends(get_session
 @router.put("/providers/{pid}")
 def update_provider(pid: int, body: ProviderIn, session: Session = Depends(get_session)) -> dict:
     p = _get(session, pid)
-    for k, v in body.model_dump().items():
+    # length caps left out of the request keep their value (older clients do not send them)
+    unset = {"max_words", "max_paragraphs"} - body.model_fields_set
+    for k, v in body.model_dump(exclude=unset).items():
         setattr(p, k, str(v) if k == "base_url" else v)
     return provider_out(p)
 

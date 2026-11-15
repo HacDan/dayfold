@@ -55,7 +55,7 @@ export type Typography = { masthead: number; headline: number; title: number; su
 
 export type Newspaper = {
   title: string; tagline: string; masthead_font: string; language: "pt" | "en"; max_articles: number;
-  excerpt_words: number; include_images: boolean; include_charge: boolean; include_games: boolean; games_per_edition: number;
+  excerpt_words: number; article_max_words: number | null; article_max_paragraphs: number | null; include_images: boolean; include_charge: boolean; include_games: boolean; games_per_edition: number;
   closing_order: ("news" | "charge" | "games")[]; typography: Typography;
 };
 
@@ -69,7 +69,7 @@ export type Settings = {
   values: {
     newspaper: Newspaper;
     schedule: { enabled: boolean; time: string; timezone: string };
-    curation: { use_ai: boolean; max_age_hours: number; languages: string[]; blocked_keywords: string[]; ai_candidates: number; per_provider_limit: number };
+    curation: { use_ai: boolean; max_age_hours: number; languages: string[]; blocked_keywords: string[]; ai_candidates: number; per_provider_limit: number; use_feedback: boolean; feedback_weight: number };
     charge: { mode: "structured" | "illustrated"; style: string };
     device: { cover_width: number; cover_height: number; image_max_width: number; screensaver_cover: boolean };
     distribution: { feed_token: string; keep_editions: number };
@@ -101,12 +101,12 @@ export type ScraperJob = {
 export type Provider = {
   id: number; slug: string; name: string; base_url: string; source_type: string; category: string; categories: string[]; language: string;
   enabled: boolean; usage_mode: string; license_name: string; license_url: string | null; license_note: string;
-  is_default: boolean; max_items: number; active_version_id: number | null; active_version: Version | null;
+  is_default: boolean; max_items: number; max_words: number | null; max_paragraphs: number | null; active_version_id: number | null; active_version: Version | null;
   latest_status: string | null; latest_version: number | null; last_run_at: string | null; last_run_ok: boolean | null;
   last_run_message: string | null; last_run_count: number | null; versions?: Version[]; jobs?: ScraperJob[];
 };
 
-export type Topic = { id: number; slug: string; name: string; keywords: string[]; weight: number; enabled: boolean; max_articles: number; position: number };
+export type Topic = { id: number; slug: string; name: string; keywords: string[]; weight: number; enabled: boolean; max_articles: number; position: number; max_words: number | null; max_paragraphs: number | null };
 
 /** Section name for a stored slug. A deleted section keeps its slug on older editions, so a
     missing topic falls back to a readable label instead of the raw identifier. */
@@ -127,12 +127,22 @@ export type AIProvider = {
 export type Game = { id: number; kind: "sudoku" | "wordle" | "wordsearch" | "crossword"; name: string; enabled: boolean; position: number; config: Record<string, string | number> };
 
 export type Overview = {
-  today: string; newspaper: Newspaper; latest_edition: EditionSummary | null; last_job: Job | null; next_run: string | null;
+  today: string; newspaper: Newspaper; latest_edition: EditionSummary | null;
+  latest_ratings: { rated: number; total: number } | null; last_job: Job | null; next_run: string | null;
   schedule: { enabled: boolean; time: string; timezone: string };
   providers: { total: number; active: number; failing: number }; scrapers: { pending: number; failed_jobs: number };
   ai: { active: boolean; name: string | null; kind: string | null; session_usage: { calls: number; prompt_chars: number; completion_chars: number } };
   games: { kind: string; name: string; enabled: boolean }[]; charge: { enabled: boolean; available: boolean };
   recent_editions: EditionSummary[];
+};
+
+export type Rating = -1 | 0 | 1;
+
+type Learned = { name: string; affinity: number; ratings: number }[];
+export type Feedback = {
+  count: number; positive: number; neutral: number; negative: number;
+  more: { providers: Learned; sections: Learned; terms: Learned };
+  less: { providers: Learned; sections: Learned; terms: Learned };
 };
 
 export const USAGE_LABEL: Record<string, string> = {

@@ -149,6 +149,16 @@ export function Press({ value }: { value: number }) {
   return <div className="press" aria-label={`${Math.round(value * 100)}%`}><div style={{ transform: `scaleX(${Math.max(0.02, value)})` }} /></div>;
 }
 
+/* Optional whole number: empty means "no value" (null), e.g. no length cap or inherit it. */
+export function OptionalNumber({ value, onChange, min, max, placeholder, label }: {
+  value: number | null; onChange: (v: number | null) => void; min: number; max: number; placeholder: string; label?: string;
+}) {
+  return (
+    <input type="number" min={min} max={max} step={1} value={value ?? ""} placeholder={placeholder} aria-label={label}
+      onChange={(e) => onChange(e.target.value === "" ? null : Math.round(Number(e.target.value)))} />
+  );
+}
+
 export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <label className="field">

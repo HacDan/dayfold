@@ -1,5 +1,9 @@
 """DAYFOLD_LANGUAGE picks the language of the server's own text (errors, labels, logs)."""
 
+import json
+
+from edition_helpers import epub_text, generate
+
 
 def test_language_env_is_normalised(monkeypatch):
     from dayfold.config import Config
@@ -31,7 +35,7 @@ def test_fresh_install_paper_follows_the_server_language(data_dir, monkeypatch):
         paper = c.get("/api/settings").json()["values"]["newspaper"]
         assert paper["language"] == "en"
         # the tagline prints on the cover: it must not be Portuguese in an English paper
-        assert paper["tagline"] == "Today's news, folded to read at your own pace."
+        assert paper["tagline"] == "The day's news, folded for an unhurried read."
         assert c.put("/api/settings/newspaper", json={**paper, "language": "pt"}).status_code == 200
 
     # An existing install keeps the language its operator chose.
@@ -42,20 +46,28 @@ def test_fresh_install_paper_follows_the_server_language(data_dir, monkeypatch):
 
 def test_puzzles_and_their_titles_follow_the_paper_language():
     from dayfold.games.generators import seeded
-    from dayfold.pipeline.generate import game_name, make_game
+    from dayfold.pipeline.generate import GAME_TITLES, make_game
 
-    # A per-game language stored in the dashboard must not leak into the paper.
-    stored = make_game("wordle", {"language": "pt", "length": 5}, seeded("x", "wordle"), "en", [])
+    # "auto" (the default) follows the paper; an explicit per-game language is honoured.
+    auto = make_game("wordle", {"language": "auto", "length": 5}, seeded("x", "wordle"), "en", [])
     plain = make_game("wordle", {"length": 5}, seeded("x", "wordle"), "en", [])
-    assert stored == plain
+    assert auto == plain
+    stored = make_game("wordle", {"language": "pt", "length": 5}, seeded("x", "wordle"), "en", [])
+    explicit = make_game("wordle", {"language": "pt", "length": 5}, seeded("x", "wordle"), "pt", [])
+    assert stored == explicit
 
     en = make_game("crossword", {}, seeded("y", "crossword"), "en", [])
     pt = make_game("crossword", {}, seeded("y", "crossword"), "pt", [])
     assert en != pt  # the puzzle really is built in the paper's language
 
     # Cover footer and job log use the same titles as the game page.
-    assert game_name("en", "crossword", "Palavras Cruzadas") == "Crossword"
-    assert game_name("pt", "crossword", "Palavras Cruzadas") == "Palavras Cruzadas"
+    assert GAME_TITLES["en"]["crossword"] == "Crossword"
+    assert GAME_TITLES["pt"]["crossword"] == "Palavras Cruzadas"
+
+    # A theme saved for the other language prints as today's news instead of failing.
+    puzzle, _ = make_game("wordsearch", {"theme": "animais"}, seeded("z", "ws"), "en",
+                          ["Security officials testify"])
+    assert puzzle["theme"] == "Today's news"
 
 
 def test_game_preview_and_themes_follow_the_paper_language(data_dir):
@@ -80,7 +92,8 @@ def test_game_preview_and_themes_follow_the_paper_language(data_dir):
         assert preview["solution"]["answer"].lower() in WORDLE["en"][length]
         themes = c.get("/api/games").json()["schemas"]["wordsearch"]["theme"]
         assert themes[0] == "news"
-        assert "animals" in themes and "animais" not in themes
+        # every language's themes are offered: a game can be set to the other language
+        assert {"animals", "animais"} <= set(themes)
 
     with session_scope() as s:
         set_section(s, "newspaper", {"language": "pt"})
@@ -88,7 +101,7 @@ def test_game_preview_and_themes_follow_the_paper_language(data_dir):
     with TestClient(app) as c:
         assert c.get(f"/api/games/{gid}/preview").json()["puzzle"]["language"] == "pt"
         themes = c.get("/api/games").json()["schemas"]["wordsearch"]["theme"]
-        assert "animais" in themes and "animals" not in themes
+        assert "animais" in themes
 
 
 def test_filtered_reasons_follow_the_language(monkeypatch):
@@ -161,7 +174,7 @@ def test_games_list_survives_an_unknown_kind(data_dir):
         assert unknown["config"] == {"language": "pt"}  # nothing to validate against: as stored
 
 
-def test_saving_a_game_drops_retired_options_and_foreign_themes(data_dir):
+def test_saving_a_game_keeps_its_options_and_ignores_unknown_ones(data_dir):
     from fastapi.testclient import TestClient
     from sqlalchemy import select
 
@@ -175,35 +188,28 @@ def test_saving_a_game_drops_retired_options_and_foreign_themes(data_dir):
         wordle = s.scalar(select(Game).where(Game.kind == "wordle"))
         search = s.scalar(select(Game).where(Game.kind == "wordsearch"))
         wordle_id, search_id = wordle.id, search.id
-        wordle.config = {**wordle.config, "language": "pt"}    # retired option
-        search.config = {**search.config, "theme": "animais"}  # a Portuguese theme
+        wordle.config = {**wordle.config, "language": "pt"}  # chosen on the Games page
 
     with TestClient(app) as c:
-        games = {g["kind"]: g for g in c.get("/api/games").json()["games"]}
-        assert "language" not in games["wordle"]["config"]
-        assert games["wordsearch"]["config"]["theme"] == "news"
-
+        # an explicit language survives a save that does not mention it
         r = c.put(f"/api/games/{wordle_id}", json={"enabled": True,
                                                     "config": {"length": 5, "attempts": 6}})
         assert r.status_code == 200, r.text
-        assert r.json()["config"] == {"length": 5, "attempts": 6}
+        cfg = r.json()["config"]
+        assert (cfg["language"], cfg["length"], cfg["attempts"]) == ("pt", 5, 6)
 
-        # saving without a theme resets the one that belonged to the other language
-        r = c.put(f"/api/games/{search_id}", json={"enabled": True,
-                                                    "config": {"size": 12, "words": 10,
-                                                               "difficulty": "medium"}})
-        assert r.json()["config"]["theme"] == "news"
-
-        # an English theme is accepted and stored
+        # an option this version does not know is dropped instead of stored
         r = c.put(f"/api/games/{search_id}", json={"enabled": True,
                                                     "config": {"size": 12, "words": 10,
                                                                "theme": "animals",
-                                                               "difficulty": "medium"}})
-        assert r.json()["config"]["theme"] == "animals"
+                                                               "difficulty": "medium", "bogus": 1}})
+        cfg = r.json()["config"]
+        assert (cfg["size"], cfg["words"], cfg["theme"], cfg["difficulty"]) == (12, 10, "animals", "medium")
+        assert "bogus" not in cfg
 
     with session_scope() as s:
-        assert "language" not in s.get(Game, wordle_id).config
-        assert s.get(Game, search_id).config["theme"] == "animals"
+        assert s.get(Game, wordle_id).config["language"] == "pt"
+        assert "bogus" not in s.get(Game, search_id).config
 
 
 def test_backend_strings_follow_the_language(data_dir, monkeypatch):
@@ -234,3 +240,73 @@ def test_backend_strings_follow_the_language(data_dir, monkeypatch):
         assert c.get("/api/auth/status").json()["language"] == "pt"
         fonts = c.get("/api/settings").json()["meta"]["masthead_fonts"]
         assert fonts[0]["label"] == "Chomsky (blackletter clássico)"
+
+ARTICLES = [("nasa", "Telescope maps the edge of the solar system"),
+            ("agencia-brasil", "Libraries open on Saturdays"),
+            ("who-news", "Vaccination campaign reaches remote villages")]
+
+
+def test_new_install_prints_an_english_edition(data_dir, monkeypatch):
+    epub = generate(monkeypatch, ARTICLES, games_per_edition=3, language="en")
+    text = epub_text(epub)
+    assert "The day's news, folded for an unhurried read." in text
+    assert "Space" in text and "Espaço" not in text
+    assert "Brazil" in text
+    for pt in ("Edição", "Passatempos", "Fim da edição", "Fontes desta edição", "Palavras Cruzadas"):
+        assert pt not in text, pt
+    games = json.loads(epub.with_name(epub.name.replace(".epub", ".games.json")).read_text())
+    assert games["language"] == "en"
+    for g in games["games"]:
+        if "language" in g["puzzle"]:
+            assert g["puzzle"]["language"] == "en", g["kind"]
+
+
+def test_portuguese_edition_keeps_portuguese(data_dir, monkeypatch):
+    epub = generate(monkeypatch, ARTICLES, language="pt", games_per_edition=3)
+    text = epub_text(epub)
+    assert "Notícias do dia, dobradas para ler com calma." in text
+    assert "Espaço" in text and "Passatempos" in text
+    games = json.loads(epub.with_name(epub.name.replace(".epub", ".games.json")).read_text())
+    assert all(g["puzzle"].get("language", "pt") == "pt" for g in games["games"])
+
+
+def test_custom_names_are_kept(data_dir, monkeypatch):
+    from sqlalchemy import select
+
+    from dayfold.db import session_scope
+    from dayfold.models import Topic
+
+    with session_scope() as s:
+        s.scalar(select(Topic).where(Topic.slug == "espaco")).name = "Cosmos"
+    text = epub_text(generate(monkeypatch, ARTICLES, tagline="Mine"))
+    assert "Cosmos" in text and "Mine" in text
+
+
+def test_old_portuguese_games_follow_the_edition(data_dir):
+    from dayfold.db import session_scope
+    from dayfold.models import Game, Setting
+    from dayfold.seed import seed
+
+    with session_scope() as s:
+        s.delete(s.get(Setting, "migrations"))
+        for g in s.query(Game):
+            if "language" in g.config:
+                g.config = {**g.config, "language": "pt"}
+    with session_scope() as s:
+        seed(s)
+    with session_scope() as s:
+        langs = {g.kind: g.config.get("language") for g in s.query(Game)}
+        assert langs == {"sudoku": None, "wordle": "auto", "wordsearch": "auto", "crossword": "auto"}
+        # runs once: an explicit choice made later is kept
+        s.query(Game).filter(Game.kind == "wordle").one().config = {"language": "pt", "length": 5}
+    with session_scope() as s:
+        seed(s)
+    with session_scope() as s:
+        assert s.query(Game).filter(Game.kind == "wordle").one().config["language"] == "pt"
+
+
+def test_word_search_theme_follows_language():
+    from dayfold.games.generators import seeded, wordsearch
+
+    puzzle, _ = wordsearch(seeded("x", "ws"), "en", 12, "animais", 8)
+    assert puzzle["theme"] == "Animals"

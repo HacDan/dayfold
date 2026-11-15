@@ -1,6 +1,7 @@
 --[[ Word search: tap the first and the last letter of a word. ]]
 local GameBase = require("dayfold_games/base")
 local D = require("dayfold_games/draw")
+local _ = require("dayfold_l10n")
 
 local WordSearch = GameBase:extend{ name = "dayfold_wordsearch" }
 
@@ -82,7 +83,7 @@ function WordSearch:draw(bb, x, top, w, h)
     end
     local sf = D.face(math.floor(w * 0.026))
     local sy = ly + math.ceil(#self.words / cols) * lh + math.floor(lh * 0.6)
-    D.center(bb, sf, string.format("%d de %d palavras · tema: %s", count, #self.words, self.game.puzzle.theme or ""), x + math.floor(w / 2), sy)
+    D.center(bb, sf, string.format(_("%d of %d words · theme: %s"), count, #self.words, self.game.puzzle.theme or ""), x + math.floor(w / 2), sy)
 end
 
 function WordSearch:tap(px, py)
@@ -106,7 +107,7 @@ function WordSearch:tap(px, py)
                 self:save()
                 local n = 0
                 for _ in pairs(self.state.found) do n = n + 1 end
-                if n == #self.words then self:flash("Parabéns! Todas as palavras encontradas.")
+                if n == #self.words then self:flash(_("Well done! All words found."))
                 else self:flash(p.word .. "!") end
             end
             return self:refresh()

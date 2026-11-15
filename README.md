@@ -38,7 +38,13 @@ downloads one file a day and reads it offline.
   isolated process before activation, and can be rolled back.
 * **License aware**: every provider declares how its content may be used
   (`metadata_only`, `excerpt_and_link`, `full_content_allowed`) and Dayfold stores only what that mode allows.
+* **Story length caps**: full text stories can be capped by words and/or paragraphs for the
+  whole paper, per section or per provider (the most specific wins). A capped story ends at the
+  last sentence that fits, with a "The story continues online" note and the link. Caps apply when
+  the edition is typeset, so `retypeset` reshapes an existing edition without collecting again.
 * **Curation without AI** by section keywords, recency, deduplication and per source limits.
+* **Rate edition**: mark each story as more of this, neutral or less of this; the next editions
+  learn from it (source, section and title words), with or without AI.
 * **Optional AI** (OpenAI compatible APIs, Ollama, Anthropic, or a local CLI such as Claude Code or Codex) for:
   editorial selection over pre-filtered candidates, the daily cartoon, and AI assisted scraper generation.
   Everything else keeps working without it.
@@ -49,8 +55,13 @@ downloads one file a day and reads it offline.
 * **Games** prepared on the server: Sudoku (unique solution), Word of the Day (Wordle style),
   Word Search (themes or words from the day's headlines) and a free-form Crossword with clues, in
   Portuguese or English.
+* **English or Portuguese editions**: the edition language (Newspaper › Identity, English on new
+  installs) sets labels, dates, the default section names and tagline, and the word games, which
+  follow the edition unless one is set to a language of its own. It is separate from the dashboard
+  switch, and the dashboard points it out when the two differ.
 * **KOReader plugin**: sync over Wi-Fi, interactive games with saved progress, and a continuous
-  flow from the news to the cartoon and the puzzles.
+  flow from the news to the cartoon and the puzzles. Its menus follow the KOReader language
+  (English, with a Portuguese catalog in `l10n/pt.po`; more languages are one `.po` file away).
 * **Sleep screen** (optional, off by default): the latest front page as the Kindle sleep screen,
   in KOReader and, with the Dayfold agent, in the stock Kindle interface.
 * **Kindle agent** (optional): new editions are downloaded on wake and every 30 minutes while awake
@@ -90,7 +101,7 @@ DAYFOLD_PASSWORD=choose-one DAYFOLD_LANGUAGE=en docker compose up -d --build
 compose file reads the variable from your shell or from a `.env` file next to `docker-compose.yml`.
 The full list is in the table below.
 
-Open `http://SERVER:8422`, press **Gerar jornal agora** and download the EPUB.
+Open `http://SERVER:8422`, press **Print today's paper** and download the EPUB.
 
 ### From source (systemd user service)
 
@@ -125,21 +136,21 @@ cd backend && uv run dayfold retypeset 12   # re-typeset edition 12 with the cur
 
 ## Using it
 
-1. **Jornal**: name of the newspaper (also the EPUB title), masthead font, type sizes (limited to
+1. **Newspaper**: name of the newspaper (also the EPUB title), masthead font, type sizes (limited to
    ranges that keep the Kindle layout intact), number of stories, sections, schedule, cartoon and games,
    closing order (news, cartoon, games). The cover preview renders with unsaved settings.
-2. **Seções**: sections and their keywords. Keywords drive the rule based curation and guide the AI.
-3. **Provedores**: enable sources, set their usage mode and license notes, test them, add new ones
+2. **Sections**: sections and their keywords. Keywords drive the rule based curation and guide the AI.
+3. **Providers**: enable sources, set their usage mode and license notes, test them, add new ones
    manually (feed, generic extraction or CSS selectors) or with assisted creation.
 4. **Scrapers**: every version with its state (`PENDING`, `GENERATING`, `TESTING`, `READY`,
    `FAILED`, `DISABLED`). A new version replaces the active one only after it passes its test.
-5. **IA**: add a provider, test it, activate it. Presets for Claude Code CLI, Codex CLI,
+5. **AI**: add a provider, test it, activate it. Presets for Claude Code CLI, Codex CLI,
    Anthropic, OpenAI, Ollama and OpenRouter. For illustrated cartoons, set an image model (API) or an
    image command (CLI agent that can draw, e.g. `codex exec --skip-git-repo-check -s workspace-write --ephemeral -`).
-   Each edition page has **Refazer charge** to draw a new cartoon and **Recompor** to re-typeset.
-6. **Jogos**: enable, order and configure Sudoku, Word of the Day, Word Search and Crossword, with previews.
-7. **Registros**: every generation with its steps and log. **Gerar jornal agora** works from the
-   overview or from here.
+   Each edition page has **Redo cartoon** to draw a new cartoon and **Re-typeset** to rebuild the cover and EPUB with the current settings.
+6. **Games**: enable, order and configure Sudoku, Word of the Day, Word Search and Crossword, with previews.
+7. **Logs**: every generation with its steps and log. **Print today's paper** works from the
+   front page or from here.
 
 ## Connecting the e-reader
 
@@ -153,7 +164,7 @@ make kindle-agent                                      # optional: new editions 
 ```
 
 With `kindle-library`, each edition shows up in the Kindle library with its front page as cover
-("Dayfold · 13 nov. 2026") and opens in KOReader. Otherwise open KOReader on the Kindle: menu › **Tools** › **Dayfold** › **Baixar edição de hoje**.
+("Dayfold · Nov. 13, 2026") and opens in KOReader. Otherwise open KOReader on the Kindle: menu › **Tools** › **Dayfold** › **Download today's edition**.
 OPDS and direct download also work with any reader. **Kindle without jailbreak:** choose "No
 jailbreak" on the dashboard Kindle page and fill in your Gmail and `@kindle.com` addresses; each
 edition is e-mailed to Send to Kindle. The full guide, including manual install

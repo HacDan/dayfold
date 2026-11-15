@@ -3,7 +3,7 @@ KINDLE ?= kindle
 PORT ?= 8422
 SERVER ?= http://$(shell hostname -I 2>/dev/null | awk '{print $$1}'):$(PORT)
 
-.PHONY: setup build dev-backend dev-frontend serve generate test lint install kindle-install kindle-koreader kindle-library kindle-agent kindle-screensaver
+.PHONY: setup build dev-backend dev-frontend serve generate test test-koreader lint install kindle-install kindle-koreader kindle-library kindle-agent kindle-screensaver
 
 setup:
 	cd backend && uv sync
@@ -45,6 +45,14 @@ kindle-koreader:
 
 kindle-install:
 	KINDLE=$(KINDLE) SERVER=$(SERVER) ./kindle/install-plugin.sh
+
+# KOReader plugin: catalogue, reader hook and the download/rename handling (see koreader/tests).
+# LuaJIT is required: skipping these tests silently would hide a broken catalogue.
+test-koreader:
+	@command -v luajit >/dev/null 2>&1 || { echo "luajit não encontrado: instale o LuaJIT (brew install luajit, apt install luajit)" >&2; exit 1; }
+	luajit koreader/tests/test_l10n.lua
+	luajit koreader/tests/test_reader_hook.lua
+	luajit koreader/tests/test_sync_games.lua
 
 kindle-library:
 	KINDLE=$(KINDLE) ./kindle/install-kompanion.sh

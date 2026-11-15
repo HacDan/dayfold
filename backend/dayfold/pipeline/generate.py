@@ -15,8 +15,18 @@ from ..config import config
 from ..db import session_scope
 from ..edition.cover import CoverData, render_cover
 from ..edition.epub import EditionDoc, build_epub
-from ..edition.i18n import LABELS, long_date, roman, short_date
+from ..edition.i18n import (
+    LABELS,
+    generated_stamp,
+    localized_tagline,
+    long_date,
+    roman,
+    section_name,
+    short_date,
+)
 from ..edition.images import prepare_photo
+from ..edition.length import cap as cap_length
+from ..edition.length import resolve as resolve_limits
 from ..games.generators import GENERATORS, seeded
 from ..games.words import wordsearch_themes
 from ..i18n import tr
@@ -44,12 +54,6 @@ GAME_TITLES = {
            "crossword": "Palavras Cruzadas"},
     "en": {"sudoku": "Sudoku", "wordle": "Word of the Day", "wordsearch": "Word Search", "crossword": "Crossword"},
 }
-
-
-def game_name(lang: str, kind: str, fallback: str) -> str:
-    """A puzzle's title in the paper's language. The dashboard stores game names in the
-    operator's language, which would otherwise print Portuguese in an English paper."""
-    return GAME_TITLES.get(lang, GAME_TITLES["pt"]).get(kind, fallback)
 
 
 class JobLog:
@@ -156,14 +160,14 @@ def run_generation_job(job_id: int) -> None:
                 configs = todays_games(enabled, news.games_per_edition, ed_date)
                 if configs:
                     log(tr("Jogos do dia (rodízio): ", "Puzzles of the day (rotation): ")
-                        + ", ".join(game_name(lang, g.kind, g.name) for g in configs) + ".")
+                        + ", ".join(GAME_TITLES[lang].get(g.kind, g.name) for g in configs) + ".")
                 for g in configs:
                     cfg = dict(g.config)
                     count = int(cfg.get("count", 1)) if g.kind == "sudoku" else 1
                     for n in range(max(1, min(count, 4))):
                         rng = seeded(ed_date.isoformat(), g.kind, n)
                         puzzle, solution = make_game(g.kind, cfg, rng, lang, same_lang_titles)
-                        title = game_name(lang, g.kind, g.name) + (f" {n + 1}" if count > 1 else "")
+                        title = GAME_TITLES[lang].get(g.kind, g.name) + (f" {n + 1}" if count > 1 else "")
                         s.add(GameInstance(edition_id=edition_id, kind=g.kind, position=n_games,
                                            title=title, puzzle=puzzle, solution=solution))
                         n_games += 1
@@ -224,18 +228,27 @@ def _auto_send_kindle(edition_id: int, epub_path: Path, log) -> None:
             log(tr(f"Send to Kindle falhou: {exc}", f"Send to Kindle failed: {exc}"))
 
 
+def game_language(cfg: dict, edition_lang: str) -> str:
+    """A puzzle's language: its own setting, or the edition's when it is "auto" (the default)."""
+    lang = cfg.get("language") or "auto"
+    return edition_lang if lang == "auto" else lang
+
+
 def make_game(kind: str, cfg: dict, rng, lang: str, headlines: list[str]) -> tuple[dict, dict]:
-    """Build a puzzle in the paper's language (``lang``), never in the game's stored config: one
-    edition must not mix a Portuguese crossword into an English paper."""
+    """Build a puzzle in the language the game asks for, ``auto`` being the paper's: one edition
+    must not mix a Portuguese crossword into an English paper."""
+    lang = game_language(cfg, lang)
     if kind == "sudoku":
         return GENERATORS["sudoku"](rng, cfg.get("difficulty", "medium"))
     if kind == "wordle":
-        return GENERATORS["wordle"](rng, lang, int(cfg.get("length", 5)), int(cfg.get("attempts", 6)))
+        return GENERATORS["wordle"](rng, lang, int(cfg.get("length", 5)),
+                                    int(cfg.get("attempts", 6)))
     if kind == "crossword":
-        return GENERATORS["crossword"](rng, lang, int(cfg.get("words", 10)), int(cfg.get("size", 13)))
+        return GENERATORS["crossword"](rng, lang, int(cfg.get("words", 10)),
+                                       int(cfg.get("size", 13)))
     theme = cfg.get("theme", "news")
     if theme not in wordsearch_themes(lang):
-        theme = "news"  # saved for another language; the generator would pick a theme at random
+        theme = "news"  # saved for the other language; the generator would pick a theme at random
     return GENERATORS["wordsearch"](rng, lang, int(cfg.get("size", 12)), theme,
                                     int(cfg.get("words", 10)), headlines, cfg.get("difficulty", "medium"))
 
@@ -253,7 +266,7 @@ def kindle_test_epub(edition_id: int) -> Path:
         games = []
         for g in s.scalars(select(Game).order_by(Game.position)):
             puzzle, solution = make_game(g.kind, dict(g.config), seeded(key, g.kind), lang, titles)
-            games.append({"kind": g.kind, "title": game_name(lang, g.kind, g.name),
+            games.append({"kind": g.kind, "title": GAME_TITLES[lang].get(g.kind, g.name),
                           "puzzle": puzzle, "solution": solution})
     return typeset(edition_id, _PrintLog(), test_games=games)
 
@@ -315,8 +328,11 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         for it in sorted(ed.items, key=lambda i: i.position):
             a = it.article
             providers[a.provider_id] = a.provider
-            sec_name = topics[it.section].name if it.section in topics else it.section.title()
+            sec_name = (section_name(it.section, topics[it.section].name, lang) if it.section in topics
+                        else it.section.title())
             view = _article_view(a, sec_name, lang, tz)
+            view["paragraphs"], view["truncated"] = cap_length(
+                view["paragraphs"], resolve_limits(a.provider, topics.get(it.section), news))
             if it.is_headline:
                 headline = view
                 continue
@@ -355,7 +371,7 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         source_line = " | ".join(filter(None, [f"{L['by']} {lead['author']}" if lead.get("author") else None,
                                                lead["provider"]]))
     cover_data = CoverData(
-        title=news.title, masthead_font=news.masthead_font, tagline=news.tagline,
+        title=news.title, masthead_font=news.masthead_font, tagline=localized_tagline(news.tagline, lang),
         long_date=long_date(ed_date, lang), number_label=f"{L['number']} {number}",
         year_label=f"{L['year']} {roman(year_n)}", daily_label=L["daily"],
         headline=lead["title"] if lead else news.title,
@@ -374,14 +390,14 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         log.step("epub", 0.92)
     identifier = f"dayfold-{ed_date.isoformat()}-{number}"
     doc = EditionDoc(
-        identifier=identifier, lang=lang, title=news.title, tagline=news.tagline,
+        identifier=identifier, lang=lang, title=news.title, tagline=localized_tagline(news.tagline, lang),
         long_date=long_date(ed_date, lang), short_date=short_date(ed_date, lang),
         iso_date=ed_date.isoformat(), number_label=f"{L['number']} {number}",
         year_label=f"{L['year']} {roman(year_n)}", masthead_font=news.masthead_font,
         typography=news.typography.model_dump(), cover_path=cover_path, headline=headline,
         sections=ordered_sections, games=[dict(g) for g in games], charge=charge,
         closing_order=news.closing_order, sources=sources, curated_by=curated_by,
-        generated_at=clock.now(tz).strftime("%m/%d/%Y %H:%M" if lang == "en" else "%d/%m/%Y %H:%M"),
+        generated_at=generated_stamp(clock.now(tz), lang),
     )
     # One file name per edition, so a second edition on the same day is a new book on the device
     # (and lands on top of the library) instead of overwriting the first one.

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { t } from "../i18n";
 import { Link, useNavigate } from "react-router-dom";
 import { get, getFresh, post, put, fmtDateTime, topicLabel, USAGE_LABEL, type Provider, type Topic } from "../api";
-import { Empty, Field, Loading, Modal, SectionTitle, Stamp, useAction, useLoad } from "../components/ui";
+import { Empty, Field, Loading, Modal, OptionalNumber, SectionTitle, Stamp, useAction, useLoad } from "../components/ui";
 
  /** Toggle chips for the provider's sections; the first selected one is the primary. */
 function SectionPicker({ value, onChange, topics }: { value: string[]; onChange: (v: string[]) => void; topics: Topic[] | null }) {
@@ -33,6 +33,7 @@ export function ProviderForm({ initial, onSubmit, creating }: {
     language: initial?.language ?? "pt", usage_mode: initial?.usage_mode ?? "excerpt_and_link",
     license_name: initial?.license_name ?? "Verificar termos", license_url: initial?.license_url ?? "",
     license_note: initial?.license_note ?? "", enabled: initial?.enabled ?? true, max_items: initial?.max_items ?? 15,
+    max_words: initial?.max_words ?? null, max_paragraphs: initial?.max_paragraphs ?? null,
   });
   const [mode, setMode] = useState<"assisted" | "manual">("assisted");
   const [strategy, setStrategy] = useState("rss");
@@ -84,6 +85,14 @@ export function ProviderForm({ initial, onSubmit, creating }: {
           </select>
         </Field>
         <Field label={t("Máximo de itens por coleta")}><input type="number" min={1} max={50} value={f.max_items} onChange={(e) => set("max_items", Number(e.target.value))} /></Field>
+        {f.usage_mode === "full_content_allowed" && (
+          <Field label={t("Tamanho máximo das matérias")} hint={t("Vazio usa o limite da seção ou do jornal. Cortadas terminam com o link para a fonte.")}>
+            <div className="row" style={{ flexWrap: "nowrap" }}>
+              <OptionalNumber value={f.max_words} min={50} max={5000} placeholder={t("palavras")} label={t("Máximo de palavras por matéria")} onChange={(v) => set("max_words", v)} />
+              <OptionalNumber value={f.max_paragraphs} min={1} max={100} placeholder={t("parágrafos")} label={t("Máximo de parágrafos por matéria")} onChange={(v) => set("max_paragraphs", v)} />
+            </div>
+          </Field>
+        )}
         <Field label={t("Licença / política observada")}><input type="text" value={f.license_name} onChange={(e) => set("license_name", e.target.value)} /></Field>
         <Field label={t("URL da licença ou termos")}><input type="url" value={f.license_url ?? ""} onChange={(e) => set("license_url", e.target.value)} /></Field>
       </div>

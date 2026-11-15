@@ -1,6 +1,7 @@
 --[[ Interactive Sudoku: tap a cell, then a number. Givens are fixed. ]]
 local GameBase = require("dayfold_games/base")
 local D = require("dayfold_games/draw")
+local _ = require("dayfold_l10n")
 
 local Sudoku = GameBase:extend{ name = "dayfold_sudoku" }
 
@@ -71,8 +72,8 @@ function Sudoku:draw(bb, x, top, w, h)
     local af = D.face(math.floor(kh * 0.32), "tfont")
     self.check_rect = { x = x + pad, y = ay, w = aw, h = math.floor(kh * 0.8) }
     self.clear_rect = { x = x + pad + aw + gap, y = ay, w = aw, h = math.floor(kh * 0.8) }
-    D.button(bb, self.check_rect, "VERIFICAR", af, true)
-    D.button(bb, self.clear_rect, "RECOMEÇAR", af)
+    D.button(bb, self.check_rect, _("CHECK"), af, true)
+    D.button(bb, self.clear_rect, _("RESTART"), af)
 end
 
 function Sudoku:tap(px, py)
@@ -96,7 +97,7 @@ function Sudoku:tap(px, py)
                 self:checkComplete()
                 self:refresh()
             else
-                self:flash("Toque numa casa vazia primeiro")
+                self:flash(_("Tap an empty cell first"))
             end
             return
         end
@@ -109,9 +110,9 @@ function Sudoku:tap(px, py)
             if v == 0 then empty = empty + 1
             elseif v ~= self.solution[i] then wrong = wrong + 1; self.errors[i] = true end
         end
-        if wrong == 0 and empty == 0 then self:flash("Perfeito! Sudoku resolvido.")
-        elseif wrong == 0 then self:flash(string.format("Tudo certo até aqui. Faltam %d casas.", empty))
-        else self:flash(string.format("%d casa(s) errada(s) marcadas em cinza.", wrong)) end
+        if wrong == 0 and empty == 0 then self:flash(_("Perfect! Sudoku solved."))
+        elseif wrong == 0 then self:flash(string.format(_("All good so far. %d cells to go."), empty))
+        else self:flash(string.format(_("%d wrong cell(s) marked in gray."), wrong)) end
         self:refresh()
     elseif D.hit(self.clear_rect, px, py) then
         for i = 1, 81 do self.state.values[i] = 0 end
@@ -128,7 +129,7 @@ function Sudoku:checkComplete()
     if not self.state.done then
         self.state.done = true
         self:save()
-        self:flash("Parabéns! Sudoku resolvido.")
+        self:flash(_("Well done! Sudoku solved."))
     end
 end
 

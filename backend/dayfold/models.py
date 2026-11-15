@@ -6,7 +6,18 @@ import enum
 from datetime import UTC, date, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -89,6 +100,9 @@ class Topic(Base):
     position: Mapped[int] = mapped_column(Integer, default=0)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     max_articles: Mapped[int] = mapped_column(Integer, default=4)
+    # Length cap for full text stories (None = no limit); see edition.length.
+    max_words: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_paragraphs: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class Provider(Base):
@@ -109,6 +123,9 @@ class Provider(Base):
     license_note: Mapped[str] = mapped_column(Text, default="")
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     max_items: Mapped[int] = mapped_column(Integer, default=15)
+    # Length cap for full text stories (None = no limit); see edition.length.
+    max_words: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_paragraphs: Mapped[int | None] = mapped_column(Integer, nullable=True)
     active_version_id: Mapped[int | None] = mapped_column(
         ForeignKey("scraper_versions.id", use_alter=True, ondelete="SET NULL"), nullable=True
     )
@@ -228,6 +245,25 @@ class EditionArticle(Base):
 
     edition: Mapped[Edition] = relationship(back_populates="items")
     article: Mapped[Article] = relationship()
+
+
+class ArticleRating(Base):
+    """Reader feedback on a printed story: -1 less of this, 0 indifferent, 1 more of this.
+
+    Provider, section and title are copied so the preference survives the deletion of the
+    edition or of the collected article (see pipeline.feedback).
+    """
+
+    __tablename__ = "article_ratings"
+    __table_args__ = (UniqueConstraint("edition_id", "article_id"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    edition_id: Mapped[int | None] = mapped_column(ForeignKey("editions.id", ondelete="SET NULL"), nullable=True)
+    article_id: Mapped[int | None] = mapped_column(ForeignKey("articles.id", ondelete="SET NULL"), nullable=True)
+    provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id", ondelete="SET NULL"), nullable=True)
+    section: Mapped[str] = mapped_column(String(40))
+    title: Mapped[str] = mapped_column(String(500))
+    value: Mapped[int] = mapped_column(Integer)
+    rated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
 
 class Game(Base):
