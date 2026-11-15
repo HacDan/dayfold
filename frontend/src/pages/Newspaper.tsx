@@ -41,6 +41,10 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
   useEffect(() => { if (data) setV(structuredClone(data.values)); }, [data]);
+  useEffect(() => {
+    window.addEventListener("dayfold:settings", reload);
+    return () => window.removeEventListener("dayfold:settings", reload);
+  }, [reload]);
   const family = useMemo(() => data?.meta.masthead_fonts.find((f) => f.key === v?.newspaper.masthead_font)?.family ?? "Chomsky", [data, v?.newspaper.masthead_font]);
   if (!data || !v) return <Loading />;
   const meta = data.meta;
@@ -100,7 +104,7 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
                 </button>
               ))}
             </div>
-            <Field label={t("Idioma da edição")}>
+            <Field label={t("Idioma da edição")} hint={t("Rótulos, datas, nomes padrão das seções e os jogos com idioma “Igual à edição”. Independe do idioma da dashboard.")}>
               <select value={news.language} onChange={(e) => setNews({ language: e.target.value as "pt" | "en" })}>
                 <option value="pt">{t("Português")}</option><option value="en">{t("English")}</option>
               </select>

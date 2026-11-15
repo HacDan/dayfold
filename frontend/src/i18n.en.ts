@@ -455,5 +455,13 @@ export const en: Record<string, string> = {
   "Usar a capa do último jornal como tela de descanso do Kindle": "Use the latest front page as the Kindle sleep screen",
   "Aplicado pelo plugin na próxima sincronização. Na tela de descanso nativa do Kindle exige o vigia instalado com make kindle-screensaver.": "Applied by the plugin on the next sync. On the stock Kindle sleep screen it needs the watcher installed with make kindle-screensaver.",
   "Escolha ao menos uma seção.": "Choose at least one section.",
+  "português": "Portuguese",
+  "inglês": "English",
+  "As edições são impressas em {lang}.": "Editions are printed in {lang}.",
+  "Imprimir em {lang}": "Print in {lang}",
+  "Pronto: as próximas edições saem em {lang}. Para refazer uma edição existente, use Recompor.": "Done: the next editions come out in {lang}. To redo an existing edition, use Re-typeset.",
+  "Dispensar": "Dismiss",
+  "Igual à edição": "Match edition",
+  "Rótulos, datas, nomes padrão das seções e os jogos com idioma “Igual à edição”. Independe do idioma da dashboard.": "Labels, dates, default section names and the puzzles set to “Match edition”. Independent of the dashboard language.",
   "Uma ou mais. Cada matéria vai para a seção que mais combina com ela; ★ marca a principal.": "One or more. Each story goes to the section that fits it best; ★ marks the primary one.",
 };

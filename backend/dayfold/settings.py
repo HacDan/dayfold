@@ -78,9 +78,11 @@ class Typography(BaseModel):
 
 class NewspaperSettings(BaseModel):
     title: str = Field("Dayfold", min_length=1, max_length=40)
-    tagline: str = Field("Notícias do dia, dobradas para ler com calma.", max_length=120)
+    tagline: str = Field("The day's news, folded for an unhurried read.", max_length=120)
     masthead_font: str = "chomsky"
-    language: Literal["pt", "en"] = "pt"
+    # Language of everything printed in the edition (labels, dates, default section names and
+    # the puzzles whose language is "auto"). New installs start in English like the dashboard.
+    language: Literal["pt", "en"] = "en"
     max_articles: int = Field(16, ge=3, le=60)
     excerpt_words: int = Field(70, ge=20, le=200)
     include_images: bool = True

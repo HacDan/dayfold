@@ -49,6 +49,10 @@ downloads one file a day and reads it offline.
 * **Games** prepared on the server: Sudoku (unique solution), Word of the Day (Wordle style),
   Word Search (themes or words from the day's headlines) and a free-form Crossword with clues, in
   Portuguese or English.
+* **English or Portuguese editions**: the edition language (Newspaper › Identity, English on new
+  installs) sets labels, dates, the default section names and tagline, and the word games, which
+  follow the edition unless one is set to a language of its own. It is separate from the dashboard
+  switch, and the dashboard points it out when the two differ.
 * **KOReader plugin**: sync over Wi-Fi, interactive games with saved progress, and a continuous
   flow from the news to the cartoon and the puzzles. Its menus follow the KOReader language
   (English, with a Portuguese catalog in `l10n/pt.po`; more languages are one `.po` file away).

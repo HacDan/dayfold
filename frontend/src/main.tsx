@@ -4,7 +4,7 @@ import { applyTheme, effectiveTheme, type Theme } from "./theme";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, NavLink, Route, Routes, Link, useLocation } from "react-router-dom";
 import "./styles.css";
-import { get, post, fmtLongDate } from "./api";
+import { get, post, put, fmtLongDate } from "./api";
 import { ToastProvider, Loading } from "./components/ui";
 import Overview from "./pages/Overview";
 import Editions from "./pages/Editions";
@@ -82,12 +82,54 @@ function HeaderControls({ onLang }: { onLang: (l: Lang) => void }) {
   );
 }
 
+const HINT_KEY = "dayfold.editionLangHint";
+
+/* The dashboard switch only changes the dashboard. When the editions are printed in the other
+   language, say so right under it and offer to switch them too (dismissable per language). */
+function EditionLangHint() {
+  const lang = getLang();
+  const [edition, setEdition] = useState<Lang | null>(null);
+  const [switched, setSwitched] = useState(false);
+  const [hidden, setHidden] = useState(() => {
+    try { return localStorage.getItem(HINT_KEY) === lang; } catch { return false; }
+  });
+  useEffect(() => {
+    get<{ values: { newspaper: { language: Lang } } }>("/api/settings").then((s) => setEdition(s.values.newspaper.language)).catch(() => {});
+  }, []);
+  if (hidden || !edition || (edition === lang && !switched)) return null;
+  const dismiss = () => {
+    try { localStorage.setItem(HINT_KEY, lang); } catch { /* ignore */ }
+    setHidden(true);
+  };
+  const apply = async () => {
+    await put("/api/settings/newspaper", { language: lang });
+    setEdition(lang);
+    setSwitched(true);
+    window.dispatchEvent(new Event("dayfold:settings"));
+  };
+  const name = (l: Lang) => (l === "pt" ? t("português") : t("inglês"));
+  return (
+    <p className="lang-hint" role="status">
+      {switched ? (
+        <span>{t("Pronto: as próximas edições saem em {lang}. Para refazer uma edição existente, use Recompor.", { lang: name(lang) })}</span>
+      ) : (
+        <>
+          <span>{t("As edições são impressas em {lang}.", { lang: name(edition) })}</span>
+          <button type="button" className="btn small" onClick={apply}>{t("Imprimir em {lang}", { lang: name(lang) })}</button>
+        </>
+      )}
+      <button type="button" className="ctl" onClick={dismiss} aria-label={t("Dispensar")} title={t("Dispensar")}>×</button>
+    </p>
+  );
+}
+
 function Masthead({ title, onLang }: { title: string; onLang: (l: Lang) => void }) {
   const today = fmtLongDate(new Date());
   return (
     <header>
       <div className="mast">
         <div className="ears"><span>{t("Sala de redação")}</span><HeaderControls onLang={onLang} /></div>
+        <EditionLangHint />
         <h1 className="name"><Link to="/">{title}</Link></h1>
         <p className="tag">{t("Painel editorial do seu jornal diário para e-readers")}</p>
       </div>

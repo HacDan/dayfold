@@ -15,7 +15,15 @@ from ..config import config
 from ..db import session_scope
 from ..edition.cover import CoverData, render_cover
 from ..edition.epub import EditionDoc, build_epub
-from ..edition.i18n import LABELS, long_date, roman, short_date
+from ..edition.i18n import (
+    LABELS,
+    generated_stamp,
+    localized_tagline,
+    long_date,
+    roman,
+    section_name,
+    short_date,
+)
 from ..edition.images import prepare_photo
 from ..games.generators import GENERATORS, seeded
 from ..models import (
@@ -211,16 +219,23 @@ def _auto_send_kindle(edition_id: int, epub_path: Path, log) -> None:
             log(f"Send to Kindle falhou: {exc}")
 
 
+def game_language(cfg: dict, edition_lang: str) -> str:
+    """A puzzle's language: its own setting, or the edition's when it is "auto" (the default)."""
+    lang = cfg.get("language") or "auto"
+    return edition_lang if lang == "auto" else lang
+
+
 def make_game(kind: str, cfg: dict, rng, lang: str, headlines: list[str]) -> tuple[dict, dict]:
+    lang = game_language(cfg, lang)
     if kind == "sudoku":
         return GENERATORS["sudoku"](rng, cfg.get("difficulty", "medium"))
     if kind == "wordle":
-        return GENERATORS["wordle"](rng, cfg.get("language", lang), int(cfg.get("length", 5)),
+        return GENERATORS["wordle"](rng, lang, int(cfg.get("length", 5)),
                                     int(cfg.get("attempts", 6)))
     if kind == "crossword":
-        return GENERATORS["crossword"](rng, cfg.get("language", lang), int(cfg.get("words", 10)),
+        return GENERATORS["crossword"](rng, lang, int(cfg.get("words", 10)),
                                        int(cfg.get("size", 13)))
-    return GENERATORS["wordsearch"](rng, cfg.get("language", lang), int(cfg.get("size", 12)),
+    return GENERATORS["wordsearch"](rng, lang, int(cfg.get("size", 12)),
                                     cfg.get("theme", "news"), int(cfg.get("words", 10)),
                                     headlines, cfg.get("difficulty", "medium"))
 
@@ -299,7 +314,8 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         for it in sorted(ed.items, key=lambda i: i.position):
             a = it.article
             providers[a.provider_id] = a.provider
-            sec_name = topics[it.section].name if it.section in topics else it.section.title()
+            sec_name = (section_name(it.section, topics[it.section].name, lang) if it.section in topics
+                        else it.section.title())
             view = _article_view(a, sec_name, lang)
             if it.is_headline:
                 headline = view
@@ -339,7 +355,7 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         source_line = " | ".join(filter(None, [f"{L['by']} {lead['author']}" if lead.get("author") else None,
                                                lead["provider"]]))
     cover_data = CoverData(
-        title=news.title, masthead_font=news.masthead_font, tagline=news.tagline,
+        title=news.title, masthead_font=news.masthead_font, tagline=localized_tagline(news.tagline, lang),
         long_date=long_date(ed_date, lang), number_label=f"{L['number']} {number}",
         year_label=f"{L['year']} {roman(year_n)}", daily_label=L["daily"],
         headline=lead["title"] if lead else news.title,
@@ -358,14 +374,14 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         log.step("epub", 0.92)
     identifier = f"dayfold-{ed_date.isoformat()}-{number}"
     doc = EditionDoc(
-        identifier=identifier, lang=lang, title=news.title, tagline=news.tagline,
+        identifier=identifier, lang=lang, title=news.title, tagline=localized_tagline(news.tagline, lang),
         long_date=long_date(ed_date, lang), short_date=short_date(ed_date, lang),
         iso_date=ed_date.isoformat(), number_label=f"{L['number']} {number}",
         year_label=f"{L['year']} {roman(year_n)}", masthead_font=news.masthead_font,
         typography=news.typography.model_dump(), cover_path=cover_path, headline=headline,
         sections=ordered_sections, games=[dict(g) for g in games], charge=charge,
         closing_order=news.closing_order, sources=sources, curated_by=curated_by,
-        generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
+        generated_at=generated_stamp(datetime.now(), lang),
     )
     # One file name per edition, so a second edition on the same day is a new book on the device
     # (and lands on top of the library) instead of overwriting the first one.

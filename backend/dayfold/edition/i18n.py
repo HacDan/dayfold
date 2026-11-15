@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 WEEKDAYS = {
     "pt": ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira",
@@ -108,6 +108,36 @@ LABELS = {
                          "Display, Literata and Old Standard TT.",
     },
 }
+
+
+# Defaults that ship with Dayfold. While the user keeps them, the edition shows them in its own
+# language; anything the user typed is printed as is.
+DEFAULT_TAGLINES = {
+    "pt": "Notícias do dia, dobradas para ler com calma.",
+    "en": "The day's news, folded for an unhurried read.",
+}
+DEFAULT_SECTION_NAMES = {
+    "brasil": {"pt": "Brasil", "en": "Brazil"},
+    "mundo": {"pt": "Mundo", "en": "World"},
+    "ciencia": {"pt": "Ciência", "en": "Science"},
+    "espaco": {"pt": "Espaço", "en": "Space"},
+    "saude": {"pt": "Saúde", "en": "Health"},
+    "tecnologia": {"pt": "Tecnologia", "en": "Technology"},
+    "cultura": {"pt": "Cultura", "en": "Culture"},
+}
+
+
+def localized_tagline(tagline: str, lang: str) -> str:
+    return DEFAULT_TAGLINES[lang] if tagline in DEFAULT_TAGLINES.values() else tagline
+
+
+def section_name(slug: str, name: str, lang: str) -> str:
+    names = DEFAULT_SECTION_NAMES.get(slug)
+    return names[lang] if names and name in names.values() else name
+
+
+def generated_stamp(dt: datetime, lang: str) -> str:
+    return short_date(dt.date(), lang) + dt.strftime(", %H:%M")
 
 
 def long_date(d: date, lang: str) -> str:

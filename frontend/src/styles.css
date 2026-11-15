@@ -70,6 +70,13 @@ pre { background: var(--paper-2); padding: .8em 1em; overflow: auto; border-left
 .mast { text-align: center; padding-top: 18px; }
 .mast .ears { display: flex; justify-content: space-between; font-family: var(--caps); font-size: .78rem;
   letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+/* edition language notice, right under the dashboard language switch */
+.mast .lang-hint { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin: 6px 0 0; font-size: .82rem; font-style: italic; color: var(--ink-2); text-align: right; }
+.mast .lang-hint .ctl { font-size: 1rem; line-height: 1; padding: 2px 6px; color: var(--ink-2); }
+.mast .lang-hint .ctl:hover { color: var(--ink); }
+.mast .lang-hint button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 640px) { .mast .lang-hint { justify-content: center; text-align: center; } }
 .mast .name { font-family: var(--masthead); font-weight: normal; font-size: clamp(2.8rem, 8vw, 5.4rem);
   line-height: 1; margin: .08em 0 0; letter-spacing: .01em; }
 .mast .name a { text-decoration: none; }

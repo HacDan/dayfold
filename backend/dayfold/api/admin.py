@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..ai.client import AIClient, test_provider, usage
 from ..db import get_session
-from ..games.generators import GENERATORS, seeded
+from ..games.generators import seeded
 from ..games.words import WORDLE, WORDSEARCH_THEMES
 from ..jobs import scheduler
 from ..models import (
@@ -308,11 +308,11 @@ def game_out(g: Game) -> dict:
 
 GAME_SCHEMAS = {
     "sudoku": {"difficulty": ["easy", "medium", "hard"], "count": [1, 2, 3, 4]},
-    "wordle": {"language": ["pt", "en"], "length": [4, 5, 6], "attempts": [4, 5, 6, 7, 8]},
-    "wordsearch": {"language": ["pt", "en"], "size": [8, 10, 12, 14, 16],
+    "wordle": {"language": ["auto", "pt", "en"], "length": [4, 5, 6], "attempts": [4, 5, 6, 7, 8]},
+    "wordsearch": {"language": ["auto", "pt", "en"], "size": [8, 10, 12, 14, 16],
                    "theme": ["news", *sorted({t for v in WORDSEARCH_THEMES.values() for t in v})],
                    "words": [6, 8, 10, 12, 15], "difficulty": ["easy", "medium", "hard"]},
-    "crossword": {"language": ["pt", "en"], "words": [6, 8, 10, 12, 14], "size": [11, 13, 15]},
+    "crossword": {"language": ["auto", "pt", "en"], "words": [6, 8, 10, 12, 14], "size": [11, 13, 15]},
 }
 
 
@@ -359,22 +359,13 @@ def order_games(ids: list[int], session: Session = Depends(get_session)) -> dict
 @router.get("/games/{gid}/preview")
 def preview_game(gid: int, session: Session = Depends(get_session)) -> dict:
     g = session.get(Game, gid) or _404()
+    from ..pipeline.generate import make_game
+
     rng = seeded(date.today().isoformat(), f"preview-{g.kind}")
-    cfg = g.config
-    if g.kind == "sudoku":
-        puzzle, solution = GENERATORS["sudoku"](rng, cfg.get("difficulty", "medium"))
-    elif g.kind == "wordle":
-        puzzle, solution = GENERATORS["wordle"](rng, cfg.get("language", "pt"), int(cfg.get("length", 5)),
-                                                int(cfg.get("attempts", 6)))
-    elif g.kind == "crossword":
-        puzzle, solution = GENERATORS["crossword"](rng, cfg.get("language", "pt"), int(cfg.get("words", 10)),
-                                                   int(cfg.get("size", 13)))
-    else:
-        titles = [t for t in session.scalars(select(Edition.headline).where(Edition.headline.is_not(None))
-                                             .order_by(Edition.id.desc()).limit(10))]
-        puzzle, solution = GENERATORS["wordsearch"](rng, cfg.get("language", "pt"), int(cfg.get("size", 12)),
-                                                    cfg.get("theme", "news"), int(cfg.get("words", 10)),
-                                                    titles, cfg.get("difficulty", "medium"))
+    titles = [t for t in session.scalars(select(Edition.headline).where(Edition.headline.is_not(None))
+                                         .order_by(Edition.id.desc()).limit(10))]
+    lang = get_section(session, "newspaper").language
+    puzzle, solution = make_game(g.kind, dict(g.config), rng, lang, titles)
     return {"kind": g.kind, "puzzle": puzzle, "solution": solution}
 
 
@@ -385,7 +376,8 @@ def preview_game(gid: int, session: Session = Depends(get_session)) -> dict:
 def preview_cover(body: dict, session: Session = Depends(get_session)) -> Response:
     """Render the cover with unsaved newspaper settings (dashboard live preview)."""
     from ..edition.cover import CoverData, render_cover
-    from ..edition.i18n import LABELS, long_date, roman
+    from ..edition.i18n import LABELS, localized_tagline, long_date, roman, section_name
+    from ..pipeline.generate import GAME_TITLES
     from ..settings import NewspaperSettings
 
     current = get_section(session, "newspaper").model_dump()
@@ -407,7 +399,7 @@ def preview_cover(body: dict, session: Session = Depends(get_session)) -> Respon
         if head:
             headline, deck = head.article.title, head.article.subtitle
             lead = (head.article.body or head.article.excerpt or "")[:900]
-        topics = {t.slug: t.name for t in session.scalars(select(Topic))}
+        topics = {t.slug: section_name(t.slug, t.name, news.language) for t in session.scalars(select(Topic))}
         secondary = [(topics.get(i.section, i.section), i.article.title) for i in items if not i.is_headline][:6]
     import tempfile
     from pathlib import Path
@@ -416,11 +408,12 @@ def preview_cover(body: dict, session: Session = Depends(get_session)) -> Respon
     with tempfile.TemporaryDirectory() as tmp:
         dest = Path(tmp) / "cover.png"
         render_cover(CoverData(
-            title=news.title, masthead_font=news.masthead_font, tagline=news.tagline,
+            title=news.title, masthead_font=news.masthead_font,
+            tagline=localized_tagline(news.tagline, news.language),
             long_date=long_date(date.today(), news.language), number_label=f"{L['number']} {latest.number + 1 if latest else 1}",
             year_label=f"{L['year']} {roman(1)}", daily_label=L["daily"], headline=headline, deck=deck,
             also_label=L["also"], secondary=secondary, lead_text=lead,
-            footer=" · ".join(g.name for g in session.scalars(select(Game).where(Game.enabled.is_(True)).order_by(Game.position))),
+            footer=" · ".join(GAME_TITLES[news.language].get(g.kind, g.name) for g in session.scalars(select(Game).where(Game.enabled.is_(True)).order_by(Game.position))),
         ), dest, device.cover_width // 2, device.cover_height // 2)
         data = dest.read_bytes()
     return Response(data, media_type="image/png", headers={"Cache-Control": "no-store"})

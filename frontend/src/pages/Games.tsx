@@ -11,7 +11,7 @@ const PARAM_LABEL: Record<string, string> = {
   size: "Tamanho da grade", theme: "Tema", words: "Palavras",
 };
 const VALUE_LABEL: Record<string, string> = {
-  easy: "Fácil", medium: "Médio", hard: "Difícil", pt: "Português", en: "Inglês", news: "Notícias do dia",
+  auto: "Igual à edição", easy: "Fácil", medium: "Médio", hard: "Difícil", pt: "Português", en: "Inglês", news: "Notícias do dia",
 };
 const DESCR: Record<string, string> = {
   sudoku: "Grade 9×9 com solução única garantida. No EPUB, para resolver de cabeça; no KOReader, toque nas casas para preencher.",
