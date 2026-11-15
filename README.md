@@ -50,7 +50,8 @@ downloads one file a day and reads it offline.
   Word Search (themes or words from the day's headlines) and a free-form Crossword with clues, in
   Portuguese or English.
 * **KOReader plugin**: sync over Wi-Fi, interactive games with saved progress, and a continuous
-  flow from the news to the cartoon and the puzzles.
+  flow from the news to the cartoon and the puzzles. Its menus follow the KOReader language
+  (English, with a Portuguese catalog in `l10n/pt.po`; more languages are one `.po` file away).
 * **Sleep screen** (optional, off by default): the latest front page as the Kindle sleep screen,
   in KOReader and, with the Dayfold agent, in the stock Kindle interface.
 * **Kindle agent** (optional): new editions are downloaded on wake and every 30 minutes while awake
