@@ -7,7 +7,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from ..ai.client import AIClient, test_provider, usage
@@ -18,6 +18,7 @@ from ..jobs import scheduler
 from ..models import (
     AIProvider,
     Edition,
+    EditionArticle,
     EditionStatus,
     Game,
     GenerationJob,
@@ -176,11 +177,33 @@ def create_topic(body: TopicIn, session: Session = Depends(get_session)) -> dict
     return topic_out(t)
 
 
+def _move_slug_references(session: Session, old: str, new: str) -> None:
+    """Keep providers and already typeset editions pointing at the renamed section.
+
+    ``Topic.slug`` is the key providers and ``edition_articles.section`` store, so renaming it
+    without this leaves providers attached to a section that no longer exists.
+    """
+    for p in session.scalars(select(Provider)):
+        cats = list(p.categories or [])
+        if old in cats:
+            p.categories = [new if c == old else c for c in cats]
+        if p.category == old:
+            p.category = new
+    session.execute(update(EditionArticle).where(EditionArticle.section == old).values(section=new))
+
+
 @router.put("/topics/{topic_id}")
 def update_topic(topic_id: int, body: TopicIn, session: Session = Depends(get_session)) -> dict:
     t = session.get(Topic, topic_id) or _404()
+    old_slug = t.slug
+    if body.slug != old_slug and session.scalar(
+        select(Topic.id).where(Topic.slug == body.slug, Topic.id != topic_id)
+    ):
+        raise HTTPException(409, "slug já existe")
     for k, v in body.model_dump().items():
         setattr(t, k, v)
+    if body.slug != old_slug:
+        _move_slug_references(session, old_slug, body.slug)
     return topic_out(t)
 
 
