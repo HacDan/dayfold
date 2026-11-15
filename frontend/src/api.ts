@@ -108,9 +108,14 @@ export type Provider = {
 
 export type Topic = { id: number; slug: string; name: string; keywords: string[]; weight: number; enabled: boolean; max_articles: number; position: number };
 
-/** Section name for a stored slug; keeps the slug when the section was renamed or deleted. */
-export const topicLabel = (topics: Topic[] | null, slug: string) =>
-  topics?.find((tp) => tp.slug === slug)?.name ?? slug;
+/** Section name for a stored slug. A deleted section keeps its slug on older editions, so a
+    missing topic falls back to a readable label instead of the raw identifier. */
+export const topicLabel = (topics: Topic[] | null, slug: string) => {
+  const name = topics?.find((tp) => tp.slug === slug)?.name;
+  if (name) return name;
+  const text = slug.replace(/-/g, " ").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : slug;
+};
 
 export type AIProvider = {
   id: number; name: string; kind: "openai" | "anthropic" | "cli"; base_url: string | null; model: string | null;

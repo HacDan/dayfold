@@ -142,6 +142,11 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .check { display: flex; align-items: center; gap: 10px; margin: 6px 0 12px; cursor: pointer; }
 .check input { width: 18px; height: 18px; accent-color: var(--ink); }
 .hint { font-size: .82rem; color: var(--ink-3); font-style: italic; margin-top: 4px; }
+/* Slug under a section name: the forms' label, tucked to the right of the name field. */
+.ledger label.slug { display: block; margin: 3px 0 0 16px; }
+.ledger label.slug > span { display: block; font-family: var(--caps); font-weight: 700; font-size: .64rem;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 2px; }
+.ledger label.slug input { font-family: monospace; font-size: .82rem; padding: 4px 8px; }
 .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .row > .grow { flex: 1; }
 fieldset { border: 1px solid var(--rule-soft); padding: 14px 16px 4px; margin: 0 0 18px; }

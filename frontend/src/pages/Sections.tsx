@@ -8,7 +8,7 @@ function TopicRow({ topic: tp, onSaved, onMove, first, last }: { topic: Topic; o
   const [f, setF] = useState({ ...tp, kw: tp.keywords.join(", ") });
   const dirty = f.name !== tp.name || f.slug !== tp.slug || f.kw !== tp.keywords.join(", ") || f.weight !== tp.weight || f.max_articles !== tp.max_articles || f.enabled !== tp.enabled;
   const save = () => {
-    if (!/^[a-z0-9-]{2,40}$/.test(f.slug)) { alert(t("minúsculas e hífens, ex.: economia")); return; }
+    if (!/^[a-z0-9-]{2,40}$/.test(f.slug)) { alert(t("Slug inválido: 2 a 40 caracteres, minúsculas, números e hífens.")); return; }
     if (f.slug !== tp.slug && !confirm(t("Renomear o slug de {old} para {new}? Provedores e edições antigas que apontam para {old} passam a apontar para {new}.", { old: tp.slug, new: f.slug }))) return;
     return run(() => put(`/api/topics/${tp.id}`, {
       slug: f.slug, name: f.name, keywords: f.kw.split(",").map((k) => k.trim()).filter(Boolean),
@@ -23,10 +23,11 @@ function TopicRow({ topic: tp, onSaved, onMove, first, last }: { topic: Topic; o
       </td>
       <td style={{ minWidth: 150 }}>
         <input type="text" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-        <input type="text" aria-label="slug" maxLength={40} value={f.slug}
-          onChange={(e) => setF({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
-          style={{ marginTop: 2, fontSize: ".85em", fontFamily: "monospace" }} />
-        <div className="small muted" style={{ maxWidth: 210, lineHeight: 1.25 }}>{t("identificador usado por provedores e edições")}</div>
+        <label className="slug">
+          <span>{t("Slug")}</span>
+          <input type="text" maxLength={40} value={f.slug}
+            onChange={(e) => setF({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} />
+        </label>
       </td>
       <td style={{ minWidth: 280 }}><textarea style={{ minHeight: 60 }} value={f.kw} onChange={(e) => setF({ ...f, kw: e.target.value })} /></td>
       <td style={{ width: 90 }}><input type="number" step={0.1} min={0.1} max={3} value={f.weight} onChange={(e) => setF({ ...f, weight: Number(e.target.value) })} /></td>
@@ -34,7 +35,7 @@ function TopicRow({ topic: tp, onSaved, onMove, first, last }: { topic: Topic; o
       <td><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} aria-label={t("Ativa")} /></td>
       <td style={{ whiteSpace: "nowrap" }}>
         <button className="btn small primary" disabled={!dirty} onClick={save}>{t("Salvar")}</button>{" "}
-        <button className="btn small danger" onClick={() => confirm(t("Excluir a seção {name}?", { name: tp.name })) && run(() => del(`/api/topics/${tp.id}`), t("Seção excluída")).then(onSaved)}>×</button>
+        <button className="btn small danger" onClick={() => confirm(t("Excluir a seção {name}? Provedores que a alimentam precisam ser movidos antes.", { name: tp.name })) && run(() => del(`/api/topics/${tp.id}`), t("Seção excluída")).then(onSaved)}>×</button>
       </td>
     </tr>
   );

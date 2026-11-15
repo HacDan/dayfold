@@ -9,6 +9,12 @@ def iso(dt: datetime | None) -> str | None:
     return dt.isoformat() + ("Z" if dt and dt.tzinfo is None else "") if dt else None
 
 
+def section_label(topics: dict[str, str], slug: str) -> str:
+    """Section name for a stored slug. Older editions keep the slug of sections deleted since, so
+    fall back to a readable form: a raw identifier in a heading reads like a missing value."""
+    return topics.get(slug) or slug.replace("-", " ").strip().capitalize() or slug
+
+
 def edition_summary(e: Edition) -> dict:
     return {
         "id": e.id, "number": e.number, "date": e.edition_date.isoformat(), "title": e.title,

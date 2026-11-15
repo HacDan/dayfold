@@ -16,7 +16,7 @@ from ..jobs.queue import enqueue_generation
 from ..models import Edition, EditionStatus, GenerationJob, Topic
 from ..settings import get_section
 from .auth import require_admin, require_feed_token
-from .serialize import edition_summary, iso, job_out
+from .serialize import edition_summary, iso, job_out, section_label
 
 router = APIRouter(prefix="/api", tags=["editions"], dependencies=[Depends(require_admin)])
 feed = APIRouter(tags=["feed"])
@@ -67,7 +67,7 @@ def get_edition(eid: int, session: Session = Depends(get_session)) -> dict:
         **edition_summary(e),
         "articles": [{
             "id": it.article.id, "position": it.position, "section": it.section,
-            "section_name": topics.get(it.section, it.section), "priority": it.priority,
+            "section_name": section_label(topics, it.section), "priority": it.priority,
             "is_headline": it.is_headline, "score": it.score, "title": it.article.title,
             "subtitle": it.article.subtitle, "author": it.article.author,
             "published_at": iso(it.article.published_at), "provider": it.article.provider.name,

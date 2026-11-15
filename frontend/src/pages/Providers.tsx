@@ -8,12 +8,12 @@ import { Empty, Field, Loading, Modal, SectionTitle, Stamp, useAction, useLoad }
 function SectionPicker({ value, onChange, topics }: { value: string[]; onChange: (v: string[]) => void; topics: Topic[] | null }) {
   if (!topics) return null;
   const known = new Set(topics.map((tp) => tp.slug));
-  const extra = value.filter((v) => !known.has(v)); // sections deleted since: keep them visible
+  const extra = value.filter((v) => !known.has(v)); // sections deleted since: keep them visible, readable
   const toggle = (slug: string) =>
     onChange(value.includes(slug) ? value.filter((v) => v !== slug) : [...value, slug]);
   return (
     <div className="chips" role="group">
-      {[...topics.map((tp) => ({ slug: tp.slug, name: tp.name, off: !tp.enabled })), ...extra.map((x) => ({ slug: x, name: x, off: true }))].map((c) => (
+      {[...topics.map((tp) => ({ slug: tp.slug, name: tp.name, off: !tp.enabled })), ...extra.map((x) => ({ slug: x, name: topicLabel(topics, x), off: true }))].map((c) => (
         <button key={c.slug} type="button" className={`chip${value.includes(c.slug) ? " on" : ""}${c.off ? " off" : ""}`}
           aria-pressed={value.includes(c.slug)} onClick={() => toggle(c.slug)}>
           {c.name}{value[0] === c.slug && value.length > 1 ? " ★" : ""}

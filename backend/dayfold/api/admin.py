@@ -39,7 +39,7 @@ from ..settings import (
     set_section,
 )
 from .auth import require_admin
-from .serialize import edition_summary, job_out
+from .serialize import edition_summary, job_out, section_label
 
 router = APIRouter(prefix="/api", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -219,7 +219,12 @@ def order_topics(ids: list[int], session: Session = Depends(get_session)) -> lis
 
 @router.delete("/topics/{topic_id}")
 def delete_topic(topic_id: int, session: Session = Depends(get_session)) -> dict:
+    """A section may only go once no provider feeds it: a provider whose section is gone would
+    keep a dead slug and silently stop matching any topic."""
     t = session.get(Topic, topic_id) or _404()
+    fed_by = [p for p in session.scalars(select(Provider)) if t.slug in p.sections]
+    if fed_by:
+        raise HTTPException(409, f"{len(fed_by)} provedor(es) usam esta seção; mova-os para outra antes de excluir")
     session.delete(t)
     return {"ok": True}
 
@@ -431,7 +436,7 @@ def preview_cover(body: dict, session: Session = Depends(get_session)) -> Respon
             headline, deck = head.article.title, head.article.subtitle
             lead = (head.article.body or head.article.excerpt or "")[:900]
         topics = {t.slug: t.name for t in session.scalars(select(Topic))}
-        secondary = [(topics.get(i.section, i.section), i.article.title) for i in items if not i.is_headline][:6]
+        secondary = [(section_label(topics, i.section), i.article.title) for i in items if not i.is_headline][:6]
     import tempfile
     from pathlib import Path
 
