@@ -399,6 +399,8 @@ export const en: Record<string, string> = {
   "Nova seção": "New section",
   "Seção criada": "Section created",
   "minúsculas e hífens, ex.: economia": "lowercase and hyphens, e.g. economy",
+  "identificador usado por provedores e edições": "identifier used by providers and older editions",
+  "Renomear o slug de {old} para {new}? Provedores e edições antigas que apontam para {old} passam a apontar para {new}.": "Rename the slug from {old} to {new}? Providers and older editions that point at {old} will point at {new} instead.",
   "Palavras-chave (vírgulas)": "Keywords (comma separated)",
   "Criar seção": "Create section",
   "Só metadados": "Metadata only",
