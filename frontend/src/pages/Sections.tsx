@@ -17,7 +17,7 @@ function TopicRow({ topic: tp, onSaved, onMove, first, last }: { topic: Topic; o
         <button className="btn small" disabled={first} onClick={() => onMove(-1)} aria-label={t("Subir")}>↑</button>{" "}
         <button className="btn small" disabled={last} onClick={() => onMove(1)} aria-label={t("Descer")}>↓</button>
       </td>
-      <td style={{ minWidth: 150 }}><input type="text" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /><div className="small muted">{tp.slug}</div></td>
+      <td style={{ minWidth: 150 }}><input type="text" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /><div className="small muted">slug: {tp.slug}</div></td>
       <td style={{ minWidth: 280 }}><textarea style={{ minHeight: 60 }} value={f.kw} onChange={(e) => setF({ ...f, kw: e.target.value })} /></td>
       <td style={{ width: 90 }}><input type="number" step={0.1} min={0.1} max={3} value={f.weight} onChange={(e) => setF({ ...f, weight: Number(e.target.value) })} /></td>
       <td style={{ width: 80 }}><input type="number" min={1} max={20} value={f.max_articles} onChange={(e) => setF({ ...f, max_articles: Number(e.target.value) })} /></td>

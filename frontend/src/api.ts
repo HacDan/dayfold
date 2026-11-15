@@ -32,6 +32,8 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
 }
 
 export const get = <T,>(p: string) => api<T>(p);
+/** GET that bypasses the browser cache: section names change while the URL stays the same. */
+export const getFresh = <T,>(p: string) => api<T>(p, { cache: "no-store" });
 export const post = <T,>(p: string, json?: unknown) => api<T>(p, { method: "POST", json: json ?? {} });
 export const put = <T,>(p: string, json: unknown) => api<T>(p, { method: "PUT", json });
 export const del = <T,>(p: string) => api<T>(p, { method: "DELETE" });
@@ -105,6 +107,10 @@ export type Provider = {
 };
 
 export type Topic = { id: number; slug: string; name: string; keywords: string[]; weight: number; enabled: boolean; max_articles: number; position: number };
+
+/** Section name for a stored slug; keeps the slug when the section was renamed or deleted. */
+export const topicLabel = (topics: Topic[] | null, slug: string) =>
+  topics?.find((tp) => tp.slug === slug)?.name ?? slug;
 
 export type AIProvider = {
   id: number; name: string; kind: "openai" | "anthropic" | "cli"; base_url: string | null; model: string | null;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { t } from "../i18n";
 import { useNavigate, useParams } from "react-router-dom";
-import { del, get, post, put, fmtDateTime, USAGE_LABEL, type Provider, type Version } from "../api";
+import { del, get, getFresh, post, put, fmtDateTime, topicLabel, USAGE_LABEL, type Provider, type Topic, type Version } from "../api";
 import { Field, Loading, Modal, SectionTitle, Stamp, useAction, useLoad } from "../components/ui";
 import { ProviderForm } from "./Providers";
 
@@ -28,6 +28,7 @@ export default function ProviderDetail() {
   const { run, busy } = useAction();
   const { data, reload } = useLoad(() => get<Provider>(`/api/providers/${id}`), [id], (d) =>
     d?.jobs?.some((j) => ["QUEUED", "RUNNING"].includes(j.status)) ? 2000 : 15000);
+  const { data: topics } = useLoad(() => getFresh<Topic[]>("/api/topics"));
   const [editing, setEditing] = useState(false);
   const [regen, setRegen] = useState(false);
   const [prompt, setPrompt] = useState("");
@@ -37,7 +38,7 @@ export default function ProviderDetail() {
 
   return (
     <div>
-      <SectionTitle kicker={`${t("Provedor")} · ${(data.categories?.length ? data.categories : [data.category]).join(", ")}`} title={data.name}>
+      <SectionTitle kicker={`${t("Provedor")} · ${(data.categories?.length ? data.categories : [data.category]).map((s) => topicLabel(topics, s)).join(", ")}`} title={data.name}>
         <button className="btn" disabled={busy || !data.active_version_id} onClick={() => run(() => post(`/api/providers/${data.id}/test`), t("Teste enfileirado")).then(reload)}>{t("Testar")}</button>
         <button className="btn" disabled={!!runningJob} onClick={() => setRegen(true)}>{t("Regenerar scraper")}</button>
         <button className="btn" onClick={() => setEditing(true)}>{t("Editar")}</button>

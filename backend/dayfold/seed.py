@@ -10,7 +10,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Game, Provider, ScraperStatus, ScraperVersion, Topic, UsageMode
+from .models import Game, Provider, ScraperStatus, ScraperVersion, Setting, Topic, UsageMode
 
 FULL = UsageMode.FULL_CONTENT_ALLOWED
 EXCERPT = UsageMode.EXCERPT_AND_LINK
@@ -179,10 +179,35 @@ DEFAULT_GAMES: list[dict] = [
 ]
 
 
+# Install-wide record of what has already been seeded, kept in the settings table so no schema
+# change is needed. Once a default list has been installed, an empty one stays empty: deleting
+# every section (or every provider) must not bring the Portuguese defaults back on restart.
+SEED_KEY = "seed"
+
+
+def _seed_state(session: Session) -> dict:
+    row = session.get(Setting, SEED_KEY)
+    return dict(row.value or {}) if row is not None else {}
+
+
+def _mark_seeded(session: Session, name: str) -> None:
+    row = session.get(Setting, SEED_KEY)
+    state = dict(row.value or {}) if row is not None else {}
+    state[name] = True
+    if row is None:
+        session.add(Setting(key=SEED_KEY, value=state))
+    else:
+        row.value = state
+    session.flush()
+
+
 def seed(session: Session) -> None:
-    if session.scalar(select(Topic.id).limit(1)) is None:
-        for i, t in enumerate(DEFAULT_TOPICS):
-            session.add(Topic(position=i, **t))
+    state = _seed_state(session)
+    if not state.get("topics"):
+        if session.scalar(select(Topic.id).limit(1)) is None:
+            for i, t in enumerate(DEFAULT_TOPICS):
+                session.add(Topic(position=i, **t))
+        _mark_seeded(session, "topics")
 
     # Games added in later versions are appended to the end of existing installs.
     existing = {k: p for k, p in session.execute(select(Game.kind, Game.position))}

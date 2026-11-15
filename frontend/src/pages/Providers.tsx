@@ -1,20 +1,19 @@
 import { useState } from "react";
 import { t } from "../i18n";
 import { Link, useNavigate } from "react-router-dom";
-import { get, post, put, fmtDateTime, USAGE_LABEL, type Provider, type Topic } from "../api";
+import { get, getFresh, post, put, fmtDateTime, topicLabel, USAGE_LABEL, type Provider, type Topic } from "../api";
 import { Empty, Field, Loading, Modal, SectionTitle, Stamp, useAction, useLoad } from "../components/ui";
 
  /** Toggle chips for the provider's sections; the first selected one is the primary. */
-function SectionPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
-  const { data } = useLoad(() => get<Topic[]>("/api/topics"));
-  if (!data) return null;
-  const known = new Set(data.map((tp) => tp.slug));
-  const extra = value.filter((v) => !known.has(v)); // sections that no longer exist stay visible
+function SectionPicker({ value, onChange, topics }: { value: string[]; onChange: (v: string[]) => void; topics: Topic[] | null }) {
+  if (!topics) return null;
+  const known = new Set(topics.map((tp) => tp.slug));
+  const extra = value.filter((v) => !known.has(v)); // sections deleted since: keep them visible
   const toggle = (slug: string) =>
     onChange(value.includes(slug) ? value.filter((v) => v !== slug) : [...value, slug]);
   return (
     <div className="chips" role="group">
-      {[...data.map((tp) => ({ slug: tp.slug, name: tp.name, off: !tp.enabled })), ...extra.map((x) => ({ slug: x, name: x, off: true }))].map((c) => (
+      {[...topics.map((tp) => ({ slug: tp.slug, name: tp.name, off: !tp.enabled })), ...extra.map((x) => ({ slug: x, name: x, off: true }))].map((c) => (
         <button key={c.slug} type="button" className={`chip${value.includes(c.slug) ? " on" : ""}${c.off ? " off" : ""}`}
           aria-pressed={value.includes(c.slug)} onClick={() => toggle(c.slug)}>
           {c.name}{value[0] === c.slug && value.length > 1 ? " ★" : ""}
@@ -30,7 +29,7 @@ export function ProviderForm({ initial, onSubmit, creating }: {
 }) {
   const [f, setF] = useState({
     name: initial?.name ?? "", base_url: initial?.base_url ?? "",
-    categories: initial?.categories?.length ? initial.categories : [initial?.category ?? "brasil"],
+    categories: initial?.categories?.length ? initial.categories : initial?.category ? [initial.category] : [],
     language: initial?.language ?? "pt", usage_mode: initial?.usage_mode ?? "excerpt_and_link",
     license_name: initial?.license_name ?? "Verificar termos", license_url: initial?.license_url ?? "",
     license_note: initial?.license_note ?? "", enabled: initial?.enabled ?? true, max_items: initial?.max_items ?? 15,
@@ -41,6 +40,8 @@ export function ProviderForm({ initial, onSubmit, creating }: {
   const [specJson, setSpecJson] = useState('{\n  "list_url": "",\n  "item_selector": "article",\n  "link_selector": "a"\n}');
   const [useAi, setUseAi] = useState(true);
   const [prompt, setPrompt] = useState("");
+  // Fetched once per form, uncached: a section renamed or added since the page loaded shows here.
+  const { data: topics } = useLoad(() => getFresh<Topic[]>("/api/topics"));
   const set = (k: string, v: unknown) => setF((p) => ({ ...p, [k]: v }));
 
   const submit = (e: React.FormEvent) => {
@@ -70,7 +71,7 @@ export function ProviderForm({ initial, onSubmit, creating }: {
         <Field label={t("Nome")}><input type="text" required value={f.name} onChange={(e) => set("name", e.target.value)} /></Field>
         <Field label={t("URL base")}><input type="url" required value={f.base_url} onChange={(e) => set("base_url", e.target.value)} placeholder={t("https://...")} /></Field>
         <Field label={t("Seções")} hint={t("Uma ou mais. Cada matéria vai para a seção que mais combina com ela; ★ marca a principal.")}>
-          <SectionPicker value={f.categories} onChange={(v) => set("categories", v)} />
+          <SectionPicker value={f.categories} onChange={(v) => set("categories", v)} topics={topics} />
         </Field>
         <Field label={t("Idioma")}>
           <select value={f.language} onChange={(e) => set("language", e.target.value)}>
@@ -136,6 +137,7 @@ export default function Providers() {
   const { run } = useAction();
   const { data, reload } = useLoad(() => get<Provider[]>("/api/providers"), [], (d) =>
     d?.some((p) => ["GENERATING", "TESTING", "PENDING"].includes(p.latest_status ?? "")) ? 3000 : 20000);
+  const { data: topics } = useLoad(() => getFresh<Topic[]>("/api/topics"));
   const [adding, setAdding] = useState(false);
   if (!data) return <Loading />;
 
@@ -161,7 +163,7 @@ export default function Providers() {
                   <Link to={`/provedores/${p.id}`} className="name" style={{ textDecoration: "none" }}>{p.name}</Link>
                   <div className="small muted">{p.license_name} · {p.language.toUpperCase()}</div>
                 </td>
-                <td className="small">{(p.categories?.length ? p.categories : [p.category]).join(", ")}</td>
+                <td className="small">{(p.categories?.length ? p.categories : [p.category]).map((s) => topicLabel(topics, s)).join(", ")}</td>
                 <td className="small">{t(USAGE_LABEL[p.usage_mode] ?? p.usage_mode)}</td>
                 <td>
                   {p.active_version ? <><Stamp status={p.active_version.status} /> <span className="small muted">v{p.active_version.version} · {p.active_version.strategy}</span></> : <Stamp status="off" label={t("sem scraper")} />}
