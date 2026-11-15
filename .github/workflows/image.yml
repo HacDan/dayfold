@@ -90,6 +90,23 @@ jobs:
         working-directory: backend
         run: uv run pytest -q
 
+      # Same Node major and pnpm as deploy/Dockerfile, which repeats this build for each
+      # architecture: a TypeScript break fails here once, early, instead of twice at the end.
+      # `corepack pnpm` instead of `corepack enable` so nothing has to write into the Node install.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dashboard deps
+        working-directory: frontend
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build dashboard
+        working-directory: frontend
+        run: corepack pnpm build
+
       - name: Install LuaJIT
         run: |
           sudo apt-get update

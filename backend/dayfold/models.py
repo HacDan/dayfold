@@ -37,6 +37,9 @@ class UsageMode(enum.StrEnum):
     METADATA_ONLY = "metadata_only"
     EXCERPT_AND_LINK = "excerpt_and_link"
     FULL_CONTENT_ALLOWED = "full_content_allowed"
+    # A comic strip from a feed: the artwork is the content, with its title and alt text. No story
+    # text is printed and none is fetched, so the feed entry is all the server needs.
+    IMAGE_ONLY = "image_only"
 
 
 class ScraperStatus(enum.StrEnum):

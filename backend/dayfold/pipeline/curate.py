@@ -15,7 +15,16 @@ from sqlalchemy.orm import Session
 
 from ..ai.client import AIError, active_client
 from ..i18n import tr
-from ..models import Article, Edition, EditionArticle, EditionStatus, Provider, Topic, utcnow
+from ..models import (
+    Article,
+    Edition,
+    EditionArticle,
+    EditionStatus,
+    Provider,
+    Topic,
+    UsageMode,
+    utcnow,
+)
 from ..settings import CurationSettings, NewspaperSettings
 from .feedback import Preferences, load_preferences, ranked
 
@@ -103,7 +112,7 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
     by_slug = {t.slug: t for t in topics}
     blocked = [fold(b) for b in cur.blocked_keywords if b.strip()]
     langs = {lang[:2] for lang in cur.languages}
-    provider_sections = {p.id: tuple(p.sections) for p in session.scalars(select(Provider))}
+    providers = {p.id: p for p in session.scalars(select(Provider))}
     out: list[Candidate] = []
     skipped = defaultdict(int)
     for a in rows:
@@ -115,13 +124,24 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
         if any(b in ftext for b in blocked):
             skipped["blocked"] += 1
             continue
-        best, best_hits = None, 0
-        for t in topics:
-            hits = _keyword_hits(a.title, t.keywords) * 3 + _keyword_hits(text, t.keywords)
-            if t.slug in provider_sections.get(a.provider_id, (a.category,)):
-                hits += 4
-            if hits > best_hits:
-                best, best_hits = t, hits
+        provider = providers.get(a.provider_id)
+        if provider is not None and provider.usage_mode == UsageMode.IMAGE_ONLY:
+            # A strip has no story text for the keywords to match, so it prints in the section its
+            # provider declares: comics collect in one place instead of scattering by subject.
+            best = next((by_slug[c] for c in provider.sections if c in by_slug), None)
+            if best is None:
+                # No section chips chosen yet: the primary category is the section of last resort,
+                # so the strips still print instead of being dropped as unsectioned.
+                best = by_slug.get(a.category)
+            best_hits = 0
+        else:
+            best, best_hits = None, 0
+            for t in topics:
+                hits = _keyword_hits(a.title, t.keywords) * 3 + _keyword_hits(text, t.keywords)
+                if t.slug in (provider.sections if provider else (a.category,)):
+                    hits += 4
+                if hits > best_hits:
+                    best, best_hits = t, hits
         if best is None:
             skipped["no_section"] += 1
             continue
@@ -150,8 +170,25 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
     if len(kept) < len(out):
         log(tr(f"Duplicadas removidas por título: {len(out) - len(kept)}.",
                f"Duplicates removed by title: {len(out) - len(kept)}."))
-    _ = by_slug
     return kept
+
+
+def _lead_with_text(picks: list[Pick], cands: list[Candidate],
+                    key: Callable[[Pick], float]) -> None:
+    """A comic strip never leads the paper while there is text to lead with.
+
+    Both selection paths share this: the rules may score a comic highest, the AI may name one as
+    its headline, but a strip has no story text for the front page, so the best story takes the
+    lead and the comic stays in its own section.
+    """
+    by_id = {c.article.id: c.article for c in cands}
+    stories = [p for p in picks if by_id[p.article_id].usage_mode != UsageMode.IMAGE_ONLY]
+    head = next((p for p in picks if p.is_headline), None)
+    if not stories or (head is not None and head.article_id in {p.article_id for p in stories}):
+        return
+    if head is not None:
+        head.is_headline = False
+    max(stories, key=key).is_headline = True
 
 
 def rule_select(session: Session, cands: list[Candidate], news: NewspaperSettings,
@@ -177,6 +214,7 @@ def rule_select(session: Session, cands: list[Candidate], news: NewspaperSetting
             return p.score + (0.8 if a.body else 0) + (0.4 if a.image_url else 0)
 
         max(picks, key=headline_key).is_headline = True
+        _lead_with_text(picks, cands, headline_key)
     return picks
 
 
@@ -269,6 +307,7 @@ def ai_select(session: Session, cands: list[Candidate], news: NewspaperSettings,
         return None
     if not any(p.is_headline for p in picks):
         min(picks, key=lambda p: (p.priority, -p.score)).is_headline = True
+    _lead_with_text(picks, cands, lambda p: (-p.priority, p.score))
     log(tr(f"IA selecionou {len(picks)} matérias.", f"AI selected {len(picks)} stories."))
     return picks
 

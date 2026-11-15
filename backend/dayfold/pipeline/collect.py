@@ -15,7 +15,7 @@ from ..db import session_scope
 from ..i18n import tr
 from ..models import Article, Provider, ScraperStatus, ScraperVersion, UsageMode, utcnow
 from ..settings import get_section
-from ..sources.base import ScrapedItem, first_words
+from ..sources.base import ScrapedItem, clean_text, first_words
 from ..sources.runner import run_isolated
 
 TRACKING = re.compile(r"^(utm_|fbclid|gclid|mc_|ref$|cmpid)")
@@ -59,6 +59,12 @@ def apply_usage(item: ScrapedItem, mode: str, excerpt_words: int) -> dict:
     if mode == UsageMode.METADATA_ONLY:
         data["subtitle"] = None
         data["image_url"] = None
+    elif mode == UsageMode.IMAGE_ONLY:
+        # A comic strip: the artwork is what gets printed, the feed's text is its alt text, and
+        # there is no story to cap. The image stays, unlike excerpts, because it is the content.
+        alt = clean_text(source_text)
+        data["excerpt"] = alt[:500] if alt else None
+        data["subtitle"] = None
     elif mode == UsageMode.EXCERPT_AND_LINK:
         data["excerpt"] = first_words(source_text, excerpt_words)
         data["image_url"] = None  # photos often carry separate rights
@@ -93,7 +99,7 @@ def _collect_provider(pid: int, log: Callable[[str], None], excerpt_words: int) 
                    language=p.language, want_body=p.usage_mode == UsageMode.FULL_CONTENT_ALLOWED)
         name, mode, category = p.name, p.usage_mode, p.category
     outcome = run_isolated(**job)
-    new = 0
+    new = skipped = 0
     with session_scope() as s:
         p = s.get(Provider, pid)
         p.last_run_at = utcnow()
@@ -104,6 +110,9 @@ def _collect_provider(pid: int, log: Callable[[str], None], excerpt_words: int) 
             log(tr(f"{name}: falhou ({outcome.error}).", f"{name}: failed ({outcome.error})."))
             return 0
         for item in outcome.items:
+            if mode == UsageMode.IMAGE_ONLY and not item.image_url:
+                skipped += 1  # a strip without its artwork is nothing to print
+                continue
             h = url_hash(item.url)
             data = apply_usage(item, mode, excerpt_words)
             existing = s.scalar(select(Article).where(Article.url_hash == h))
@@ -118,6 +127,9 @@ def _collect_provider(pid: int, log: Callable[[str], None], excerpt_words: int) 
                 category=category, **data,
             ))
             new += 1
+    if skipped:
+        log(tr(f"{name}: {skipped} itens sem imagem ignorados.",
+               f"{name}: {skipped} items without an image skipped."))
     log(tr(f"{name}: {len(outcome.items)} lidas, {new} novas.",
            f"{name}: {len(outcome.items)} read, {new} new."))
     return new

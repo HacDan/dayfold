@@ -8,9 +8,9 @@
 {% if headline %}{{ m.article(headline, L, headline=True) }}{% endif %}
 <div class="index">
   <h3>{{ L.in_this_edition }}</h3>
-  {% for sec in sections %}
-    <p class="sec"><a href="{{ sec.file }}">{{ sec.name }}</a></p>
-    {% for a in sec.articles %}<p class="item"><a href="{{ sec.file }}#a{{ a.id }}">{{ a.title }}</a></p>{% endfor %}
+  {% for row in index %}
+    <p class="sec"><a href="{{ row.href }}">{{ row.name }}</a></p>
+    {% for it in row.links %}<p class="item"><a href="{{ it.href }}">{{ it.title }}</a></p>{% endfor %}
   {% endfor %}
   {% if has_charge %}<p class="sec"><a href="charge.xhtml">{{ L.charge }}</a></p>{% endif %}
   {% if games %}<p class="sec"><a href="{{ games[0].file }}">{{ L.games }}</a></p>

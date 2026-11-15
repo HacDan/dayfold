@@ -149,6 +149,7 @@ export const USAGE_LABEL: Record<string, string> = {
   metadata_only: "Só metadados",
   excerpt_and_link: "Excerto + link",
   full_content_allowed: "Texto integral",
+  image_only: "Só imagem (tira)",
 };
 
 export const STATUS_LABEL: Record<string, string> = {

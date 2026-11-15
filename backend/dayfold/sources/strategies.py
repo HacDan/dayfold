@@ -61,9 +61,13 @@ def _entry_image(entry) -> str | None:
     for e in entry.get("enclosures") or []:
         if str(e.get("type", "")).startswith("image"):
             return e.get("href")
-    content = (entry.get("content") or [{}])[0].get("value") or entry.get("summary") or ""
-    m = re.search(r"<img[^>]+src=[\"']([^\"']+)", content)
-    return m.group(1) if m else None
+    # Comic feeds often carry the artwork only as an <img> inside the entry text.
+    content = (entry.get("content") or [{}])[0].get("value") or ""
+    for fragment in (content, entry.get("summary") or ""):
+        m = re.search(r"<img[^>]+src=[\"']([^\"']+)", fragment)
+        if m:
+            return m.group(1)
+    return None
 
 
 def _entry_date(entry) -> str | None:

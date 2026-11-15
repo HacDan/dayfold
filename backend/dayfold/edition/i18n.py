@@ -126,6 +126,7 @@ DEFAULT_SECTION_NAMES = {
     "saude": {"pt": "Saúde", "en": "Health"},
     "tecnologia": {"pt": "Tecnologia", "en": "Technology"},
     "cultura": {"pt": "Cultura", "en": "Culture"},
+    "quadrinhos": {"pt": "Quadrinhos", "en": "Comics"},
 }
 
 

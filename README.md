@@ -37,7 +37,11 @@ downloads one file a day and reads it offline.
   is no feed, and CSS selector scrapers for the rest. Scrapers are versioned, tested in an
   isolated process before activation, and can be rolled back.
 * **License aware**: every provider declares how its content may be used
-  (`metadata_only`, `excerpt_and_link`, `full_content_allowed`) and Dayfold stores only what that mode allows.
+  (`metadata_only`, `excerpt_and_link`, `full_content_allowed`, `image_only`) and Dayfold stores only what that mode allows.
+  `image_only` turns an RSS feed into comics: no story text is fetched or kept, the strips print in
+  the section the provider declares (`Quadrinhos` is seeded for this, falling back to its category)
+  rather than being matched by keywords, and each one gets a page like the cartoon — strip name on
+  top, then the title, the artwork, and the entry's alt text as the caption.
 * **Story length caps**: full text stories can be capped by words and/or paragraphs for the
   whole paper, per section or per provider (the most specific wins). A capped story ends at the
   last sentence that fits, with a "The story continues online" note and the link. Caps apply when

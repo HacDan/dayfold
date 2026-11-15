@@ -41,6 +41,7 @@ from ..models import (
     JobStatus,
     Provider,
     Topic,
+    UsageMode,
     utcnow,
 )
 from ..settings import get_section
@@ -95,6 +96,7 @@ def _article_view(a: Article, section_name: str, lang: str, tz: str | None = Non
         "provider": a.provider.name, "url": a.url, "url_short": _short_url(a.url),
         "paragraphs": _paragraphs(a.body), "excerpt": a.excerpt, "section_name": section_name,
         "image_url": a.image_url, "language": a.language,
+        "image_only": a.usage_mode == UsageMode.IMAGE_ONLY,
     }
 
 
@@ -350,13 +352,13 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
     (out_dir / "img").mkdir(parents=True, exist_ok=True)
     ordered_sections = sorted(sections.values(), key=lambda x: x["position"])
     all_views = ([headline] if headline else []) + [a for s_ in ordered_sections for a in s_["articles"]]
-    if news.include_images:
-        for v in all_views:
-            if v.get("image_url"):
-                dest = out_dir / "img" / f"a{v['id']}.jpg"
-                path = dest if dest.exists() else prepare_photo(v["image_url"], dest, device.image_max_width)
-                if path:
-                    v["image_path"] = str(path)
+    for v in all_views:
+        # A comic's artwork is the story, so it is fetched even when story photos are off.
+        if v.get("image_url") and (news.include_images or v.get("image_only")):
+            dest = out_dir / "img" / f"a{v['id']}.jpg"
+            path = dest if dest.exists() else prepare_photo(v["image_url"], dest, device.image_max_width)
+            if path:
+                v["image_path"] = str(path)
 
     # cover
     lead = headline or (ordered_sections[0]["articles"][0] if ordered_sections else None)

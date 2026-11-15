@@ -74,7 +74,32 @@ with its cover. Games work as printed puzzles; the interactive versions need the
 
 Any EPUB reader can fetch `http://SERVER:8422/feed/latest.epub?token=...`. The token can also be
 sent as the password of HTTP Basic authentication or in the `X-Dayfold-Token` header.
-`/feed/latest.json` returns the edition metadata for scripts.
+
+### The device feed (`/feed/latest.json`)
+
+The plugin reads this file to decide whether there is anything new to download; your own scripts
+can use it the same way. It describes the latest ready edition:
+
+| Field | Meaning |
+| --- | --- |
+| `id` | the edition: `dayfold-<date>-<number>` |
+| `rev` | a revision of the EPUB file itself: its modification time in seconds |
+| `epub`, `games`, `cover` | paths to fetch, with the token |
+| `epub_name`, `games_name` | the names the device must save those files under |
+| `size` | the EPUB size in bytes, when the file exists |
+| `title`, `number`, `date`, `headline` | what the device shows when an edition arrives |
+| `screensaver` | whether the cover is used as the sleep screen |
+
+**A device is up to date only when both `id` and `rev` match what it downloaded.** `id` alone is
+not enough: re-typesetting an edition (**Recompor** on the dashboard) rewrites it in place, keeping
+the date and the number, so the file changes while its name does not. The plugin stores the pair
+on every sync and downloads again when either differs, which is how a corrected edition replaces
+the copy already on the device.
+
+`rev` is optional for compatibility: a server that does not send it (or has no EPUB yet, when it
+is `null`) is treated as a match, and the file name stays the only evidence — the behaviour before
+revisions existed. A device upgrading from such a version downloads the current edition once more,
+then settles into the `id` + `rev` rule.
 
 ## Kindle without jailbreak (Send to Kindle)
 

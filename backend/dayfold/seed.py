@@ -165,6 +165,9 @@ DEFAULT_TOPICS: list[dict] = [
          max_articles=3),
     dict(slug="cultura", name="Cultura", keywords=["cultura", "museu", "arte", "livro",
          "cinema", "música", "patrimônio", "festival"], weight=0.8, max_articles=2),
+    # Where comic feeds print: an image-only provider always lands in the section it declares,
+    # and this is the one the dashboard offers for that.
+    dict(slug="quadrinhos", name="Quadrinhos", keywords=[], weight=0.8, max_articles=2),
 ]
 
 DEFAULT_GAMES: list[dict] = [
@@ -213,6 +216,14 @@ def _migrate(session: Session) -> None:
             if g.config.get("language") == "pt":
                 g.config = {**g.config, "language": "auto"}
         done.add("games_language_auto")
+    if "comics_section" not in done:
+        # Comic feeds need a section to print in; installs seeded before it was added get one.
+        # Sections are curated by the operator, so this only ever adds the one missing default.
+        if session.scalar(select(Topic.id).where(Topic.slug == "quadrinhos")) is None:
+            positions = [t.position for t in session.scalars(select(Topic))]
+            session.add(Topic(slug="quadrinhos", name="Quadrinhos", keywords=[], weight=0.8,
+                              position=max(positions, default=-1) + 1, max_articles=2))
+        done.add("comics_section")
     value = {"done": sorted(done)}
     if row is None:
         session.add(Setting(key="migrations", value=value))

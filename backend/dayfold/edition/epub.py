@@ -147,8 +147,32 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
             g["solution_img"] = add_image_bytes(
                 crossword_png(pz["grid"], pz["numbers"], g["solution"]["grid"]), f"crossword_{i}_sol.png")
 
+    # The news as pages: a section prints its stories, and every strip prints alone on a page of
+    # its own, headed by the strip's name — the layout the cartoon already uses. Pages and the
+    # index are derived here instead of rewriting the sections the document was built with.
+    news: list[dict] = []
+    index: list[dict] = []
+    for s in doc.sections:
+        stories = [a for a in s["articles"] if not a.get("image_only")]
+        rows: list[dict] = []
+        if stories:
+            news.append({"uid": f"sec-{s['slug']}", "file": s["file"], "title": s["name"],
+                         "body": tpl("section.html.j2").render(
+                             ed=ed, L=L, sec={**s, "articles": stories})})
+            rows += [{"title": a["title"], "href": f"{s['file']}#a{a['id']}"} for a in stories]
+        for a in s["articles"]:
+            if not a.get("image_only"):
+                continue
+            file = f"comic_{a['id']}.xhtml"
+            news.append({"uid": f"comic-{a['id']}", "file": file, "title": a["title"],
+                         "body": tpl("comic.html.j2").render(L=L, c=a)})
+            rows.append({"title": a["title"], "href": f"{file}#a{a['id']}"})
+        # A section of nothing but strips has no story page, so its heading leads to the first one.
+        head = s["file"] if stories or not rows else rows[0]["href"]
+        index.append({"name": s["name"], "href": head, "links": rows})
+
     front = _page("front", "front.xhtml", L["front_page"], tpl("front.html.j2").render(
-        ed=ed, L=L, headline=doc.headline, sections=doc.sections, games=doc.games,
+        ed=ed, L=L, headline=doc.headline, index=index, games=doc.games,
         has_charge=bool(doc.charge)), doc.lang, css)
     book.add_item(front)
     spine.append(front)
@@ -162,9 +186,8 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
         toc.append(check)
 
     def add_news() -> None:
-        for s in doc.sections:
-            page = _page(f"sec-{s['slug']}", s["file"], s["name"],
-                         tpl("section.html.j2").render(ed=ed, L=L, sec=s), doc.lang, css)
+        for p in news:
+            page = _page(p["uid"], p["file"], p["title"], p["body"], doc.lang, css)
             book.add_item(page)
             spine.append(page)
             toc.append(page)

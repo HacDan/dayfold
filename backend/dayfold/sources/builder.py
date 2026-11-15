@@ -80,16 +80,26 @@ def _test(version_id: int, strategy: str, spec: dict, provider: dict, log: _Logg
     _set_version(version_id, status=ScraperStatus.TESTING, strategy=strategy, spec=spec)
     log(tr(f"Testando estratégia '{strategy}' em processo isolado...",
            f"Testing strategy '{strategy}' in an isolated process..."))
+    usage = provider["usage_mode"]
     outcome = run_isolated(strategy, spec, max_items=5, language=provider["language"],
-                           want_body=provider["usage_mode"] == UsageMode.FULL_CONTENT_ALLOWED)
+                           want_body=usage == UsageMode.FULL_CONTENT_ALLOWED)
     for line in outcome.log[-6:]:
         if line:
             log(line.strip()[:400])
     report = validate(outcome, min_items=2, need_body=strategy != "rss")
+    if usage == UsageMode.IMAGE_ONLY and report["ok"] and not report["with_image"]:
+        # Collection drops image-less entries, so this feed would store nothing at all.
+        report["reasons"].append(tr("nenhum item com imagem: um feed de tiras precisa de imagens",
+                                    "no item has an image: a comic feed needs images"))
+        report["ok"] = False
     _set_version(version_id, test_report=report)
     if report["ok"]:
-        log(tr(f"Teste aprovado: {report['count']} matérias, {report['with_body']} com corpo.",
-               f"Test passed: {report['count']} stories, {report['with_body']} with body text."))
+        if usage == UsageMode.IMAGE_ONLY:
+            log(tr(f"Teste aprovado: {report['count']} itens, {report['with_image']} com imagem.",
+                   f"Test passed: {report['count']} items, {report['with_image']} with an image."))
+        else:
+            log(tr(f"Teste aprovado: {report['count']} matérias, {report['with_body']} com corpo.",
+                   f"Test passed: {report['count']} stories, {report['with_body']} with body text."))
     else:
         log(tr("Teste reprovado: ", "Test failed: ") + "; ".join(report["reasons"]))
     return report

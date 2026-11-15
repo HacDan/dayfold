@@ -430,6 +430,7 @@ export const en: Record<string, string> = {
   "Só metadados": "Metadata only",
   "Excerto + link": "Excerpt + link",
   "Texto integral": "Full text",
+  "Só imagem (tira)": "Image only (comic strip)",
   "Pendente": "Pending",
   "Gerando": "Generating",
   "Testando": "Testing",
