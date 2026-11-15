@@ -1,10 +1,13 @@
 """Wall-clock time for the operator.
 
-Stored timestamps are naive UTC and the API sends them with a ``Z`` suffix, so the dashboard
-renders them in the browser's own zone. Text the server writes itself is different: a job log
-line, the paper's print stamp and the Kindle send record are frozen strings, so they have to be
-rendered in the one timezone the operator chose — ``schedule.timezone`` — instead of the
-container's clock, which is UTC under Docker.
+One timezone belongs to the whole product: ``schedule.timezone``, the zone the operator sets for
+the daily run. The dashboard renders its dates in it (the server hands it over in
+``/api/auth/status``) and the paper prints its times in it, so both agree.
+
+Stored timestamps are naive UTC and the API sends them with a ``Z`` suffix. Text the server
+freezes itself — a job log line, the paper's print stamp, the Kindle send record — cannot be
+converted after the fact, so it is rendered here instead of with ``datetime.now()``, which
+would read the container's clock (UTC under Docker).
 """
 
 from __future__ import annotations

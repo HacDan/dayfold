@@ -147,8 +147,20 @@ export const STATUS_LABEL: Record<string, string> = {
   ARCHIVED: "Arquivado",
 };
 
+/* Dates are shown in the newspaper's timezone — the schedule's — not the browser's, so the
+   dashboard and the printed paper agree. Set once from /api/auth/status; without it (or with a
+   zone this browser does not know) dates fall back to the browser's own zone. */
+let TIMEZONE: string | undefined;
+
+export function setTimeZone(tz: string | null | undefined) {
+  if (!tz) { TIMEZONE = undefined; return; }
+  try { new Intl.DateTimeFormat("en", { timeZone: tz }); TIMEZONE = tz; } catch { TIMEZONE = undefined; }
+}
+
+const zone = () => (TIMEZONE ? { timeZone: TIMEZONE } : {});
+
 export const fmtDateTime = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString(locale(), { dateStyle: "short", timeStyle: "short" }) : t("nunca");
+  iso ? new Date(iso).toLocaleString(locale(), { dateStyle: "short", timeStyle: "short", ...zone() }) : t("nunca");
 
 export const fmtLongDate = (d: Date) =>
-  d.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  d.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long", year: "numeric", ...zone() });

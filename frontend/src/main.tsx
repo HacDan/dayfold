@@ -4,7 +4,7 @@ import { applyTheme, effectiveTheme, type Theme } from "./theme";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, NavLink, Route, Routes, Link, useLocation } from "react-router-dom";
 import "./styles.css";
-import { get, post, fmtLongDate } from "./api";
+import { get, post, fmtLongDate, setTimeZone } from "./api";
 import { ToastProvider, Loading } from "./components/ui";
 import Overview from "./pages/Overview";
 import Editions from "./pages/Editions";
@@ -104,16 +104,18 @@ function Masthead({ title, onLang }: { title: string; onLang: (l: Lang) => void 
 }
 
 function App() {
-  const [auth, setAuth] = useState<{ required: boolean; authenticated: boolean; language?: Lang } | null>(null);
+  const [auth, setAuth] = useState<{ required: boolean; authenticated: boolean; language?: Lang; timezone?: string } | null>(null);
   const [title, setTitle] = useState("Dayfold");
   const [lang, setLangState] = useState<Lang>(getLang());
   const changeLang = (l: Lang) => { setLang(l); setLangState(l); };
   const loc = useLocation();
 
   useEffect(() => {
-    get<{ required: boolean; authenticated: boolean; language?: Lang }>("/api/auth/status").then((s) => {
+    get<{ required: boolean; authenticated: boolean; language?: Lang; timezone?: string }>("/api/auth/status").then((s) => {
       // Never picked a language: start in the server's own (DAYFOLD_LANGUAGE) without saving it.
       if (s.language && !hasSavedLang()) { setLang(s.language, false); setLangState(s.language); }
+      // Every date below is rendered in the paper's zone, before this page can paint.
+      setTimeZone(s.timezone);
       setAuth(s);
     }).catch(() => setAuth({ required: false, authenticated: true }));
     const onUnauth = () => setAuth((a) => (a ? { ...a, authenticated: false } : a));

@@ -66,11 +66,13 @@ class LoginIn(BaseModel):
 
 
 @router.get("/status")
-def status(request: Request) -> dict:
+def status(request: Request, session: Session = Depends(get_session)) -> dict:
     """Bootstrap call for the dashboard: the language it should start in when the operator has
-    never picked one is the server's own (``DAYFOLD_LANGUAGE``)."""
+    never picked one is the server's own (``DAYFOLD_LANGUAGE``), and the timezone its dates are
+    rendered in (the schedule's, so the dashboard and the printed paper agree)."""
     return {"required": bool(config.password), "authenticated": is_authenticated(request),
-            "language": config.language}
+            "language": config.language,
+            "timezone": get_section(session, "schedule").timezone}
 
 
 @router.post("/login")
