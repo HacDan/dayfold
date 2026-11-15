@@ -156,7 +156,7 @@ def wordsearch(rng: random.Random, language: str = "pt", size: int = 12, theme: 
     if len(pool) < count:
         themes = WORDSEARCH_THEMES.get(language, WORDSEARCH_THEMES["pt"])
         key = theme if theme in themes else rng.choice(sorted(themes))
-        if not pool:
+        if not pool:  # no headlines to draw from: label the theme itself
             theme_label = THEME_LABELS.get(key, key.capitalize())
         pool += [plain(w) for w in themes[key] if plain(w) not in pool]
     pool = [w for w in pool if 3 <= len(w) <= size]

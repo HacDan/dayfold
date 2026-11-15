@@ -62,6 +62,18 @@ def _keyword_hits(text: str, keywords: list[str]) -> int:
     return hits
 
 
+SKIP_LABELS = {
+    "language": ("idioma", "language"),
+    "blocked": ("palavra bloqueada", "blocked keyword"),
+    "no_section": ("sem seção", "no section"),
+}
+
+
+def skip_label(key: str) -> str:
+    """Why a story was filtered out, in the server's language: this lands in the job log."""
+    return tr(*SKIP_LABELS.get(key, (key, key)))
+
+
 def candidates(session: Session, cur: CurationSettings, log: Callable[[str], None]) -> list[Candidate]:
     since = utcnow() - timedelta(hours=cur.max_age_hours)
     used = select(EditionArticle.article_id).join(Edition).where(
@@ -84,12 +96,12 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
     skipped = defaultdict(int)
     for a in rows:
         if a.language and langs and a.language[:2] not in langs:
-            skipped["idioma"] += 1
+            skipped["language"] += 1
             continue
         text = " ".join(filter(None, [a.title, a.subtitle, a.excerpt, (a.body or "")[:1500]]))
         ftext = fold(text)
         if any(b in ftext for b in blocked):
-            skipped["palavra bloqueada"] += 1
+            skipped["blocked"] += 1
             continue
         best, best_hits = None, 0
         for t in topics:
@@ -99,7 +111,7 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
             if hits > best_hits:
                 best, best_hits = t, hits
         if best is None:
-            skipped["sem seção"] += 1
+            skipped["no_section"] += 1
             continue
         age_h = (utcnow() - (a.published_at or a.collected_at)).total_seconds() / 3600
         recency = max(0.0, 1 - age_h / cur.max_age_hours)
@@ -110,7 +122,7 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
         out.append(Candidate(a, best.slug, round(score, 3), best_hits))
     if skipped:
         log(tr("Filtradas: ", "Filtered out: ")
-            + ", ".join(f"{n} ({k})" for k, n in skipped.items()) + ".")
+            + ", ".join(f"{n} ({skip_label(k)})" for k, n in skipped.items()) + ".")
     # dedupe by title similarity, keep the best scored
     out.sort(key=lambda c: -c.score)
     kept: list[Candidate] = []

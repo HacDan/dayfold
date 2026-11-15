@@ -91,6 +91,38 @@ def test_game_preview_and_themes_follow_the_paper_language(data_dir):
         assert "animais" in themes and "animals" not in themes
 
 
+def test_filtered_reasons_follow_the_language(monkeypatch):
+    from dayfold.config import config
+    from dayfold.pipeline.curate import skip_label
+
+    monkeypatch.setattr(config, "language", "en")
+    assert [skip_label(k) for k in ("language", "blocked", "no_section")] == \
+        ["language", "blocked keyword", "no section"]
+    assert skip_label("something_new") == "something_new"  # unknown keys stay readable
+
+    monkeypatch.setattr(config, "language", "pt")
+    assert [skip_label(k) for k in ("language", "blocked", "no_section")] == \
+        ["idioma", "palavra bloqueada", "sem seção"]
+
+
+def test_wordsearch_theme_label_follows_the_paper_language():
+    from dayfold.games.generators import seeded, wordsearch
+
+    # With headlines: the label names today's news in the paper's language.
+    en, _ = wordsearch(seeded("w", "ws"), "en", 12, "news", 10,
+                       ["Security officials testify following the Wisconsin election"])
+    pt, _ = wordsearch(seeded("w", "ws"), "pt", 12, "news", 10,
+                       ["Autoridades depõem sobre a eleição no Wisconsin"])
+    assert en["theme"] == "Today's news"
+    assert pt["theme"] == "Notícias do dia"
+
+    # Without headlines a theme is drawn from the paper's own list, and labelled in its language.
+    empty_en, _ = wordsearch(seeded("w", "ws"), "en", 12, "news", 10, [])
+    empty_pt, _ = wordsearch(seeded("w", "ws"), "pt", 12, "news", 10, [])
+    assert empty_en["theme"] in {"Animals", "Nature", "Space", "City", "Kitchen"}
+    assert empty_pt["theme"] in {"Animais", "Natureza", "Espaço", "Cidade", "Cozinha"}
+
+
 def test_games_list_survives_an_unknown_kind(data_dir):
     from fastapi.testclient import TestClient
 
