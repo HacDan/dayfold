@@ -28,7 +28,6 @@ from ..edition.images import prepare_photo
 from ..edition.length import cap as cap_length
 from ..edition.length import resolve as resolve_limits
 from ..games.generators import GENERATORS, seeded
-from ..games.words import wordsearch_themes
 from ..i18n import tr
 from ..models import (
     Article,
@@ -246,11 +245,9 @@ def make_game(kind: str, cfg: dict, rng, lang: str, headlines: list[str]) -> tup
     if kind == "crossword":
         return GENERATORS["crossword"](rng, lang, int(cfg.get("words", 10)),
                                        int(cfg.get("size", 13)))
-    theme = cfg.get("theme", "news")
-    if theme not in wordsearch_themes(lang):
-        theme = "news"  # saved for the other language; the generator would pick a theme at random
-    return GENERATORS["wordsearch"](rng, lang, int(cfg.get("size", 12)), theme,
-                                    int(cfg.get("words", 10)), headlines, cfg.get("difficulty", "medium"))
+    return GENERATORS["wordsearch"](rng, lang, int(cfg.get("size", 12)),
+                                    cfg.get("theme", "news"), int(cfg.get("words", 10)),
+                                    headlines, cfg.get("difficulty", "medium"))
 
 
 def kindle_test_epub(edition_id: int) -> Path:

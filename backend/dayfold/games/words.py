@@ -42,12 +42,6 @@ WORDSEARCH_THEMES: dict[str, dict[str, list[str]]] = {
 }
 
 
-def wordsearch_themes(lang: str) -> list[str]:
-    """Themes offered for a language. The lists differ per language (animais vs animals), so
-    merging them would let a Portuguese theme sit in an English paper."""
-    return ["news", *sorted(WORDSEARCH_THEMES.get(lang, WORDSEARCH_THEMES["pt"]))]
-
-
 STOPWORDS = set(
     ["a", "o", "as", "os", "um", "uma", "uns", "umas", "de", "da", "do", "das", "dos", "em", "no", "na", "nos", "nas", "por", "para", "pelo", "pela", "com", "sem", "que", "se", "ao", "aos", "e", "ou", "mas", "mais", "menos", "como", "sobre", "entre", "apos", "ate", "seu", "sua", "seus", "suas", "ser", "sao", "foi", "vai", "tem", "ter", "este", "esta", "isso", "isto", "ele", "ela", "eles", "elas", "nao", "sim", "ja", "ha", "the", "of", "and", "to", "in", "on", "for", "with", "from", "by", "at", "is", "are", "was", "were", "be", "has", "have", "will", "after", "over", "into", "new", "says", "said", "about", "their", "its", "this", "that", "than", "more", "brasil"]
 )

@@ -64,10 +64,6 @@ def test_puzzles_and_their_titles_follow_the_paper_language():
     assert GAME_TITLES["en"]["crossword"] == "Crossword"
     assert GAME_TITLES["pt"]["crossword"] == "Palavras Cruzadas"
 
-    # A theme saved for the other language prints as today's news instead of failing.
-    puzzle, _ = make_game("wordsearch", {"theme": "animais"}, seeded("z", "ws"), "en",
-                          ["Security officials testify"])
-    assert puzzle["theme"] == "Today's news"
 
 
 def test_game_preview_and_themes_follow_the_paper_language(data_dir):
@@ -172,6 +168,11 @@ def test_games_list_survives_an_unknown_kind(data_dir):
         assert r.status_code == 200, r.text
         unknown = next(g for g in r.json()["games"] if g["kind"] == "cryptogram")
         assert unknown["config"] == {"language": "pt"}  # nothing to validate against: as stored
+
+        # and saving one is a bad request, not a crash
+        r = c.put(f"/api/games/{unknown['id']}", json={"enabled": True, "config": {}})
+        assert r.status_code == 400, r.text
+        assert "cryptogram" in r.json()["detail"]
 
 
 def test_saving_a_game_keeps_its_options_and_ignores_unknown_ones(data_dir):

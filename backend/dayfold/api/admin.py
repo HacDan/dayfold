@@ -378,7 +378,10 @@ class GameIn(BaseModel):
 @router.put("/games/{gid}")
 def update_game(gid: int, body: GameIn, session: Session = Depends(get_session)) -> dict:
     g = session.get(Game, gid) or _404()
-    schema = GAME_SCHEMAS[g.kind]
+    schema = GAME_SCHEMAS.get(g.kind)
+    if schema is None:  # a kind this version does not know: nothing to validate a save against
+        raise HTTPException(400, tr(f"tipo de jogo desconhecido: {g.kind}",
+                                    f"unknown game kind: {g.kind}"))
     clean = {}
     for k, v in body.config.items():
         if k in schema and v in schema[k]:

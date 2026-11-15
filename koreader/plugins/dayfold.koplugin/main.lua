@@ -269,7 +269,7 @@ end
 function Dayfold:autoSync()
     if self.settings:readSetting("auto_sync") == false then return end
     if not (self.config.server and self.config.token) then return end
-    -- cheap: one small JSON request; the EPUB is only fetched when the edition id changed
+    -- cheap: one small JSON request; the EPUB is only fetched when the edition or its revision changed
     if NetworkMgr:isOnline() then
         local ok, err = pcall(self.sync, self, false)
         if not ok then logger.warn("Dayfold auto sync failed", err) end
