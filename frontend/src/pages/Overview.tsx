@@ -55,6 +55,11 @@ export default function Overview() {
               </p>
               <p className="byline">{t("Gerada em")}{" "}{fmtDateTime(ed.created_at)}{" "}{t("· EPUB")}{" "}{String(ed.stats.epub_kb ?? "?")} KB</p>
               <div className="row" style={{ margin: "14px 0 22px" }}>
+                <Link className="btn primary" to={`/edicoes/${ed.id}/avaliar`}>
+                  {data.latest_ratings && data.latest_ratings.rated > 0
+                    ? t("Avaliar edição ({rated}/{total})", { rated: data.latest_ratings.rated, total: data.latest_ratings.total })
+                    : t("Avaliar edição")}
+                </Link>
                 {ed.epub_url && <a className="btn" href={ed.epub_url}>{t("Baixar EPUB")}</a>}
                 <Link className="btn" to={`/edicoes/${ed.id}`}>{t("Ver detalhes")}</Link>
                 <Link className="btn" to="/kindle">{t("Enviar ao Kindle")}</Link>

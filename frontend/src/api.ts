@@ -67,7 +67,7 @@ export type Settings = {
   values: {
     newspaper: Newspaper;
     schedule: { enabled: boolean; time: string; timezone: string };
-    curation: { use_ai: boolean; max_age_hours: number; languages: string[]; blocked_keywords: string[]; ai_candidates: number; per_provider_limit: number };
+    curation: { use_ai: boolean; max_age_hours: number; languages: string[]; blocked_keywords: string[]; ai_candidates: number; per_provider_limit: number; use_feedback: boolean; feedback_weight: number };
     charge: { mode: "structured" | "illustrated"; style: string };
     device: { cover_width: number; cover_height: number; image_max_width: number; screensaver_cover: boolean };
     distribution: { feed_token: string; keep_editions: number };
@@ -116,12 +116,22 @@ export type AIProvider = {
 export type Game = { id: number; kind: "sudoku" | "wordle" | "wordsearch" | "crossword"; name: string; enabled: boolean; position: number; config: Record<string, string | number> };
 
 export type Overview = {
-  today: string; newspaper: Newspaper; latest_edition: EditionSummary | null; last_job: Job | null; next_run: string | null;
+  today: string; newspaper: Newspaper; latest_edition: EditionSummary | null;
+  latest_ratings: { rated: number; total: number } | null; last_job: Job | null; next_run: string | null;
   schedule: { enabled: boolean; time: string; timezone: string };
   providers: { total: number; active: number; failing: number }; scrapers: { pending: number; failed_jobs: number };
   ai: { active: boolean; name: string | null; kind: string | null; session_usage: { calls: number; prompt_chars: number; completion_chars: number } };
   games: { kind: string; name: string; enabled: boolean }[]; charge: { enabled: boolean; available: boolean };
   recent_editions: EditionSummary[];
+};
+
+export type Rating = -1 | 0 | 1;
+
+type Learned = { name: string; affinity: number; ratings: number }[];
+export type Feedback = {
+  count: number; positive: number; neutral: number; negative: number;
+  more: { providers: Learned; sections: Learned; terms: Learned };
+  less: { providers: Learned; sections: Learned; terms: Learned };
 };
 
 export const USAGE_LABEL: Record<string, string> = {

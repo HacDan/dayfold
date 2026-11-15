@@ -140,6 +140,9 @@ class CurationSettings(BaseModel):
     blocked_keywords: list[str] = []
     ai_candidates: int = Field(40, ge=10, le=120)
     per_provider_limit: int = Field(4, ge=1, le=20)
+    # Reader ratings ("Rate edition") nudge the score of similar stories; 0 = ignore them.
+    use_feedback: bool = True
+    feedback_weight: float = Field(1.0, ge=0, le=3)
 
 
 class ChargeSettings(BaseModel):

@@ -196,6 +196,13 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
               </Field>
               <Field label={t("Candidatas enviadas à IA")}><input type="number" min={10} max={120} value={v.curation.ai_candidates} onChange={(e) => setV({ ...v, curation: { ...v.curation, ai_candidates: Number(e.target.value) } })} /></Field>
             </div>
+            <label className="check">
+              <input type="checkbox" checked={v.curation.use_feedback} onChange={(e) => setV({ ...v, curation: { ...v.curation, use_feedback: e.target.checked } })} />
+              {t("Usar as avaliações das edições na curadoria")}
+            </label>
+            <Field label={t("Peso das avaliações")} hint={t("0 ignora as avaliações; 1 é o padrão; 3 deixa o seu gosto pesar mais que a relevância do dia")}>
+              <input type="number" min={0} max={3} step={0.25} disabled={!v.curation.use_feedback} value={v.curation.feedback_weight} onChange={(e) => setV({ ...v, curation: { ...v.curation, feedback_weight: Number(e.target.value) } })} />
+            </Field>
             <Field label={t("Palavras bloqueadas")} hint={t("matérias com estes termos são descartadas")}>
               <input type="text" value={v.curation.blocked_keywords.join(", ")} onChange={(e) => setV({ ...v, curation: { ...v.curation, blocked_keywords: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } })} />
             </Field>

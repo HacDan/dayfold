@@ -9,6 +9,7 @@ import { ToastProvider, Loading } from "./components/ui";
 import Overview from "./pages/Overview";
 import Editions from "./pages/Editions";
 import EditionDetail from "./pages/EditionDetail";
+import RateEdition from "./pages/RateEdition";
 import Providers from "./pages/Providers";
 import ProviderDetail from "./pages/ProviderDetail";
 import Scrapers from "./pages/Scrapers";
@@ -179,6 +180,7 @@ function App() {
           <Route path="/" element={<Overview />} />
           <Route path="/edicoes" element={<Editions />} />
           <Route path="/edicoes/:id" element={<EditionDetail />} />
+          <Route path="/edicoes/:id/avaliar" element={<RateEdition />} />
           <Route path="/provedores" element={<Providers />} />
           <Route path="/provedores/:id" element={<ProviderDetail />} />
           <Route path="/scrapers" element={<Scrapers />} />

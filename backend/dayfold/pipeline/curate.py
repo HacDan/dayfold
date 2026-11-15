@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from ..ai.client import AIError, active_client
 from ..models import Article, Edition, EditionArticle, EditionStatus, Provider, Topic, utcnow
 from ..settings import CurationSettings, NewspaperSettings
+from .feedback import Preferences, load_preferences, ranked
 
 
 def fold(s: str) -> str:
@@ -61,7 +62,17 @@ def _keyword_hits(text: str, keywords: list[str]) -> int:
     return hits
 
 
-def candidates(session: Session, cur: CurationSettings, log: Callable[[str], None]) -> list[Candidate]:
+def preferences(session: Session, cur: CurationSettings, log: Callable[[str], None]) -> Preferences:
+    if not cur.use_feedback or cur.feedback_weight <= 0:
+        return Preferences()
+    prefs = load_preferences(session)
+    if prefs:
+        log(f"Preferências do leitor: {prefs.count} avaliações, {len(prefs.terms)} palavras aprendidas.")
+    return prefs
+
+
+def candidates(session: Session, cur: CurationSettings, log: Callable[[str], None],
+               prefs: Preferences | None = None) -> list[Candidate]:
     since = utcnow() - timedelta(hours=cur.max_age_hours)
     used = select(EditionArticle.article_id).join(Edition).where(
         Edition.status.in_([EditionStatus.READY, "ARCHIVED"])
@@ -106,6 +117,8 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
         score += 0.6 if a.body and len(a.body) > 800 else 0
         score += 0.3 if a.image_url else 0
         score += 0.1 if a.author else 0
+        if prefs:
+            score += prefs.bonus(a.provider_id, best.slug, a.title, cur.feedback_weight)
         out.append(Candidate(a, best.slug, round(score, 3), best_hits))
     if skipped:
         log("Filtradas: " + ", ".join(f"{n} por {k}" for k, n in skipped.items()) + ".")
@@ -167,7 +180,7 @@ Seções disponíveis (slug: tema e palavras-chave): {sections}
 Escolha até {max_articles} matérias entre as candidatas abaixo, priorizando relevância
 pública, diversidade de temas e de fontes, e evitando assuntos repetidos. Use no máximo
 {per_section} por seção. Prioridade: 1 = destaque, 2 = importante, 3 = nota.
-
+{preferences}
 Responda com JSON: {{"headline_id": <id>, "selected": [{{"id": <id>, "section": "<slug>",
 "priority": 1}}]}}
 
@@ -176,8 +189,26 @@ Candidatas (id | seção sugerida | fonte | título | resumo):
 """
 
 
+def preference_hint(session: Session, prefs: Preferences | None) -> str:
+    """One paragraph for the AI prompt with what the reader asked for more or less of."""
+    if not prefs:
+        return ""
+    names = {p.id: p.name for p in session.scalars(select(Provider))}
+    topics = {t.slug: t.name for t in session.scalars(select(Topic))}
+
+    def side(positive: bool) -> str:
+        parts = [names.get(k, "") for k, _, _ in ranked(prefs.providers, prefs.counts["providers"], positive)]
+        parts += [topics.get(k, k) for k, _, _ in ranked(prefs.sections, prefs.counts["sections"], positive)]
+        parts += [k for k, _, _ in ranked(prefs.terms, prefs.counts["terms"], positive, limit=8)]
+        return ", ".join(p for p in parts if p) or "nada em especial"
+
+    return (f"O leitor avaliou edições anteriores. Quer mais de: {side(True)}. "
+            f"Quer menos de: {side(False)}. Leve isso em conta sem abrir mão da diversidade.\n")
+
+
 def ai_select(session: Session, cands: list[Candidate], news: NewspaperSettings,
-              cur: CurationSettings, log: Callable[[str], None]) -> list[Pick] | None:
+              cur: CurationSettings, log: Callable[[str], None],
+              prefs: Preferences | None = None) -> list[Pick] | None:
     ai = active_client(session)
     if ai is None:
         log("Curadoria com IA ligada, mas nenhuma IA está ativa: usando regras.")
@@ -193,6 +224,7 @@ def ai_select(session: Session, cands: list[Candidate], news: NewspaperSettings,
     prompt = AI_PROMPT.format(
         title=news.title, sections=sections, max_articles=news.max_articles,
         per_section=max(t.max_articles for t in topics), lines="\n".join(lines),
+        preferences=preference_hint(session, prefs),
     )
     log(f"Enviando {len(pool)} candidatas para {ai.label} (~{len(prompt) // 4} tokens).")
     try:
@@ -224,12 +256,13 @@ def ai_select(session: Session, cands: list[Candidate], news: NewspaperSettings,
 
 def curate(session: Session, news: NewspaperSettings, cur: CurationSettings,
            log: Callable[[str], None]) -> tuple[list[Pick], str]:
-    cands = candidates(session, cur, log)
+    prefs = preferences(session, cur, log)
+    cands = candidates(session, cur, log, prefs)
     log(f"{len(cands)} candidatas após filtros.")
     if not cands:
         return [], "rules"
     if cur.use_ai:
-        picks = ai_select(session, cands, news, cur, log)
+        picks = ai_select(session, cands, news, cur, log, prefs)
         if picks:
             return order(session, picks), "ai"
     return order(session, rule_select(session, cands, news, cur)), "rules"

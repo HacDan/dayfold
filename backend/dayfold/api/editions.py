@@ -8,12 +8,13 @@ from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
 from ..jobs.queue import enqueue_generation
-from ..models import Edition, EditionStatus, GenerationJob, Topic
+from ..models import ArticleRating, Edition, EditionStatus, GenerationJob, Provider, Topic
 from ..settings import get_section
 from .auth import require_admin, require_feed_token
 from .serialize import edition_summary, iso, job_out
@@ -63,6 +64,7 @@ def get_edition(eid: int, session: Session = Depends(get_session)) -> dict:
     e = _edition(session, eid)
     topics = {t.slug: t.name for t in session.scalars(select(Topic))}
     job = session.get(GenerationJob, e.job_id) if e.job_id else None
+    ratings = _ratings(session, e.id)
     return {
         **edition_summary(e),
         "articles": [{
@@ -73,6 +75,7 @@ def get_edition(eid: int, session: Session = Depends(get_session)) -> dict:
             "published_at": iso(it.article.published_at), "provider": it.article.provider.name,
             "url": it.article.url, "usage_mode": it.article.usage_mode,
             "has_body": bool(it.article.body), "image_url": it.article.image_url,
+            "excerpt": it.article.excerpt, "rating": ratings.get(it.article.id),
         } for it in e.items],
         "games": [{"kind": g.kind, "title": g.title, "puzzle": g.puzzle, "solution": g.solution} for g in e.games],
         "charge": {"mode": e.charge.mode, "caption": e.charge.caption, "script": e.charge.script,
@@ -139,6 +142,77 @@ def redo_charge(eid: int, session: Session = Depends(get_session)) -> dict:
     retypeset(eid)
     session.expire_all()
     return {"logs": logs, **edition_summary(_edition(session, eid))}
+
+
+# ------------------------------------------------------------------ reader ratings
+
+
+def _ratings(session: Session, eid: int) -> dict[int, int]:
+    rows = session.scalars(select(ArticleRating).where(ArticleRating.edition_id == eid))
+    return {r.article_id: r.value for r in rows if r.article_id is not None}
+
+
+def rating_progress(session: Session, e: Edition) -> dict:
+    return {"rated": len(_ratings(session, e.id)), "total": len(e.items)}
+
+
+class RatingsIn(BaseModel):
+    # article id -> -1 (less of this), 0 (indifferent), 1 (more of this) or None (clear)
+    ratings: dict[int, int | None]
+
+
+@router.put("/editions/{eid}/ratings")
+def rate_edition(eid: int, body: RatingsIn, session: Session = Depends(get_session)) -> dict:
+    e = _edition(session, eid)
+    items = {it.article_id: it for it in e.items}
+    existing = {r.article_id: r for r in session.scalars(
+        select(ArticleRating).where(ArticleRating.edition_id == eid))}
+    for aid, value in body.ratings.items():
+        if aid not in items:
+            raise HTTPException(400, f"a matéria {aid} não está nesta edição")
+        if value is not None and value not in (-1, 0, 1):
+            raise HTTPException(422, "avaliação deve ser -1, 0 ou 1")
+        row = existing.get(aid)
+        if value is None:
+            if row:
+                session.delete(row)
+            continue
+        if row is None:
+            it = items[aid]
+            row = ArticleRating(edition_id=eid, article_id=aid, provider_id=it.article.provider_id,
+                                section=it.section, title=it.article.title, value=value)
+            session.add(row)
+        row.value = value
+    session.flush()
+    return {"ratings": _ratings(session, eid), **rating_progress(session, e)}
+
+
+@router.get("/feedback")
+def feedback_summary(session: Session = Depends(get_session)) -> dict:
+    """What the curation learned from the ratings (shown next to the rating page)."""
+    from ..pipeline.feedback import load_preferences, ranked
+
+    prefs = load_preferences(session)
+    providers = {p.id: p.name for p in session.scalars(select(Provider))}
+    topics = {t.slug: t.name for t in session.scalars(select(Topic))}
+    names = {"providers": lambda k: providers.get(k, "?"), "sections": lambda k: topics.get(k, k),
+             "terms": lambda k: k}
+
+    def side(positive: bool) -> dict:
+        out = {}
+        for kind, label in names.items():
+            aff = getattr(prefs, kind)
+            out[kind] = [{"name": label(k), "affinity": round(v, 2), "ratings": n}
+                         for k, v, n in ranked(aff, prefs.counts.get(kind, {}), positive)]
+        return out
+
+    values = [r.value for r in session.scalars(select(ArticleRating))]
+    return {
+        "count": prefs.count,
+        "positive": sum(1 for v in values if v > 0), "neutral": values.count(0),
+        "negative": sum(1 for v in values if v < 0),
+        "more": side(True), "less": side(False),
+    }
 
 
 @router.delete("/editions/{eid}")

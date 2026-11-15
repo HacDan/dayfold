@@ -38,6 +38,7 @@ from ..settings import (
     set_section,
 )
 from .auth import require_admin
+from .editions import rating_progress
 from .serialize import edition_summary, job_out
 
 router = APIRouter(prefix="/api", tags=["admin"], dependencies=[Depends(require_admin)])
@@ -72,6 +73,7 @@ def overview(session: Session = Depends(get_session)) -> dict:
         "today": date.today().isoformat(),
         "newspaper": news.model_dump(),
         "latest_edition": edition_summary(latest) if latest else None,
+        "latest_ratings": rating_progress(session, latest) if latest else None,
         "last_job": job_out(last_job) if last_job else None,
         "next_run": nxt.isoformat() if nxt else None,
         "schedule": sched.model_dump(),

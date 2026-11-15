@@ -43,6 +43,8 @@ downloads one file a day and reads it offline.
   last sentence that fits, with a "The story continues online" note and the link. Caps apply when
   the edition is typeset, so `retypeset` reshapes an existing edition without collecting again.
 * **Curation without AI** by section keywords, recency, deduplication and per source limits.
+* **Rate edition**: mark each story as more of this, neutral or less of this; the next editions
+  learn from it (source, section and title words), with or without AI.
 * **Optional AI** (OpenAI compatible APIs, Ollama, Anthropic, or a local CLI such as Claude Code or Codex) for:
   editorial selection over pre-filtered candidates, the daily cartoon, and AI assisted scraper generation.
   Everything else keeps working without it.
