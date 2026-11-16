@@ -44,6 +44,7 @@ class EditionDoc:
     sections: list[dict]
     games: list[dict] = field(default_factory=list)
     charge: dict | None = None
+    weather: dict | None = None  # place, condition, highs and lows, sunrise/sunset
     closing_order: list[str] = field(default_factory=lambda: ["news", "charge", "games"])
     sources: list[dict] = field(default_factory=list)
     curated_by: str = "rules"
@@ -176,7 +177,7 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
 
     front = _page("front", "front.xhtml", L["front_page"], tpl("front.html.j2").render(
         ed=ed, L=L, headline=doc.headline, index=index, games=doc.games,
-        has_charge=bool(doc.charge)), doc.lang, css)
+        has_charge=bool(doc.charge), weather=doc.weather), doc.lang, css)
     book.add_item(front)
     spine.append(front)
     toc.append(front)
@@ -240,7 +241,8 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
         {"news": add_news, "charge": add_charge, "games": add_games}[part]()
 
     colophon = _page("colophon", "colophon.xhtml", L["colophon"], tpl("colophon.html.j2").render(
-        ed=ed, L=L, sources=doc.sources, curated_by=doc.curated_by, generated_at=doc.generated_at),
+        ed=ed, L=L, sources=doc.sources, curated_by=doc.curated_by, generated_at=doc.generated_at,
+        weather=doc.weather),
         doc.lang, css)
     book.add_item(colophon)
     spine.append(colophon)

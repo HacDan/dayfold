@@ -170,6 +170,16 @@ class DeviceSettings(BaseModel):
     screensaver_cover: bool = False
 
 
+class WeatherSettings(BaseModel):
+    """Today's forecast on the front page, from Open-Meteo: no key, no account."""
+
+    enabled: bool = False
+    place: str = Field("", max_length=80)
+    latitude: float | None = Field(None, ge=-90, le=90)
+    longitude: float | None = Field(None, ge=-180, le=180)
+    units: Literal["celsius", "fahrenheit"] = "celsius"
+
+
 class DistributionSettings(BaseModel):
     feed_token: str = Field(default_factory=lambda: secrets.token_urlsafe(18))
     keep_editions: int = Field(30, ge=1, le=365)
@@ -213,6 +223,7 @@ SECTIONS: dict[str, type[BaseModel]] = {
     "curation": CurationSettings,
     "charge": ChargeSettings,
     "device": DeviceSettings,
+    "weather": WeatherSettings,
     "distribution": DistributionSettings,
     "kindle": KindleSettings,
 }

@@ -223,6 +223,8 @@ class Edition(Base):
     cover_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     games_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     stats: Mapped[dict] = mapped_column(JSON, default=dict)
+    # The forecast printed on the front page, snapshotted at generation so a re-typeset keeps it.
+    weather: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     curated_by: Mapped[str] = mapped_column(String(20), default="rules")  # rules | ai
     job_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

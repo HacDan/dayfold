@@ -58,6 +58,8 @@ LABELS = {
         "also": "Também nesta edição", "end": "Fim da edição",
         "end_note": "Obrigado pela leitura. Até amanhã.",
         "daily": "Edição diária",
+        "high": "Máx.", "low": "Mín.", "sunrise": "Nascer do sol", "sunset": "Pôr do sol",
+        "weather_credit": "Dados meteorológicos: Open-Meteo (CC BY 4.0).",
         "free_software": "Dayfold é software livre (licença MIT). Tipografia sob SIL Open Font "
                          "License 1.1: Chomsky, UnifrakturMaguntia, UnifrakturCook, Playfair "
                          "Display, Literata e Old Standard TT.",
@@ -105,6 +107,8 @@ LABELS = {
         "also": "Also in this edition", "end": "End of edition",
         "end_note": "Thanks for reading. See you tomorrow.",
         "daily": "Daily edition",
+        "high": "High", "low": "Low", "sunrise": "Sunrise", "sunset": "Sunset",
+        "weather_credit": "Weather data: Open-Meteo (CC BY 4.0).",
         "free_software": "Dayfold is free software (MIT license). Typefaces under the SIL Open "
                          "Font License 1.1: Chomsky, UnifrakturMaguntia, UnifrakturCook, Playfair "
                          "Display, Literata and Old Standard TT.",

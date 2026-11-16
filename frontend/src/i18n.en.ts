@@ -1,5 +1,14 @@
 // English translations for the dashboard. Keys are the Portuguese source strings (see i18n.ts).
 export const en: Record<string, string> = {
+  "Tempo na primeira página": "Weather on the front page",
+  "Previsão do dia, nascer e pôr do sol. Dados do Open-Meteo, sem chave de API.": "The day's forecast, sunrise and sunset. Open-Meteo data, no API key.",
+  "Imprimir o tempo na primeira página": "Print the weather on the front page",
+  "Cidade ou região. “Buscar” preenche as coordenadas pelo nome.": "City or region. “Find” fills in the coordinates by name.",
+  "Buscar": "Find",
+  "Salvar tempo": "Save weather",
+  "Local": "Location",
+  "Unidade": "Units",
+  "Vale para as edições geradas depois de salvar; a edição guarda a previsão com que foi impressa.": "Applies to editions generated after saving; each edition keeps the forecast it was printed with.",
   "Avaliar edição": "Rate edition",
   "Avaliar edição ({rated}/{total})": "Rate edition ({rated}/{total})",
   "Menos disso": "Less of this",

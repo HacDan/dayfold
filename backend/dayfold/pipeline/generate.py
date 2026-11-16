@@ -11,7 +11,7 @@ from pathlib import Path
 
 from sqlalchemy import func, select
 
-from .. import clock
+from .. import clock, weather
 from ..config import config
 from ..db import session_scope
 from ..edition.cover import CoverData, render_cover
@@ -139,6 +139,7 @@ def run_generation_job(job_id: int) -> None:
             news = get_section(s, "newspaper")
             cur = get_section(s, "curation")
             charge_cfg = get_section(s, "charge")
+            weather_cfg = get_section(s, "weather")
             picks, curated_by = curate(s, news, cur, log)
             if not picks:
                 raise RuntimeError(tr("nenhuma matéria disponível para a edição (verifique provedores e filtros)",
@@ -146,8 +147,13 @@ def run_generation_job(job_id: int) -> None:
             ed_date = today_in_tz()
             published = Edition.status.in_([EditionStatus.READY, "ARCHIVED"])
             number = (s.scalar(select(func.count(Edition.id)).where(published)) or 0) + 1
+        # The forecast is one network call: make it with no write transaction open, and print
+        # without it if the service is down.
+        forecast = weather.today(weather_cfg) if weather_cfg.enabled else None
+        with session_scope() as s:
             edition = Edition(number=number, edition_date=ed_date, title=news.title,
-                              status=EditionStatus.BUILDING, curated_by=curated_by, job_id=job_id)
+                              status=EditionStatus.BUILDING, curated_by=curated_by, job_id=job_id,
+                              weather=forecast)
             s.add(edition)
             s.flush()
             edition_id = edition.id
@@ -163,6 +169,13 @@ def run_generation_job(job_id: int) -> None:
         (out_dir / "img").mkdir(parents=True)
         log(tr(f"Edição nº {number} com {len(picks)} matérias ({'IA' if curated_by == 'ai' else 'regras'}).",
                f"Edition No. {number} with {len(picks)} stories ({'AI' if curated_by == 'ai' else 'rules'})."))
+        if forecast:
+            log(tr(f"Tempo em {forecast['place']}: {forecast['t_min']}–{forecast['t_max']}{forecast['unit']}.",
+                   f"Weather in {forecast['place']}: {forecast['t_min']}–{forecast['t_max']}"
+                   f"{forecast['unit']}."))
+        elif weather_cfg.enabled:
+            log(tr("Previsão do tempo indisponível para a edição.",
+                   "Weather forecast unavailable for this edition."))
         lang = news.language
         with session_scope() as s:
             rows = [(a.title, a.language) for a in s.scalars(
@@ -425,12 +438,16 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
     if hasattr(log, "step"):
         log.step("epub", 0.92)
     identifier = f"dayfold-{ed_date.isoformat()}-{number}"
+    # The stored snapshot keeps the numbers; the condition is a label, so it is localised now.
+    weather_view = (None if not ed.weather else
+                    {**ed.weather, "condition": weather.condition_label(ed.weather.get("code"), lang)})
     doc = EditionDoc(
         identifier=identifier, lang=lang, title=news.title, tagline=localized_tagline(news.tagline, lang),
         long_date=long_date(ed_date, lang), short_date=short_date(ed_date, lang),
         iso_date=ed_date.isoformat(), number_label=f"{L['number']} {number}",
         year_label=f"{L['year']} {roman(year_n)}", masthead_font=news.masthead_font,
         typography=news.typography.model_dump(), cover_path=cover_path, headline=headline,
+        weather=weather_view,
         sections=ordered_sections, games=[dict(g) for g in games], charge=charge,
         closing_order=news.closing_order, sources=sources, curated_by=curated_by,
         generated_at=generated_stamp(clock.now(tz), lang),

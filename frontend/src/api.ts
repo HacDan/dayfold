@@ -72,6 +72,7 @@ export type Settings = {
     curation: { use_ai: boolean; max_age_hours: number; languages: string[]; blocked_keywords: string[]; ai_candidates: number; per_provider_limit: number; use_feedback: boolean; feedback_weight: number };
     charge: { mode: "structured" | "illustrated"; style: string };
     device: { cover_width: number; cover_height: number; image_max_width: number; screensaver_cover: boolean };
+    weather: { enabled: boolean; place: string; latitude: number | null; longitude: number | null; units: "celsius" | "fahrenheit" };
     distribution: { feed_token: string; keep_editions: number };
     kindle: KindleCfg;
   };

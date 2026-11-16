@@ -40,6 +40,7 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
   const [v, setV] = useState<Settings["values"] | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
+  const [looking, setLooking] = useState(false);
   useEffect(() => { if (data) setV(structuredClone(data.values)); }, [data]);
   useEffect(() => {
     window.addEventListener("dayfold:settings", reload);
@@ -68,6 +69,18 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
       const blob = await res.blob();
       setCoverUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(blob); });
     } catch (e) { alert((e as Error).message); } finally { setCoverBusy(false); }
+  };
+
+  const setWeather = (patch: Partial<Settings["values"]["weather"]>) =>
+    setV({ ...v, weather: { ...v.weather, ...patch } });
+
+  const lookupPlace = async () => {
+    setLooking(true);
+    try {
+      const found = await get<{ place: string; latitude: number; longitude: number }>(
+        `/api/weather/lookup?q=${encodeURIComponent(v.weather.place.trim())}`);
+      setWeather({ place: found.place, latitude: found.latitude, longitude: found.longitude });
+    } catch (e) { alert((e as Error).message); } finally { setLooking(false); }
   };
 
   const moveOrder = (i: number, d: -1 | 1) => {
@@ -180,6 +193,45 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
               </Field>
             </div>
             <button className="btn" onClick={() => save("schedule")}>{t("Salvar agendamento")}</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>{t("Tempo na primeira página")}</legend>
+            <p className="small muted">{t("Previsão do dia, nascer e pôr do sol. Dados do Open-Meteo, sem chave de API.")}</p>
+            <label className="check">
+              <input type="checkbox" checked={v.weather.enabled} onChange={(e) => setWeather({ enabled: e.target.checked })} />{" "}
+              {t("Imprimir o tempo na primeira página")}
+            </label>
+            {v.weather.enabled && (
+              <>
+                <Field label={t("Local")} hint={t("Cidade ou região. “Buscar” preenche as coordenadas pelo nome.")}>
+                  <div className="row">
+                    <input className="grow" type="text" maxLength={80} value={v.weather.place}
+                      onChange={(e) => setWeather({ place: e.target.value })} />
+                    <button type="button" className="btn" disabled={looking || !v.weather.place.trim()} onClick={lookupPlace}>
+                      {looking ? "…" : t("Buscar")}
+                    </button>
+                  </div>
+                </Field>
+                <div className="grid cols-2" style={{ gap: 14 }}>
+                  <Field label={t("Latitude")}>
+                    <input type="number" step="0.01" min={-90} max={90} value={v.weather.latitude ?? ""}
+                      onChange={(e) => setWeather({ latitude: e.target.value === "" ? null : Number(e.target.value) })} />
+                  </Field>
+                  <Field label={t("Longitude")}>
+                    <input type="number" step="0.01" min={-180} max={180} value={v.weather.longitude ?? ""}
+                      onChange={(e) => setWeather({ longitude: e.target.value === "" ? null : Number(e.target.value) })} />
+                  </Field>
+                </div>
+                <Field label={t("Unidade")} hint={t("Vale para as edições geradas depois de salvar; a edição guarda a previsão com que foi impressa.")}>
+                  <select value={v.weather.units} onChange={(e) => setWeather({ units: e.target.value as "celsius" | "fahrenheit" })}>
+                    <option value="celsius">{t("Celsius (°C)")}</option>
+                    <option value="fahrenheit">{t("Fahrenheit (°F)")}</option>
+                  </select>
+                </Field>
+              </>
+            )}
+            <button className="btn" onClick={() => save("weather")}>{t("Salvar tempo")}</button>
           </fieldset>
 
           <fieldset>

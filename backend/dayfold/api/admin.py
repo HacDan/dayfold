@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
+from .. import weather
 from ..ai.client import AIClient, test_provider, usage
 from ..db import get_session
 from ..games.generators import seeded
@@ -51,6 +52,15 @@ def ai_available(session: Session) -> bool:
 
 
 # ---------------------------------------------------------------- overview
+
+
+@router.get("/weather/lookup")
+def weather_lookup(q: str, session: Session = Depends(get_session)) -> dict:
+    """Place name → coordinates, so the weather fields can be filled in from the dashboard."""
+    found = weather.lookup_place(q.strip(), get_section(session, "newspaper").language)
+    if not found:
+        raise HTTPException(404, tr("local não encontrado", "place not found"))
+    return found
 
 
 @router.get("/overview")

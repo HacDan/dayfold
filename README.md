@@ -45,6 +45,11 @@ downloads one file a day and reads it offline.
   feed's name and author come off it, since the kicker and the artwork already carry them), then the
   artwork, with the entry's alt text as its caption when it says more than the title does — the
   artwork always carries that description either way. The navigation lists a strip by name and day.
+* **Weather without keys**: the front page can carry the day's forecast, high and low, sunrise and
+  sunset for a place you name, looked up by name in the dashboard. It uses
+  [Open-Meteo](https://open-meteo.com), which needs no key or account, and credits it in the
+  colophon; no data comes from the sources above. If the service is unreachable the page prints
+  without the block instead of losing the edition.
 * **Story length caps**: full text stories can be capped by words and/or paragraphs for the
   whole paper, per section or per provider (the most specific wins). A capped story ends at the
   last sentence that fits, with a "The story continues online" note and the link. Caps apply when
