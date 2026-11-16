@@ -37,6 +37,7 @@ class CoverData:
     also_label: str = "Também nesta edição"
     secondary: list[tuple[str, str]] = field(default_factory=list)  # (section, title)
     lead_text: str | None = None
+    weather: list[str] | None = None  # the front page's weather and sun lines
     footer: str = ""
 
 
@@ -131,6 +132,15 @@ def render_cover(data: CoverData, dest: Path, width: int = REF_W, height: int = 
     y += 42
     d.rectangle([M, y, W - M, y + 1], fill=INK)
     y += 34
+
+    # weather and sun under the dateline, as on the front page
+    if data.weather:
+        for text in data.weather:
+            wf, wlines = _fit_block(d, text, "OldStandard-Regular.ttf", inner, 25, 17, 1)
+            _center(d, y, wlines[0].upper(), wf, W, fill=GRAY - 10)
+            y += 35
+        d.rectangle([M, y - 4, W - M, y - 3], fill=170)
+        y += 26
 
     # headline
     hf, hlines = _fit_block(d, data.headline, "PlayfairDisplay-Black.ttf", inner, 88, 52, 3)

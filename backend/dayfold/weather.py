@@ -93,6 +93,15 @@ def today(cfg: WeatherSettings) -> dict | None:
         return None
 
 
+def caption(w: dict, labels: dict) -> list[str]:
+    """The front page's two lines, in the same words, for the cover image."""
+    hi, lo = labels["high"], labels["low"]
+    return [
+        f"{w['place']} · {w['condition']} · {hi} {w['t_max']}{w['unit']} · {lo} {w['t_min']}{w['unit']}",
+        f"{labels['sunrise']} {w['sunrise']} · {labels['sunset']} {w['sunset']}",
+    ]
+
+
 def lookup_place(name: str, lang: str = "pt") -> dict | None:
     """The first match for a place name, so the dashboard can fill in coordinates."""
     params = {"name": name, "count": 1, "language": lang, "format": "json"}

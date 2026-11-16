@@ -419,6 +419,9 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
     if lead:
         source_line = " | ".join(filter(None, [f"{L['by']} {lead['author']}" if lead.get("author") else None,
                                                lead["provider"]]))
+    # The stored snapshot keeps the numbers; the condition is a label, so it is localised now.
+    weather_view = (None if not ed.weather else
+                    {**ed.weather, "condition": weather.condition_label(ed.weather.get("code"), lang)})
     cover_data = CoverData(
         title=news.title, masthead_font=news.masthead_font, tagline=localized_tagline(news.tagline, lang),
         long_date=long_date(ed_date, lang), number_label=f"{L['number']} {number}",
@@ -429,6 +432,7 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         also_label=L["also"], secondary=secondary[:6],
         lead_text=" ".join(lead["paragraphs"][:4]) if lead and lead["paragraphs"] else (lead or {}).get("excerpt"),
         footer=" · ".join(extras),
+        weather=weather.caption(weather_view, L) if weather_view else None,
     )
     if hasattr(log, "step"):
         log.step("cover", 0.85)
@@ -438,9 +442,6 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
     if hasattr(log, "step"):
         log.step("epub", 0.92)
     identifier = f"dayfold-{ed_date.isoformat()}-{number}"
-    # The stored snapshot keeps the numbers; the condition is a label, so it is localised now.
-    weather_view = (None if not ed.weather else
-                    {**ed.weather, "condition": weather.condition_label(ed.weather.get("code"), lang)})
     doc = EditionDoc(
         identifier=identifier, lang=lang, title=news.title, tagline=localized_tagline(news.tagline, lang),
         long_date=long_date(ed_date, lang), short_date=short_date(ed_date, lang),

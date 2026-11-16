@@ -9,6 +9,8 @@ from dayfold.games.generators import crossword, seeded, sudoku, wordle, wordsear
 
 def test_cover_and_epub(tmp_path: Path):
     cover = render_cover(CoverData(title="Dayfold", masthead_font="chomsky", tagline="t", long_date="Hoje",
+                                   weather=["Springfield · Overcast · High 43°F · Low 37°F",
+                                            "Sunrise 06:49 · Sunset 16:25"],
                                    number_label="Nº 1", year_label="Ano I", daily_label="Diária",
                                    headline="Manchete de teste", secondary=[("Mundo", "Outra")]),
                          tmp_path / "cover.png")

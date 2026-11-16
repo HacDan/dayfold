@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from dayfold import weather
+from dayfold.edition.i18n import LABELS
 from dayfold.settings import WeatherSettings
 
 FORECAST = {
@@ -46,6 +47,21 @@ def test_today_needs_no_key(monkeypatch):
     assert seen["url"].startswith("https://api.open-meteo.com/v1/forecast?")
     assert "latitude=-23.55" in seen["url"]
     assert "timezone=auto" in seen["url"]  # the place's own day, not the schedule's clock
+
+
+def test_caption_puts_the_same_two_lines_on_the_cover():
+    """The cover is a front page too: it must not print a pre-weather version of the paper."""
+    forecast = {"place": "Burlington, Vermont", "code": 3, "t_max": 43, "t_min": 37,
+                "sunrise": "06:49", "sunset": "16:25", "unit": "°F"}
+    view = {**forecast, "condition": weather.condition_label(3, "en")}
+    view_pt = {**forecast, "condition": weather.condition_label(3, "pt")}
+
+    assert weather.caption(view, LABELS["en"]) == [
+        "Burlington, Vermont · Overcast · High 43°F · Low 37°F",
+        "Sunrise 06:49 · Sunset 16:25"]
+    assert weather.caption(view_pt, LABELS["pt"]) == [
+        "Burlington, Vermont · Nublado · Máx. 43°F · Mín. 37°F",
+        "Nascer do sol 06:49 · Pôr do sol 16:25"]
 
 
 def test_today_swaps_between_celsius_and_fahrenheit(monkeypatch):
