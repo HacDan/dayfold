@@ -7,10 +7,10 @@ import unicodedata
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..ai.client import AIError, active_client
@@ -51,6 +51,7 @@ class Candidate:
     section: str
     score: float
     keyword_hits: int
+    fallback: bool = False  # older than the window: a thin day's top-up
 
 
 @dataclass
@@ -70,6 +71,11 @@ def _keyword_hits(text: str, keywords: list[str]) -> int:
         if k and re.search(rf"(?<![a-z0-9]){re.escape(k)}(?![a-z0-9])", t):
             hits += 1
     return hits
+
+
+# How far back a thin day may reach for unused stories, and how much text one must carry to count.
+FALLBACK_MAX_AGE_HOURS = 24 * 7
+FALLBACK_MIN_CHARS = 200
 
 
 SKIP_LABELS = {
@@ -95,7 +101,7 @@ def preferences(session: Session, cur: CurationSettings, log: Callable[[str], No
 
 
 def candidates(session: Session, cur: CurationSettings, log: Callable[[str], None],
-               prefs: Preferences | None = None) -> list[Candidate]:
+               prefs: Preferences | None = None, limit: int = 0) -> list[Candidate]:
     since = utcnow() - timedelta(hours=cur.max_age_hours)
     used = select(EditionArticle.article_id).join(Edition).where(
         Edition.status.in_([EditionStatus.READY, "ARCHIVED"])
@@ -106,6 +112,8 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
             # A strip belongs to the day, not to one edition: it prints again in every edition made
             # while it is current, so a paper regenerated at noon is not missing today's comic.
             or_(Article.id.not_in(used), Article.usage_mode == UsageMode.IMAGE_ONLY),
+            # Turning a source off stops its stories, including the ones already collected.
+            Article.provider_id.in_(select(Provider.id).where(Provider.enabled.is_(True))),
         )
     ))
     topics = list(session.scalars(select(Topic).where(Topic.enabled.is_(True)).order_by(Topic.position)))
@@ -115,18 +123,15 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
     blocked = [fold(b) for b in cur.blocked_keywords if b.strip()]
     langs = {lang[:2] for lang in cur.languages}
     providers = {p.id: p for p in session.scalars(select(Provider))}
-    out: list[Candidate] = []
-    skipped = defaultdict(int)
-    for a in rows:
+    def score(a: Article, fallback: bool = False) -> tuple[Candidate | None, str]:
+        """The candidate for one article, or the reason it was dropped."""
+        provider = providers.get(a.provider_id)
         if a.language and langs and a.language[:2] not in langs:
-            skipped["language"] += 1
-            continue
+            return None, "language"
         text = " ".join(filter(None, [a.title, a.subtitle, a.excerpt, (a.body or "")[:1500]]))
         ftext = fold(text)
         if any(b in ftext for b in blocked):
-            skipped["blocked"] += 1
-            continue
-        provider = providers.get(a.provider_id)
+            return None, "blocked"
         if provider is not None and provider.usage_mode == UsageMode.IMAGE_ONLY:
             # A strip has no story text for the keywords to match, so it prints in the section its
             # provider declares: comics collect in one place instead of scattering by subject.
@@ -145,8 +150,7 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
                 if hits > best_hits:
                     best, best_hits = t, hits
         if best is None:
-            skipped["no_section"] += 1
-            continue
+            return None, "no_section"
         age_h = (utcnow() - (a.published_at or a.collected_at)).total_seconds() / 3600
         recency = max(0.0, 1 - age_h / cur.max_age_hours)
         score = best.weight * (1 + min(best_hits, 8) * 0.15) + recency * 1.2
@@ -155,12 +159,67 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
         score += 0.1 if a.author else 0
         if prefs:
             score += prefs.bonus(a.provider_id, best.slug, a.title, cur.feedback_weight)
-        out.append(Candidate(a, best.slug, round(score, 3), best_hits))
+        return Candidate(a, best.slug, round(score, 3), best_hits, fallback), ""
+
+    out: list[Candidate] = []
+    skipped = defaultdict(int)
+    languages_dropped: set[str] = set()
+    for a in rows:
+        cand, why = score(a)
+        if cand is None:
+            skipped[why] += 1
+            provider = providers.get(a.provider_id)
+            if why == "language" and provider is not None:
+                languages_dropped.add(provider.name)
+            continue
+        out.append(cand)
     if skipped:
-        log(tr("Filtradas: ", "Filtered out: ")
-            + ", ".join(f"{n} ({skip_label(k)})" for k, n in skipped.items()) + ".")
-    # dedupe by title similarity, keep the best scored
-    out.sort(key=lambda c: -c.score)
+        parts = []
+        for key, n in skipped.items():
+            names = sorted(languages_dropped) if key == "language" else []
+            source = f": {', '.join(names[:3])}{'…' if len(names) > 3 else ''}" if names else ""
+            parts.append(f"{n} ({skip_label(key)}{source})")
+        log(tr("Filtradas: ", "Filtered out: ") + ", ".join(parts) + ".")
+    kept = _dedupe(out)
+    if len(kept) < len(out):
+        log(tr(f"Duplicadas removidas por título: {len(out) - len(kept)}.",
+               f"Duplicates removed by title: {len(out) - len(kept)}."))
+
+    # A late regeneration finds the day already spent. They score with no recency, so older
+    # stories can only fill the tail; how many actually print is reported after selection.
+    if limit and len(kept) < limit:
+        extra = [c for c in (score(a, fallback=True)[0]
+                             for a in _older_unused(session, since, used, limit * 3))
+                 if c is not None]
+        if extra:
+            log(tr(f"Só {len(kept)} matérias do dia: buscando mais antigas.",
+                   f"Only {len(kept)} stories from the day: reaching back for older ones."))
+            kept = _dedupe(kept + extra)
+    return kept
+
+
+def _older_unused(session: Session, since: datetime, used, want: int) -> list[Article]:
+    """Unused stories that missed the day's window: what a thin paper tops up with.
+
+    A week is as far back as "older" may go, and a story has to carry some text, so a teaser cannot
+    stand in for one. Strips stay out: a comic belongs to its day.
+    """
+    floor = since - timedelta(hours=FALLBACK_MAX_AGE_HOURS)
+    return list(session.scalars(
+        select(Article).where(
+            or_(Article.published_at.between(floor, since),
+                Article.published_at.is_(None) & Article.collected_at.between(floor, since)),
+            Article.id.not_in(used),
+            Article.usage_mode != UsageMode.IMAGE_ONLY,
+            Article.provider_id.in_(select(Provider.id).where(Provider.enabled.is_(True))),
+            func.length(Article.body) >= FALLBACK_MIN_CHARS,
+        ).order_by(Article.published_at.desc()).limit(want)
+    ))
+
+
+def _dedupe(out: list[Candidate]) -> list[Candidate]:
+    """Best scored first, one candidate per story: same headline from two feeds prints once."""
+    out = sorted(out, key=lambda c: -c.score)
     kept: list[Candidate] = []
     toks: list[set[str]] = []
     for c in out:
@@ -169,9 +228,6 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
             continue
         kept.append(c)
         toks.append(tk)
-    if len(kept) < len(out):
-        log(tr(f"Duplicadas removidas por título: {len(out) - len(kept)}.",
-               f"Duplicates removed by title: {len(out) - len(kept)}."))
     return kept
 
 
@@ -317,15 +373,28 @@ def ai_select(session: Session, cands: list[Candidate], news: NewspaperSettings,
 def curate(session: Session, news: NewspaperSettings, cur: CurationSettings,
            log: Callable[[str], None]) -> tuple[list[Pick], str]:
     prefs = preferences(session, cur, log)
-    cands = candidates(session, cur, log, prefs)
+    cands = candidates(session, cur, log, prefs, limit=news.max_articles)
     log(tr(f"{len(cands)} candidatas após filtros.", f"{len(cands)} candidates after filters."))
     if not cands:
         return [], "rules"
     if cur.use_ai:
         picks = ai_select(session, cands, news, cur, log, prefs)
         if picks:
-            return order(session, picks), "ai"
-    return order(session, rule_select(session, cands, news, cur)), "rules"
+            ordered = order(session, picks)
+            _note_older(ordered, cands, log)
+            return ordered, "ai"
+    ordered = order(session, rule_select(session, cands, news, cur))
+    _note_older(ordered, cands, log)
+    return ordered, "rules"
+
+
+def _note_older(picks: list[Pick], cands: list[Candidate], log: Callable[[str], None]) -> None:
+    """How many printed stories came from outside the day's window, now that selection is done."""
+    older = {c.article.id for c in cands if c.fallback}
+    count = sum(1 for p in picks if p.article_id in older)
+    if count:
+        log(tr(f"Matérias mais antigas nesta edição: {count}.",
+               f"Older stories in this edition: {count}."))
 
 
 def order(session: Session, picks: list[Pick]) -> list[Pick]:

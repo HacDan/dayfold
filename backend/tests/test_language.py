@@ -2,7 +2,7 @@
 
 import json
 
-from edition_helpers import epub_text, generate
+from edition_helpers import add_article, epub_text, generate
 
 
 def test_language_env_is_normalised(monkeypatch):
@@ -311,3 +311,45 @@ def test_word_search_theme_follows_language():
 
     puzzle, _ = wordsearch(seeded("x", "ws"), "en", 12, "animais", 8)
     assert puzzle["theme"] == "Animals"
+
+
+def test_language_filter_names_the_provider_it_dropped(data_dir):
+    """A provider marked with the wrong language empties the paper; the log must say which one."""
+    from sqlalchemy import select
+
+    from dayfold.db import session_scope
+    from dayfold.models import Article, Provider
+    from dayfold.pipeline.curate import candidates, skip_label
+    from dayfold.settings import get_section, set_section
+
+    with session_scope() as s:
+        set_section(s, "curation", {"languages": ["en"]})
+        add_article(s, "nasa", "Rocket launch to the Moon with astronauts")
+        provider = s.scalar(select(Provider).where(Provider.slug == "nasa"))
+        assert provider is not None
+        provider.language = "pt"  # an English feed marked Portuguese
+        for article in s.scalars(select(Article)):
+            article.language = "pt"
+
+    logs: list[str] = []
+    with session_scope() as s:
+        assert candidates(s, get_section(s, "curation"), logs.append) == []
+    assert any(skip_label("language") in line and "NASA" in line for line in logs), logs
+
+
+def test_disabling_a_provider_removes_its_stored_stories(data_dir):
+    """A source switched off must not keep printing from what it collected earlier."""
+    from sqlalchemy import select
+
+    from dayfold.db import session_scope
+    from dayfold.models import Provider
+    from dayfold.pipeline.curate import candidates
+    from dayfold.settings import get_section
+
+    with session_scope() as s:
+        add_article(s, "nasa", "Rocket launch to the Moon with astronauts")
+    with session_scope() as s:
+        assert len(candidates(s, get_section(s, "curation"), lambda m: None)) == 1
+        s.scalar(select(Provider).where(Provider.slug == "nasa")).enabled = False
+    with session_scope() as s:
+        assert candidates(s, get_section(s, "curation"), lambda m: None) == []
