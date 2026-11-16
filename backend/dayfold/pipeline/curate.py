@@ -103,7 +103,9 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
     rows = list(session.scalars(
         select(Article).where(
             or_(Article.published_at >= since, Article.published_at.is_(None) & (Article.collected_at >= since)),
-            Article.id.not_in(used),
+            # A strip belongs to the day, not to one edition: it prints again in every edition made
+            # while it is current, so a paper regenerated at noon is not missing today's comic.
+            or_(Article.id.not_in(used), Article.usage_mode == UsageMode.IMAGE_ONLY),
         )
     ))
     topics = list(session.scalars(select(Topic).where(Topic.enabled.is_(True)).order_by(Topic.position)))

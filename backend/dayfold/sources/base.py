@@ -17,6 +17,7 @@ class ScrapedItem:
     author: str | None = None
     published_at: str | None = None  # ISO 8601, UTC
     image_url: str | None = None
+    image_alt: str | None = None  # the artwork's alt text, when the feed provides one
     body: str | None = None  # plain text, paragraphs separated by blank lines
     excerpt: str | None = None
     language: str | None = None

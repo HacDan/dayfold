@@ -41,6 +41,15 @@ def _strip_title(body: str | None, title: str) -> str | None:
     return "\n\n".join(paras) or None
 
 
+def _restates(text: str, title: str) -> bool:
+    """True when text says no more than the title does ("... on Sun" vs "... for Sun")."""
+    def words(s: str) -> set[str]:
+        return set(re.findall(r"[a-z0-9]{2,}", s.casefold()))
+
+    a, b = words(text), words(title)
+    return bool(a and b) and len(a & b) / len(a | b) >= 0.8
+
+
 def apply_usage(item: ScrapedItem, mode: str, excerpt_words: int) -> dict:
     """Keep only what the provider's license allows."""
     body = _strip_title(item.body, item.title)
@@ -62,7 +71,9 @@ def apply_usage(item: ScrapedItem, mode: str, excerpt_words: int) -> dict:
     elif mode == UsageMode.IMAGE_ONLY:
         # A comic strip: the artwork is what gets printed, the feed's text is its alt text, and
         # there is no story to cap. The image stays, unlike excerpts, because it is the content.
-        alt = clean_text(source_text)
+        alt = clean_text(item.image_alt) or clean_text(source_text)
+        if alt and item.title and _restates(alt, item.title):
+            alt = None  # the feed's alt text only restates the title we already print
         data["excerpt"] = alt[:500] if alt else None
         data["subtitle"] = None
     elif mode == UsageMode.EXCERPT_AND_LINK:
@@ -99,7 +110,7 @@ def _collect_provider(pid: int, log: Callable[[str], None], excerpt_words: int) 
                    language=p.language, want_body=p.usage_mode == UsageMode.FULL_CONTENT_ALLOWED)
         name, mode, category = p.name, p.usage_mode, p.category
     outcome = run_isolated(**job)
-    new = skipped = 0
+    new = skipped = refreshed = 0
     with session_scope() as s:
         p = s.get(Provider, pid)
         p.last_run_at = utcnow()
@@ -117,9 +128,19 @@ def _collect_provider(pid: int, log: Callable[[str], None], excerpt_words: int) 
             data = apply_usage(item, mode, excerpt_words)
             existing = s.scalar(select(Article).where(Article.url_hash == h))
             if existing:
-                for k, val in data.items():
-                    if val and not getattr(existing, k):
+                if existing.usage_mode != mode or (data["language"] and data["language"] != existing.language):
+                    # The provider's usage mode (or language) changed after this story was stored.
+                    # What may be printed, and the text printed, follow the mode, so re-derive them
+                    # rather than leaving a strip stored as a story with its feed boilerplate.
+                    for k, val in data.items():
                         setattr(existing, k, val)
+                    existing.usage_mode = mode
+                    refreshed += 1
+                else:
+                    for k, val in data.items():
+                        if val and not getattr(existing, k):
+                            setattr(existing, k, val)
+                existing.category = category
                 continue
             s.add(Article(
                 provider_id=pid, url=item.url[:1000], url_hash=h,
@@ -130,8 +151,8 @@ def _collect_provider(pid: int, log: Callable[[str], None], excerpt_words: int) 
     if skipped:
         log(tr(f"{name}: {skipped} itens sem imagem ignorados.",
                f"{name}: {skipped} items without an image skipped."))
-    log(tr(f"{name}: {len(outcome.items)} lidas, {new} novas.",
-           f"{name}: {len(outcome.items)} read, {new} new."))
+    log(tr(f"{name}: {len(outcome.items)} lidas, {new} novas, {refreshed} atualizadas.",
+           f"{name}: {len(outcome.items)} read, {new} new, {refreshed} updated."))
     return new
 
 

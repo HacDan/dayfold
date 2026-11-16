@@ -258,3 +258,119 @@ def test_ai_selection_cannot_lead_with_a_comic(data_dir, monkeypatch):
     assert heads[0].article_id != comic_id
     with session_scope() as s:
         assert s.scalar(select(Article.usage_mode).where(Article.id == heads[0].article_id)) != "image_only"
+
+
+def test_changing_the_mode_updates_stories_already_collected(data_dir, monkeypatch):
+    """A strip collected before the provider became image-only must stop printing as a story."""
+    from sqlalchemy import select
+
+    from dayfold.db import session_scope
+    from dayfold.models import Article, Provider, UsageMode, utcnow
+    from dayfold.pipeline import collect as collect_mod
+    from dayfold.sources.base import ScrapedItem
+    from dayfold.sources.runner import RunOutcome
+
+    url = "https://example.org/comic/1"
+    with session_scope() as s:
+        p = s.scalar(select(Provider).where(Provider.slug == "nasa"))
+        p.usage_mode = UsageMode.IMAGE_ONLY  # stored while the provider was full content
+        s.add(Article(provider_id=p.id, url=url, url_hash=hashlib.sha1(url.encode()).hexdigest(),
+                      title="Family Circus for Sun, 15 Nov 2026", language="en",
+                      image_url="https://example.org/comic/1.png", usage_mode=UsageMode.FULL_CONTENT_ALLOWED,
+                      body="Subscribe\n\nBy clicking submit, I authorize marketing.",
+                      excerpt="Subscribe", category=p.category,
+                      published_at=utcnow(), collected_at=utcnow()))
+        pid = p.id
+
+    item = ScrapedItem(url=url, title="Family Circus for Sun, 15 Nov 2026",
+                       body="Two panels of family life.", excerpt="A boy argues with a tiger.",
+                       image_url="https://example.org/comic/1.png", language="en")
+    monkeypatch.setattr(collect_mod, "run_isolated",
+                        lambda **kw: RunOutcome(ok=True, items=[item], log=["ok"]))
+
+    lines: list[str] = []
+    collect_mod._collect_provider(pid, lines.append, excerpt_words=70)
+
+    with session_scope() as s:
+        a = s.scalars(select(Article).where(Article.url_hash == hashlib.sha1(url.encode()).hexdigest())).one()
+        assert a.usage_mode == UsageMode.IMAGE_ONLY
+        assert a.body is None and a.subtitle is None  # the feed boilerplate is gone
+        assert a.excerpt == "A boy argues with a tiger."  # the alt text
+        assert a.image_url == "https://example.org/comic/1.png"
+    assert any("1 atualizadas" in line or "1 updated" in line for line in lines)
+
+
+def test_a_used_strip_still_prints_in_the_next_edition(data_dir):
+    """A paper regenerated the same day keeps its comic; a used story stays used."""
+    from datetime import date
+
+    from sqlalchemy import select
+
+    from dayfold.db import session_scope
+    from dayfold.models import Article, Edition, EditionArticle, Provider, UsageMode, utcnow
+
+    with session_scope() as s:
+        tiras = _comic_provider(s, category="quadrinhos", sections=["quadrinhos"])
+        comic_id = _comic(s, tiras)
+        nasa = s.scalar(select(Provider).where(Provider.slug == "nasa"))
+        story = Article(provider_id=nasa.id, url="https://example.org/story",
+                        url_hash=hashlib.sha1(b"story").hexdigest(), title="A used story",
+                        body="Body.", usage_mode=UsageMode.FULL_CONTENT_ALLOWED, language="en",
+                        category="espaco", published_at=utcnow(), collected_at=utcnow())
+        s.add(story)
+        s.flush()
+        ed = Edition(number=1, edition_date=date(2026, 11, 15), title="Dayfold", status="READY")
+        s.add(ed)
+        s.flush()
+        for i, aid in enumerate((comic_id, story.id)):
+            s.add(EditionArticle(edition_id=ed.id, article_id=aid, section="quadrinhos", position=i))
+
+    with session_scope() as s:
+        found = {c.article.id for c in _candidates(s)}
+    assert comic_id in found
+    assert story.id not in found
+
+
+def test_the_artwork_alt_text_is_the_caption_not_the_feed_link_label(monkeypatch):
+    """comicsrss-style feeds: the description is only a "Source" link; the alt text is the caption."""
+    from dayfold.models import UsageMode
+    from dayfold.pipeline.collect import apply_usage
+    from dayfold.sources import strategies
+
+    feed = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>Strips</title>
+      <item><title>Family Circus for Sun, 15 Nov 2026</title><link>https://example.org/1</link>
+        <description><![CDATA[<p><img src="https://example.org/1.gif" alt="A boy argues with a tiger"></p>
+          <p><a href="https://example.org/1">Source</a></p>]]></description></item>
+    </channel></rss>"""
+
+    class Client:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(strategies.net, "fetch", lambda url, **kw: SimpleNamespace(content=feed))
+    monkeypatch.setattr(strategies.net, "client", lambda: Client())
+
+    items = strategies.run_strategy("rss", {"feed_url": "https://example.org/feed"},
+                                    max_items=5, language="en", want_body=False).items
+    assert items[0].image_alt == "A boy argues with a tiger"
+
+    data = apply_usage(items[0], UsageMode.IMAGE_ONLY, excerpt_words=70)
+    assert data["excerpt"] == "A boy argues with a tiger"
+    assert data["image_url"] == "https://example.org/1.gif"
+
+
+def test_a_caption_that_only_repeats_the_title_is_dropped():
+    from dayfold.models import UsageMode
+    from dayfold.pipeline.collect import apply_usage
+    from dayfold.sources.base import ScrapedItem
+
+    title = "Family Circus by Bil Keane on Sun, 15 Nov 2026"
+    item = ScrapedItem(url="https://example.org/1", title=title, image_url="https://example.org/1.gif",
+                       image_alt=title, body="Source")
+    data = apply_usage(item, UsageMode.IMAGE_ONLY, excerpt_words=70)
+
+    assert data["excerpt"] is None  # printing the title twice would be worse than no caption
+    assert data["image_url"] == "https://example.org/1.gif"

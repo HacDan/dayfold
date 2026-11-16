@@ -50,24 +50,29 @@ def run_strategy(strategy: str, spec: dict, *, max_items: int = 15, language: st
 # ---------------------------------------------------------------- RSS / Atom
 
 
-def _entry_image(entry) -> str | None:
+def _entry_image(entry) -> tuple[str | None, str | None]:
+    """The entry's artwork and its alt text, if the feed gives either."""
     for key in ("media_content", "media_thumbnail"):
         for m in entry.get(key) or []:
             if m.get("url") and (m.get("medium") in (None, "image") or "image" in m.get("type", "")):
-                return m["url"]
+                return m["url"], None
     for link in entry.get("links") or []:
         if link.get("rel") == "enclosure" and str(link.get("type", "")).startswith("image"):
-            return link.get("href")
+            return link.get("href"), None
     for e in entry.get("enclosures") or []:
         if str(e.get("type", "")).startswith("image"):
-            return e.get("href")
-    # Comic feeds often carry the artwork only as an <img> inside the entry text.
+            return e.get("href"), None
+    # Comic feeds often carry the artwork only as an <img> inside the entry text, with the only
+    # human-written description of the strip in that tag's alt text.
     content = (entry.get("content") or [{}])[0].get("value") or ""
     for fragment in (content, entry.get("summary") or ""):
-        m = re.search(r"<img[^>]+src=[\"']([^\"']+)", fragment)
-        if m:
-            return m.group(1)
-    return None
+        for tag in re.findall(r"<img\b[^>]*>", fragment):
+            src = re.search(r"\bsrc=[\"']([^\"']+)", tag)
+            if not src:
+                continue
+            alt = re.search(r"\balt=[\"']([^\"']*)", tag) or re.search(r"\btitle=[\"']([^\"']*)", tag)
+            return src.group(1), ((alt.group(1).strip() or None) if alt else None)
+    return None, None
 
 
 def _entry_date(entry) -> str | None:
@@ -103,6 +108,7 @@ def scrape_rss(spec: dict, *, max_items: int, language: str | None, want_body: b
             content_html = None
             if entry.get("content"):
                 content_html = max((c.get("value") or "" for c in entry["content"]), key=len)
+            image_url, image_alt = _entry_image(entry)
             summary = html_to_paragraphs(entry.get("summary"))
             body = html_to_paragraphs(content_html) if content_html else None
             item = ScrapedItem(
@@ -111,7 +117,7 @@ def scrape_rss(spec: dict, *, max_items: int, language: str | None, want_body: b
                 subtitle=None,
                 author=strip_author(entry.get("author")),
                 published_at=_entry_date(entry),
-                image_url=_entry_image(entry),
+                image_url=image_url, image_alt=image_alt,
                 body=body,
                 excerpt=summary if summary and summary != body else None,
                 language=feed_lang,
