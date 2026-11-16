@@ -40,12 +40,11 @@ class EditionDoc:
     masthead_font: str
     typography: dict
     cover_path: Path
-    headline: dict | None
     sections: list[dict]
     games: list[dict] = field(default_factory=list)
     charge: dict | None = None
-    weather_lines: list[str] = field(default_factory=list)  # the front page's weather strip, as printed
-    almanac: dict | None = None  # the moon today and one event from the day
+    has_weather: bool = False  # the cover prints the forecast, and the colophon credits it
+    almanac: dict | None = None  # the moon and the day's event, printed on the cover
     closing_order: list[str] = field(default_factory=lambda: ["news", "charge", "games"])
     sources: list[dict] = field(default_factory=list)
     curated_by: str = "rules"
@@ -118,7 +117,8 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
                                     content=data))
         return f"images/{name}"
 
-    for a in ([doc.headline] if doc.headline else []) + [a for s in doc.sections for a in s["articles"]]:
+    # The lead prints in its section, so every story on a page is a story here: one image each.
+    for a in {a["id"]: a for s in doc.sections for a in s["articles"]}.values():
         if a.get("image_path"):
             a["image"] = add_image(a["image_path"], Path(a["image_path"]).name)
 
@@ -153,35 +153,24 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
     # its own, headed by the strip's name — the layout the cartoon already uses. Pages and the
     # index are derived here instead of rewriting the sections the document was built with.
     news: list[dict] = []
-    index: list[dict] = []
     for s in doc.sections:
         stories = [a for a in s["articles"] if not a.get("image_only")]
-        rows: list[dict] = []
         if stories:
             news.append({"uid": f"sec-{s['slug']}", "file": s["file"], "title": s["name"],
                          "body": tpl("section.html.j2").render(
                              ed=ed, L=L, sec={**s, "articles": stories})})
-            rows += [{"title": a["title"], "href": f"{s['file']}#a{a['id']}"} for a in stories]
         for a in s["articles"]:
             if not a.get("image_only"):
                 continue
             file = f"comic_{a['id']}.xhtml"
-            # Listed by name and day: the headline is only the day, and the section only says
-            # "Quadrinhos", so the navigation carries the strip's name.
+            # The page heads the strip with the paper and its day, so the navigation carries the
+            # day (or the strip's own subtitle) beside the strip's name.
             label = f"{a['feed_title'] or a['provider']} — {a['title']}"
             news.append({"uid": f"comic-{a['id']}", "file": file, "title": label,
-                         "body": tpl("comic.html.j2").render(L=L, c=a)})
-            rows.append({"title": label, "href": f"{file}#a{a['id']}"})
-        # A section of nothing but strips has no story page, so its heading leads to the first one.
-        head = s["file"] if stories or not rows else rows[0]["href"]
-        index.append({"name": s["name"], "href": head, "links": rows})
+                         "body": tpl("comic.html.j2").render(ed=ed, L=L, c=a)})
 
-    front = _page("front", "front.xhtml", L["front_page"], tpl("front.html.j2").render(
-        ed=ed, L=L, headline=doc.headline, index=index, games=doc.games,
-        has_charge=bool(doc.charge), weather_lines=doc.weather_lines, almanac=doc.almanac), doc.lang, css)
-    book.add_item(front)
-    spine.append(front)
-    toc.append(front)
+    # The cover is the front page: masthead, date, weather, almanac and the lead are all drawn
+    # there, so the reading flow goes from it straight to the news.
 
     if doc.test_checklist:
         check = _page("kindle-test", "kindle_test.xhtml", L["test_title"],
@@ -243,7 +232,7 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
 
     colophon = _page("colophon", "colophon.xhtml", L["colophon"], tpl("colophon.html.j2").render(
         ed=ed, L=L, sources=doc.sources, curated_by=doc.curated_by, generated_at=doc.generated_at,
-        has_weather=bool(doc.weather_lines), almanac=doc.almanac),
+        has_weather=doc.has_weather, almanac=doc.almanac),
         doc.lang, css)
     book.add_item(colophon)
     spine.append(colophon)

@@ -58,7 +58,7 @@ export type SearchHit = {
 
 export type SearchResults = { hits: SearchHit[]; more: boolean };
 
-export type Typography = { masthead: number; headline: number; title: number; subtitle: number; body: number; line_height: number };
+export type Typography = { masthead: number; title: number; subtitle: number; body: number; line_height: number };
 
 export type Newspaper = {
   title: string; tagline: string; masthead_font: string; language: "pt" | "en"; max_articles: number;

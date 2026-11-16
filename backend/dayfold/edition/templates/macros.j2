@@ -1,5 +1,5 @@
-{% macro article(a, L, headline=False, dropcap=True) -%}
-<div class="article{% if headline %} headline{% endif %}" id="a{{ a.id }}">
+{% macro article(a, L, dropcap=True) -%}
+<div class="article" id="a{{ a.id }}">
   <p class="kicker">{{ a.section_name }}</p>
   <h2>{{ a.title }}</h2>
   {% if a.subtitle %}<p class="deck">{{ a.subtitle }}</p>{% endif %}

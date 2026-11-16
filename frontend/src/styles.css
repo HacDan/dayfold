@@ -226,7 +226,7 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
 
 .type-preview { background: #fff; color: #111; border: 1px solid var(--rule); padding: 22px 24px; }
 .type-preview .tp-mast { text-align: center; line-height: 1.05; }
-.type-preview .tp-head { font-family: var(--display); font-weight: 900; line-height: 1.08; margin: .3em 0 .2em; }
+.type-preview .tp-head { font-family: var(--display); font-weight: 900; line-height: 1.1; margin: .3em 0 .2em; }
 .type-preview .tp-title { font-family: var(--display); font-weight: 700; line-height: 1.15; margin: .5em 0 .2em; }
 .type-preview .tp-deck { font-style: italic; line-height: 1.35; }
 .type-preview .tp-body { font-family: var(--text); text-align: justify; hyphens: auto; }

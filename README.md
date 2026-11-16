@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/screenshots/kindle-cover.png" alt="Dayfold front page on a Kindle" width="300">
+  <img src="docs/screenshots/kindle-cover.png" alt="Dayfold's cover, rendered at 1236×1648" width="300">
 </p>
 
 <h1 align="center">Dayfold</h1>
@@ -12,16 +12,18 @@
 ---
 
 Dayfold runs on a home server and does all the heavy lifting: it collects news from feeds and
-scrapers, picks and organizes the stories (by rules, or with an optional AI), draws the front page,
+scrapers, picks and organizes the stories (by rules, or with an optional AI), draws the cover,
 writes an EPUB with sections, a cartoon and games, and serves it to your Kindle. The e-reader only
 downloads one file a day and reads it offline.
 
 <p align="center">
-  <img src="docs/screenshots/kindle-reading-flow.png" alt="Reading flow on a Kindle: cover, front page, cartoon, puzzles, interactive game, end of edition">
+  <img src="docs/screenshots/kindle-reading-flow.png" alt="Edition pages rendered at 1236×1648: the cover, a section opener, a comic, the puzzles and the masthead">
 </p>
 
-> The screenshots above were taken on a Kindle Paperwhite running KOReader and the Dayfold plugin.
-> With KOmpanion, each edition also appears in the stock Kindle library with its front page as cover:
+> The pages above are renders of edition No. 23 at the Kindle Paperwhite's 1236×1648, taken from the
+> same EPUB the device downloads. The library shot below is a capture from a Kindle Paperwhite running
+> KOReader and the Dayfold plugin: with KOmpanion, each edition appears in the stock library with its
+> cover as the thumbnail:
 
 <p align="center"><img src="docs/screenshots/kindle-library.png" alt="Dayfold edition in the Kindle library" width="180"></p>
 
@@ -40,17 +42,17 @@ downloads one file a day and reads it offline.
   (`metadata_only`, `excerpt_and_link`, `full_content_allowed`, `image_only`) and Dayfold stores only what that mode allows.
   `image_only` turns an RSS feed into comics: no story text is fetched or kept, the strips print in
   the section the provider declares (`Quadrinhos` is seeded for this, falling back to its category)
-  rather than being matched by keywords, and each one gets a page like the cartoon: the strip's name
-  on top (the feed's channel title, falling back to the provider name), the day as the headline (the
-  feed's name and author come off it, since the kicker and the artwork already carry them), then the
-  artwork, with the entry's alt text as its caption when it says more than the title does — the
+  rather than being matched by keywords, and each one gets a page of its own, headed like a section
+  page: the paper's name and the day on top (so a book that loses its cover still says whose paper
+  it is), then the strip's name (the feed's channel title, falling back to the provider name), then
+  the artwork, with the entry's alt text as its caption when it says more than the title does — the
   artwork always carries that description either way. The navigation lists a strip by name and day.
-* **Weather without keys**: the front page can carry the day's forecast, high and low, sunrise and
-  sunset for a place you name, looked up by name in the dashboard. It uses
+* **Weather without keys**: the cover can carry the day's forecast, high and low, sunrise and
+  sunset (and tomorrow's, with air quality) for a place you name, looked up in the dashboard. It uses
   [Open-Meteo](https://open-meteo.com), which needs no key or account, and credits it in the
   colophon; no data comes from the sources above. If the service is unreachable the page prints
   without the block instead of losing the edition.
-* **Almanac without keys**: the front page can carry the moon's phase and "on this day". The phase
+* **Almanac without keys**: the cover can carry the moon's phase and "on this day". The phase
   is arithmetic on the date (no service, no key); the event comes from
   [Wikipedia's feed](https://api.wikimedia.org/), also keyless, shortened to a line and credited in
   the colophon. Both paper languages are stored when the edition is made, so `retypeset` prints the
@@ -103,11 +105,14 @@ downloads one file a day and reads it offline.
 
 On the Kindle:
 
-| Front page | Cartoon | Puzzle page in the EPUB | Pocket Wordle (plain EPUB) |
+| Cover | Cartoon | Puzzle page in the EPUB | Pocket Wordle (plain EPUB) |
 | --- | --- | --- | --- |
-| ![](docs/screenshots/kindle-front-page.png) | ![](docs/screenshots/kindle-cartoon.png) | ![](docs/screenshots/kindle-sudoku-page.png) | ![](docs/screenshots/kindle-pocket-wordle.png) |
+| ![](docs/screenshots/kindle-cover.png) | ![](docs/screenshots/kindle-cartoon.png) | ![](docs/screenshots/kindle-sudoku-page.png) | ![](docs/screenshots/kindle-pocket-wordle.png) |
 | **Sudoku in KOReader** | **Word of the Day in KOReader** | **Word Search in KOReader** | **End of the edition** |
 | ![](docs/screenshots/kindle-sudoku-game.png) | ![](docs/screenshots/kindle-wordle-game.png) | ![](docs/screenshots/kindle-wordsearch-game.png) | ![](docs/screenshots/kindle-end-of-edition.png) |
+
+The cover and the page strip are renders at 1236×1648; the remaining screens are captures from a
+Kindle Paperwhite running KOReader.
 
 ## Quick start
 
@@ -160,8 +165,8 @@ cd backend && uv run dayfold retypeset 12   # re-typeset edition 12 with the cur
 
 1. **Newspaper**: name of the newspaper (also the EPUB title), masthead font, type sizes (limited to
    ranges that keep the Kindle layout intact), number of stories, sections, schedule, cartoon and games,
-   closing order (news, cartoon, games), weather and the front page almanac (moon phase, on this
-   day). The cover preview renders with unsaved settings.
+   closing order (news, cartoon, games), weather and the almanac (moon phase, on this day). The
+   cover preview renders with unsaved settings.
 2. **Sections**: sections and their keywords. Keywords drive the rule based curation and guide the AI.
 3. **Providers**: enable sources, set their usage mode and license notes, test them, add new ones
    manually (feed, generic extraction or CSS selectors) or with assisted creation.

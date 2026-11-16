@@ -3,7 +3,7 @@ KINDLE ?= kindle
 PORT ?= 8422
 SERVER ?= http://$(shell hostname -I 2>/dev/null | awk '{print $$1}'):$(PORT)
 
-.PHONY: setup build dev-backend dev-frontend serve generate test test-koreader lint install kindle-install kindle-koreader kindle-library kindle-agent kindle-screensaver
+.PHONY: setup build dev-backend dev-frontend serve generate test test-koreader lint install kindle-install kindle-koreader kindle-library kindle-agent kindle-screensaver docs-renders
 
 setup:
 	cd backend && uv sync
@@ -29,6 +29,11 @@ test:
 
 lint:
 	cd backend && uvx ruff check dayfold tests
+
+# Regenerate the README's page renders from an edition EPUB (the site serves them under /files).
+docs-renders:
+	@test -n "$(EPUB)" || { echo "usage: make docs-renders EPUB=path/to/dayfold-2026-11-16.epub"; exit 1; }
+	cd backend && uv run python ../scripts/docs_renders.py "$(abspath $(EPUB))"
 
 # Install as a systemd user service (see deploy/dayfold.service).
 install: setup build

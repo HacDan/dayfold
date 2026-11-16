@@ -432,7 +432,7 @@ def preview_game(gid: int, session: Session = Depends(get_session)) -> dict:
 @router.post("/preview/cover")
 def preview_cover(body: dict, session: Session = Depends(get_session)) -> Response:
     """Render the cover with unsaved newspaper settings (dashboard live preview)."""
-    from ..edition.cover import CoverData, render_cover
+    from ..edition.cover import CoverData, cover_masthead_scale, render_cover
     from ..edition.i18n import LABELS, localized_tagline, long_date, roman, section_name
     from ..pipeline.generate import GAME_TITLES
     from ..settings import NewspaperSettings
@@ -467,6 +467,7 @@ def preview_cover(body: dict, session: Session = Depends(get_session)) -> Respon
         dest = Path(tmp) / "cover.png"
         render_cover(CoverData(
             title=news.title, masthead_font=news.masthead_font,
+            masthead_scale=cover_masthead_scale(news.typography.masthead),
             tagline=localized_tagline(news.tagline, news.language),
             long_date=long_date(date.today(), news.language), number_label=f"{L['number']} {latest.number + 1 if latest else 1}",
             year_label=f"{L['year']} {roman(1)}", daily_label=L["daily"], headline=headline, deck=deck,

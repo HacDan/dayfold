@@ -12,13 +12,23 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from ..config import FONTS_DIR
-from ..settings import masthead_font_path
+from ..settings import TYPE_RANGES, masthead_font_path
 from .images import to_eink_png
 
 REF_W, REF_H = 1236, 1648
 INK = 0
 GRAY = 85
 PAPER = 255
+
+
+def cover_masthead_scale(em: float) -> float:
+    """The cover's masthead scale for a Newspaper typography size (1.0 at the default size).
+
+    Clamped to the slider's range: a value from anywhere else (an old settings row, a hand-made
+    API call) still draws a masthead the page has room for.
+    """
+    lo, default, hi = TYPE_RANGES["masthead"]
+    return max(lo, min(em, hi)) / default
 
 
 @dataclass
@@ -37,7 +47,9 @@ class CoverData:
     also_label: str = "Também nesta edição"
     secondary: list[tuple[str, str]] = field(default_factory=list)  # (section, title)
     lead_text: str | None = None
-    weather: list[str] | None = None  # the front page's weather and sun lines
+    weather: list[str] | None = None  # the day's weather and sun lines
+    almanac: list[str] | None = None  # the moon and the day's event, under the weather
+    masthead_scale: float = 1.0  # the Newspaper masthead size, relative to the default
     footer: str = ""
 
 
@@ -108,7 +120,7 @@ def render_cover(data: CoverData, dest: Path, width: int = REF_W, height: int = 
 
     # masthead, fitted to the width
     mpath = masthead_font_path(data.masthead_font)
-    size = 230
+    size = round(230 * data.masthead_scale)  # the name is fitted to the width below
     while size > 60:
         mf = ImageFont.truetype(mpath, size)
         if d.textlength(data.title, font=mf) <= inner * 0.94:
@@ -133,14 +145,25 @@ def render_cover(data: CoverData, dest: Path, width: int = REF_W, height: int = 
     d.rectangle([M, y, W - M, y + 1], fill=INK)
     y += 34
 
-    # weather and sun under the dateline, as on the front page
+    # weather and sun under the dateline
     if data.weather:
         for text in data.weather:
-            wf, wlines = _fit_block(d, text, "OldStandard-Regular.ttf", inner, 25, 17, 1)
-            _center(d, y, wlines[0].upper(), wf, W, fill=GRAY - 10)
+            wf, wlines = _fit_block(d, text.upper(), "OldStandard-Regular.ttf", inner, 25, 17, 1)
+            _center(d, y, wlines[0], wf, W, fill=GRAY - 10)
             y += 35
         d.rectangle([M, y - 4, W - M, y - 3], fill=170)
         y += 26
+
+    # the almanac follows the weather: the moon, then the day's event (which may take two lines)
+    if data.almanac:
+        for text, lines_allowed in [(data.almanac[0], 1)] + [(e, 2) for e in data.almanac[1:]]:
+            af, alines = _fit_block(d, text.upper(), "OldStandard-Regular.ttf", inner, 22, 14,
+                                    lines_allowed)
+            for line in alines:
+                _center(d, y, line, af, W, fill=GRAY - 10)
+                y += int(af.size * 1.25)
+        d.rectangle([M, y - 4, W - M, y - 3], fill=170)
+        y += 22
 
     # headline
     hf, hlines = _fit_block(d, data.headline, "PlayfairDisplay-Black.ttf", inner, 88, 52, 3)
@@ -165,9 +188,9 @@ def render_cover(data: CoverData, dest: Path, width: int = REF_W, height: int = 
     has_image = bool(data.image_path and Path(data.image_path).exists())
     secondary = data.secondary[:3] if has_image else data.secondary[:6]
     rows = 1 if len(secondary) <= 3 else 2
-    also_h = (46 + 235 * rows) if secondary else 0
+    also_h = (46 + 210 * rows) if secondary else 0
     bottom = H - footer_h - 24 - also_h
-    if has_image and bottom - y > 260:
+    if has_image and bottom - y > 230:
         photo = Image.open(data.image_path).convert("L")
         ph = min(bottom - y - 10, int(inner * 0.6))
         photo = ImageOps.fit(photo, (inner, ph), Image.LANCZOS)

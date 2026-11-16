@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from .. import almanac, clock, weather
 from ..config import config
 from ..db import session_scope
-from ..edition.cover import CoverData, render_cover
+from ..edition.cover import CoverData, cover_masthead_scale, render_cover
 from ..edition.epub import EditionDoc, build_epub
 from ..edition.i18n import (
     LABELS,
@@ -367,8 +367,7 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
             view["paragraphs"], view["truncated"] = cap_length(
                 view["paragraphs"], resolve_limits(a.provider, topics.get(it.section), news))
             if it.is_headline:
-                headline = view
-                continue
+                headline = view  # the cover leads with it; it prints in its section too
             sec = sections.setdefault(it.section, {
                 "slug": it.section, "name": sec_name, "file": f"sec_{it.section}.xhtml",
                 "articles": [], "position": topics[it.section].position if it.section in topics else 99,
@@ -410,12 +409,12 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
 
     # cover
     lead = headline or (ordered_sections[0]["articles"][0] if ordered_sections else None)
-    # "Also in this edition" advertises stories: a strip's headline is only its day, which says
-    # nothing about the strip once it is off its own page.
-    secondary = [(a["section_name"], a["title"]) for s_ in ordered_sections
-                 for a in s_["articles"][:1] if not a.get("image_only")]
-    secondary += [(a["section_name"], a["title"]) for s_ in ordered_sections
-                  for a in s_["articles"][1:2] if not a.get("image_only")]
+    # "Also in this edition" advertises stories (a strip's headline is only its day, which says
+    # nothing about the strip off its page) and leaves the lead out: the cover already carries it.
+    lead_id = lead["id"] if lead else None
+    secondary = [(a["section_name"], a["title"]) for rank in (0, 1) for s_ in ordered_sections
+                 for a in s_["articles"][rank:rank + 1]
+                 if not a.get("image_only") and a["id"] != lead_id]
     extras = ([L["charge"]] if charge else []) + [g["title"] for g in games]
     source_line = None
     if lead:
@@ -426,8 +425,15 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
                     {**ed.weather, "condition": weather.condition_label(ed.weather.get("code"), lang)})
     weather_lines = weather.caption(weather_view, L, lang) if weather_view else []
     almanac_view = _almanac_view(ed.almanac, lang, L)
+    almanac_lines: list[str] = []
+    if almanac_view:
+        almanac_lines = [almanac_view["moon"]]  # the moon always prints
+        if almanac_view["event"]:
+            almanac_lines.append(almanac_view["event"])
     cover_data = CoverData(
-        title=news.title, masthead_font=news.masthead_font, tagline=localized_tagline(news.tagline, lang),
+        title=news.title, masthead_font=news.masthead_font,
+        masthead_scale=cover_masthead_scale(news.typography.masthead),
+        tagline=localized_tagline(news.tagline, lang),
         long_date=long_date(ed_date, lang), number_label=f"{L['number']} {number}",
         year_label=f"{L['year']} {roman(year_n)}", daily_label=L["daily"],
         headline=lead["title"] if lead else news.title,
@@ -436,7 +442,7 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         also_label=L["also"], secondary=secondary[:6],
         lead_text=" ".join(lead["paragraphs"][:4]) if lead and lead["paragraphs"] else (lead or {}).get("excerpt"),
         footer=" · ".join(extras),
-        weather=weather_lines or None,
+        weather=weather_lines or None, almanac=almanac_lines or None,
     )
     if hasattr(log, "step"):
         log.step("cover", 0.85)
@@ -451,8 +457,8 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         long_date=long_date(ed_date, lang), short_date=short_date(ed_date, lang),
         iso_date=ed_date.isoformat(), number_label=f"{L['number']} {number}",
         year_label=f"{L['year']} {roman(year_n)}", masthead_font=news.masthead_font,
-        typography=news.typography.model_dump(), cover_path=cover_path, headline=headline,
-        weather_lines=weather_lines, almanac=almanac_view,
+        typography=news.typography.model_dump(), cover_path=cover_path,
+        has_weather=bool(weather_lines), almanac=almanac_view,
         sections=ordered_sections, games=[dict(g) for g in games], charge=charge,
         closing_order=news.closing_order, sources=sources, curated_by=curated_by,
         generated_at=generated_stamp(clock.now(tz), lang),

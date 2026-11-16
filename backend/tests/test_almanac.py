@@ -90,9 +90,9 @@ def test_the_switch_controls_the_block(monkeypatch):
     assert moon_only is not None and "event" not in moon_only
 
 
-def test_the_front_page_prints_the_almanac(data_dir, monkeypatch):
-    """Moon and event are snapshotted with the edition, and Wikipedia is credited."""
-    from edition_helpers import add_article, epub_text
+def test_the_cover_prints_the_almanac(data_dir, monkeypatch):
+    """Moon and event are snapshotted with the edition, printed on the cover, Wikipedia credited."""
+    from edition_helpers import add_article, capture_cover, epub_text
     from sqlalchemy import select
 
     from dayfold.db import session_scope
@@ -101,13 +101,14 @@ def test_the_front_page_prints_the_almanac(data_dir, monkeypatch):
     from dayfold.settings import set_section
 
     monkeypatch.setattr(gen, "collect_all", lambda log: None)
+    covers = capture_cover(monkeypatch)
     monkeypatch.setattr(gen.almanac, "today", lambda day, cfg: {
         "moon": {"phase": 4, "illuminated": 99},
         "event": {"en": {"year": 2012, "text": "Xi Jinping replaced Hu Jintao."},
                   "pt": {"year": 2012, "text": "Xi Jinping substituiu Hu Jintao."}},
     })
 
-    def build(language: str) -> str:
+    def build(language: str) -> tuple[list[str] | None, str]:
         with session_scope() as s:
             set_section(s, "newspaper", {"include_charge": False, "include_images": False,
                                          "include_games": False, "language": language})
@@ -121,12 +122,13 @@ def test_the_front_page_prints_the_almanac(data_dir, monkeypatch):
         gen.run_generation_job(job_id)
         with session_scope() as s:
             edition = s.scalar(select(Edition).order_by(Edition.id.desc()).limit(1))
-            return epub_text(Path(edition.epub_path))
+            return covers[-1].almanac, epub_text(Path(edition.epub_path))
 
-    english = build("en")
-    assert "Moon: Full moon · 99% illuminated" in english
-    assert "On this day: 2012 · Xi Jinping replaced Hu Jintao." in english
-    assert "Almanac: Wikipedia (CC BY-SA 4.0)." in english
+    lines, text = build("en")
+    assert lines == ["Moon: Full moon · 99% illuminated",
+                     "On this day: 2012 · Xi Jinping replaced Hu Jintao."]
+    assert "Almanac: Wikipedia (CC BY-SA 4.0)." in text
 
     # the same snapshot, printed in Portuguese: the event follows the paper, not the fetch
-    assert "Xi Jinping substituiu Hu Jintao." in build("pt")
+    portuguese, _ = build("pt")
+    assert portuguese[1] == "Neste dia: 2012 · Xi Jinping substituiu Hu Jintao."

@@ -1,7 +1,6 @@
-"""The front page's weather strip: Open-Meteo forecast and sun times, no key involved."""
+"""The cover's weather strip: Open-Meteo forecast and sun times, no key involved."""
 
 import json
-from pathlib import Path
 from types import SimpleNamespace
 
 from dayfold import weather
@@ -177,13 +176,12 @@ def test_lookup_place(monkeypatch):
     assert weather.lookup_place("Atlantis", "en") is None
 
 
-def test_the_front_page_prints_weather_and_sun_times(data_dir, monkeypatch):
-    """The forecast is snapshotted with the edition and localised when the paper is typeset."""
-    from edition_helpers import add_article, epub_text
-    from sqlalchemy import select
+def test_the_cover_prints_weather_and_sun_times(data_dir, monkeypatch):
+    """The forecast is snapshotted with the edition and localised when the cover is drawn."""
+    from edition_helpers import add_article, capture_cover
 
     from dayfold.db import session_scope
-    from dayfold.models import Edition, GenerationJob
+    from dayfold.models import GenerationJob
     from dayfold.pipeline import generate as gen
     from dayfold.settings import set_section
 
@@ -193,9 +191,11 @@ def test_the_front_page_prints_weather_and_sun_times(data_dir, monkeypatch):
                 "tomorrow_max": 29, "tomorrow_min": 18, "aqi": 42}
     monkeypatch.setattr(gen.weather, "today", lambda cfg: forecast)
 
+    covers = capture_cover(monkeypatch)  # the lines the cover is drawn with, in order
+
     runs = 0
 
-    def build(**weather_cfg) -> str:
+    def build(**weather_cfg) -> list[str] | None:
         nonlocal runs
         runs += 1
         with session_scope() as s:
@@ -208,21 +208,19 @@ def test_the_front_page_prints_weather_and_sun_times(data_dir, monkeypatch):
             s.flush()
             job_id = job.id
         gen.run_generation_job(job_id)
-        with session_scope() as s:
-            edition = s.scalar(select(Edition).order_by(Edition.id.desc()).limit(1))
-            return epub_text(Path(edition.epub_path))
+        return covers[-1].weather
 
-    text = build(latitude=-23.55, longitude=-46.63)
-    assert "São Paulo" in text and "Overcast" in text
-    assert "High 27°C" in text and "Low 17°C" in text
-    assert "Sunrise 05:13" in text and "Sunset 18:29" in text
-    assert "Tomorrow High 29°C · Low 18°C · Air quality 42 (Good)" in text
+    assert build(latitude=-23.55, longitude=-46.63) == [
+        "São Paulo · Overcast · High 27°C · Low 17°C",
+        "Sunrise 05:13 · Sunset 18:29",
+        "Tomorrow High 29°C · Low 18°C · Air quality 42 (Good)",
+    ]
 
     monkeypatch.setattr(gen.weather, "today", lambda cfg: {**forecast, "t_max": 43, "t_min": 37,
                                                           "unit": "°F"})
-    assert "High 43°F" in build(latitude=-23.55, longitude=-46.63)  # the unit is a setting
+    assert "High 43°F" in build(latitude=-23.55, longitude=-46.63)[0]  # the unit is a setting
 
-    assert "Sunrise" not in build(enabled=False)  # off is off, not fetched
+    assert build(enabled=False) is None  # off is off, not fetched
 
     monkeypatch.setattr(gen.weather, "today", lambda cfg: None)  # enabled, but the call fails
-    assert "Sunrise" not in build(latitude=-23.55, longitude=-46.63)
+    assert build(latitude=-23.55, longitude=-46.63) is None

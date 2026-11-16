@@ -59,7 +59,6 @@ MASTHEAD_FONTS: dict[str, dict] = {
 # (min, default, max) in em. Validated server side and exposed to the dashboard.
 TYPE_RANGES: dict[str, tuple[float, float, float]] = {
     "masthead": (2.4, 3.4, 4.4),
-    "headline": (1.5, 2.1, 2.7),
     "title": (1.15, 1.45, 1.8),
     "subtitle": (0.95, 1.1, 1.3),
     "body": (0.85, 1.0, 1.25),
@@ -69,7 +68,6 @@ TYPE_RANGES: dict[str, tuple[float, float, float]] = {
 
 class Typography(BaseModel):
     masthead: float = TYPE_RANGES["masthead"][1]
-    headline: float = TYPE_RANGES["headline"][1]
     title: float = TYPE_RANGES["title"][1]
     subtitle: float = TYPE_RANGES["subtitle"][1]
     body: float = TYPE_RANGES["body"][1]

@@ -103,7 +103,7 @@ older `READY` version.
 
 ## Reading flow on the Kindle
 
-* **EPUB only**: cover, front page, sections, charge, games (printable Sudoku and word
+* **EPUB only**: cover (which is the front page), sections, charge, games (printable Sudoku and word
   search, "pocket Wordle" with tappable guesses) and solutions behind links. Works in
   any reader.
 * **KOReader plugin**: downloads the latest edition and `games.json` over Wi-Fi, opens it,

@@ -17,7 +17,6 @@ MONTHS = {
 LABELS = {
     "pt": {
         "edition": "Edição", "number": "Nº", "year": "Ano", "by": "Por", "source": "Fonte",
-        "in_this_edition": "Nesta edição", "front_page": "Primeira página",
         "read_more": "Leia a íntegra na fonte", "continues": "A matéria continua na fonte",
         "excerpt_note": "Excerto. Texto integral em",
         "metadata_note": "Somente título e dados. Matéria completa em",
@@ -69,7 +68,6 @@ LABELS = {
     },
     "en": {
         "edition": "Edition", "number": "No.", "year": "Vol.", "by": "By", "source": "Source",
-        "in_this_edition": "In this edition", "front_page": "Front page",
         "read_more": "Read the full story at the source", "continues": "The story continues online",
         "excerpt_note": "Excerpt. Full text at",
         "metadata_note": "Headline and metadata only. Full story at",

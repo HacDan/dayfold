@@ -28,8 +28,8 @@ def test_full_mode_keeps_body():
 
 
 def test_typography_is_clamped():
-    t = Typography(body=9, headline=0.1)
-    assert t.body == 1.25 and t.headline == 1.5
+    t = Typography(body=9, title=0.1)
+    assert t.body == 1.25 and t.title == 1.15
 
 
 def test_closing_order_validation():

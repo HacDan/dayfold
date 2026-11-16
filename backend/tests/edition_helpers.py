@@ -25,6 +25,21 @@ def add_article(s, slug: str, title: str, body: str | None = LONG_BODY, language
                   published_at=utcnow(), collected_at=utcnow()))
 
 
+def capture_cover(monkeypatch) -> list:
+    """Collects the CoverData each edition is drawn with, so a test can read what the cover prints."""
+    from dayfold.pipeline import generate as gen
+
+    covers: list = []
+    draw = gen.render_cover
+
+    def draw_and_capture(data, dest, w, h):
+        covers.append(data)
+        return draw(data, dest, w, h)
+
+    monkeypatch.setattr(gen, "render_cover", draw_and_capture)
+    return covers
+
+
 def generate(monkeypatch, articles: list[tuple[str, str]], **newspaper) -> Path:
     """Runs the generation job over the given (provider slug, title) articles; returns the EPUB."""
     from dayfold.db import session_scope

@@ -4,7 +4,7 @@ import { get, put, type Newspaper as NewspaperT, type Settings, type Typography 
 import { Field, Loading, OptionalNumber, SectionTitle, useAction, useLoad } from "../components/ui";
 
 const TYPE_LABEL: Record<keyof Typography, string> = {
-  masthead: "Nome do jornal (masthead)", headline: "Manchete principal", title: "Título das matérias",
+  masthead: "Nome do jornal (masthead)", title: "Título das matérias",
   subtitle: "Subtítulo", body: "Corpo do texto", line_height: "Entrelinha",
 };
 const MAST_WEIGHT: Record<string, number> = { "old-standard": 700, playfair: 900 };
@@ -22,7 +22,8 @@ function TypePreview({ news, family }: { news: NewspaperT; family: string }) {
       <div style={{ borderTop: "3px solid #111", borderBottom: "1px solid #111", textAlign: "center", fontFamily: "var(--caps)", fontWeight: 700, fontSize: ".7em", letterSpacing: ".08em", padding: "4px 0", margin: "6px 0 10px", textTransform: "uppercase" }}>
         {new Date().toLocaleDateString(news.language === "pt" ? "pt-BR" : "en-US", { dateStyle: "full" })}
       </div>
-      <div className="tp-head" style={{ fontSize: `${ty.headline}em` }}>{t("Missão leva telescópio a observar a borda do sistema solar")}</div>
+      {/* A sample lead, set at the story-title size: the paper fits its real headline on the cover. */}
+      <div className="tp-head" style={{ fontSize: `${ty.title}em` }}>{t("Missão leva telescópio a observar a borda do sistema solar")}</div>
       <div className="tp-deck" style={{ fontSize: `${ty.subtitle}em` }}>{t("Instrumento vai medir poeira e gelo em órbitas distantes durante cinco anos")}</div>
       <div className="byline" style={{ margin: "6px 0", color: "#555" }}>{t("Por Ana Lima · Fonte: Agência Exemplo")}</div>
       <div className="tp-body" style={{ fontSize: `${ty.body}em` }}>
@@ -129,7 +130,7 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
 
           <fieldset>
             <legend>{t("Tipografia")}</legend>
-            <p className="small muted">{t("Tamanhos relativos ao corpo de letra do leitor, limitados a faixas que não quebram o layout no Kindle.")}</p>
+            <p className="small muted">{t("Tamanhos relativos ao corpo de letra do leitor, limitados a faixas que não quebram o layout no Kindle. A manchete da capa se ajusta sozinha à largura.")}</p>
             {(Object.keys(TYPE_LABEL) as (keyof Typography)[]).map((k) => {
               const r = meta.type_ranges[k];
               return (

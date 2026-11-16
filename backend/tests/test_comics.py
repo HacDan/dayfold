@@ -6,8 +6,11 @@ and the edition prints it on a page of its own, in the section its provider decl
 
 import hashlib
 import io
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
+
+from dayfold.edition.i18n import short_date
 
 FEED = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>Strips</title>
   <item><title>Tiger and boy</title><link>https://example.org/1</link>
@@ -187,8 +190,8 @@ def test_image_only_provider_stores_only_entries_with_artwork(data_dir, monkeypa
     assert any("sem imagem" in line for line in lines)
 
 
-def test_a_strip_headlines_the_day_not_its_own_name():
-    """The kicker names the strip and the artwork signs the artist, so the headline keeps the day."""
+def test_a_strip_derives_its_title_without_the_strip_name():
+    """The page prints the strip's own name, so its derived title keeps the day (or its subtitle)."""
     from dayfold.pipeline.generate import _comic_headline
 
     assert _comic_headline("Family Circus by Bil Keane for Sun, 15 Nov 2026",
@@ -202,7 +205,7 @@ def test_a_strip_headlines_the_day_not_its_own_name():
 
 def test_comic_prints_on_its_own_page(data_dir, monkeypatch):
     """The strip prints alone, like the cartoon, and its alt text describes the artwork."""
-    from edition_helpers import add_article, epub_text
+    from edition_helpers import add_article, capture_cover, epub_text
     from sqlalchemy import select
 
     from dayfold.db import session_scope
@@ -211,6 +214,7 @@ def test_comic_prints_on_its_own_page(data_dir, monkeypatch):
     from dayfold.settings import set_section
 
     monkeypatch.setattr(gen, "collect_all", lambda log: None)
+    covers = capture_cover(monkeypatch)
     fetched: list[str] = []
 
     def fake_photo(url: str, dest: Path, max_width: int) -> Path:
@@ -230,7 +234,7 @@ def test_comic_prints_on_its_own_page(data_dir, monkeypatch):
         tiras = _comic_provider(s, category="quadrinhos", sections=["quadrinhos"],
                                 feed_title="Family Circus")
         # Titled the way comic feeds do it: strip name, author, then the day.
-        _comic(s, tiras, title="Family Circus by Bil Keane for Sun, 15 Nov 2026", n=1)
+        circus = _comic(s, tiras, title="Family Circus by Bil Keane for Sun, 15 Nov 2026", n=1)
         other = _comic_provider(s, "outra", "quadrinhos", ["quadrinhos"])  # no channel title
         _comic(s, other, title="Outra by Someone for Sun, 15 Nov 2026", excerpt=None, n=2)
         job = GenerationJob()
@@ -243,18 +247,21 @@ def test_comic_prints_on_its_own_page(data_dir, monkeypatch):
     with session_scope() as s:
         edition = s.scalar(select(Edition).order_by(Edition.id.desc()).limit(1))
         sections = sorted({i.section for i in edition.items})
-        epub = Path(edition.epub_path)
+        epub, paper, paper_date = Path(edition.epub_path), edition.title, edition.edition_date
     text = epub_text(epub)
 
-    # Each strip gets a page of its own, laid out like the cartoon: strip name, title, artwork.
+    # Each strip gets a page of its own, headed like a section: the paper and its day, then the strip.
     assert text.count('class="comic-page"') == 2
-    assert '<p class="kicker">Family Circus</p>' in text  # the strip's own name
-    assert '<p class="kicker">Outra</p>' in text  # no channel title: the provider name stands in
-    # The headline prints the day: the kicker already names the strip, the art already signs it.
-    assert text.count("<h1>Sun, 15 Nov 2026</h1>") == 2
-    assert "by Bil Keane" not in text  # not in the headline, and this strip's alt is its caption
-    assert '<p class="caption">A boy argues with a tiger about homework.</p>' in text
-    assert 'alt="A boy argues with a tiger about homework."' in text  # the caption describes it
+    assert '<h1>Outra</h1>' in text  # no channel title: the provider name stands in
+    with zipfile.ZipFile(epub) as z:
+        page = z.read(f"EPUB/comic_{circus}.xhtml").decode()
+    assert f'<p class="kicker">{paper} · {short_date(paper_date, "en")}</p>' in page
+    # A book whose cover was dropped still says whose paper it is, so the strip takes the heading
+    # a section's name takes elsewhere.
+    assert "<h1>Family Circus</h1>" in page
+    assert "by Bil Keane" not in page  # not in the heading, and this strip's alt is its caption
+    assert '<p class="caption">A boy argues with a tiger about homework.</p>' in page
+    assert 'alt="A boy argues with a tiger about homework."' in page  # the caption describes it
     # With no caption the feed's full title stays behind the artwork, where it still describes it.
     assert 'alt="Outra by Someone for Sun, 15 Nov 2026"' in text
     assert 'class="caption">Outra by Someone' not in text
@@ -263,7 +270,9 @@ def test_comic_prints_on_its_own_page(data_dir, monkeypatch):
     assert "Outra — Sun, 15 Nov 2026" in text
     # Its own section, not matched by keyword; that section has no story page of its own.
     assert sections == ["espaco", "quadrinhos"]
-    assert 'class="article headline"' in text  # the story leads the front page
+    # The cover leads with the day's story, and the story prints in its own section too.
+    assert covers[-1].headline == "Telescope maps the edge of the solar system"
+    assert "Telescope maps the edge of the solar system" in text
     # Artwork is fetched even though story photos are off in these settings.
     assert sorted(fetched) == ["https://example.org/comic/1.png", "https://example.org/comic/2.png"]
 

@@ -1,7 +1,7 @@
 <div class="comic-page" id="a{{ c.id }}">
 <div class="section-head">
-  <p class="kicker">{{ c.feed_title or c.provider }}</p>
-  <h1>{{ c.title }}</h1>
+  <p class="kicker">{{ ed.title }} · {{ ed.short_date }}</p>
+  <h1>{{ c.feed_title or c.provider }}</h1>
 </div>
 <div class="charge">
   {# no caption: the feed's full title still describes the artwork #}

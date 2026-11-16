@@ -2,7 +2,7 @@
 
 import json
 
-from edition_helpers import add_article, epub_text, generate
+from edition_helpers import add_article, capture_cover, epub_text, generate
 
 
 def test_language_env_is_normalised(monkeypatch):
@@ -248,9 +248,10 @@ ARTICLES = [("nasa", "Telescope maps the edge of the solar system"),
 
 
 def test_new_install_prints_an_english_edition(data_dir, monkeypatch):
+    covers = capture_cover(monkeypatch)
     epub = generate(monkeypatch, ARTICLES, games_per_edition=3, language="en")
     text = epub_text(epub)
-    assert "The day's news, folded for an unhurried read." in text
+    assert covers[-1].tagline == "The day's news, folded for an unhurried read."  # on the cover
     assert "Space" in text and "Espaço" not in text
     assert "Brazil" in text
     for pt in ("Edição", "Passatempos", "Fim da edição", "Fontes desta edição", "Palavras Cruzadas"):
@@ -263,9 +264,10 @@ def test_new_install_prints_an_english_edition(data_dir, monkeypatch):
 
 
 def test_portuguese_edition_keeps_portuguese(data_dir, monkeypatch):
+    covers = capture_cover(monkeypatch)
     epub = generate(monkeypatch, ARTICLES, language="pt", games_per_edition=3)
     text = epub_text(epub)
-    assert "Notícias do dia, dobradas para ler com calma." in text
+    assert covers[-1].tagline == "Notícias do dia, dobradas para ler com calma."  # on the cover
     assert "Espaço" in text and "Passatempos" in text
     games = json.loads(epub.with_name(epub.name.replace(".epub", ".games.json")).read_text())
     assert all(g["puzzle"].get("language", "pt") == "pt" for g in games["games"])
@@ -277,10 +279,12 @@ def test_custom_names_are_kept(data_dir, monkeypatch):
     from dayfold.db import session_scope
     from dayfold.models import Topic
 
+    covers = capture_cover(monkeypatch)
     with session_scope() as s:
         s.scalar(select(Topic).where(Topic.slug == "espaco")).name = "Cosmos"
     text = epub_text(generate(monkeypatch, ARTICLES, tagline="Mine"))
-    assert "Cosmos" in text and "Mine" in text
+    assert "Cosmos" in text  # the section keeps the name the operator gave it
+    assert covers[-1].tagline == "Mine"  # and so does the cover
 
 
 def test_old_portuguese_games_follow_the_edition(data_dir):
