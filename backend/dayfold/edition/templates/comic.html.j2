@@ -4,8 +4,8 @@
   <h1>{{ c.title }}</h1>
 </div>
 <div class="charge">
-  {# no caption: the title still describes the artwork #}
-  {% if c.image %}<img src="{{ c.image }}" alt="{{ c.excerpt or c.title }}"/>{% endif %}
+  {# no caption: the feed's full title still describes the artwork #}
+  {% if c.image %}<img src="{{ c.image }}" alt="{{ c.excerpt or c.title_full }}"/>{% endif %}
   {% if c.excerpt %}<p class="caption">{{ c.excerpt }}</p>{% endif %}
   <p class="credit">{{ L.source }}: <a href="{{ c.url }}">{{ c.url_short }}</a></p>
 </div>

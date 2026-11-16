@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from dataclasses import replace
 from datetime import date
@@ -83,6 +84,19 @@ def _short_url(url: str) -> str:
     return u if len(u) <= 70 else u[:67] + "…"
 
 
+def _comic_headline(title: str, strip: str | None) -> str:
+    """What is left of a strip's title once its name and author are gone.
+
+    Comic feeds title each day "Family Circus by Bil Keane for Sun, 15 Nov 2026"; the page already
+    names the strip in its kicker, so the headline prints the day instead of repeating it."""
+    rest = title.strip()
+    if strip and rest.casefold().startswith(strip.casefold()):
+        rest = rest[len(strip):].lstrip(" ,:;-–—")
+    rest = re.sub(r"^(?:by|por)\s+\S.*?\s+(?=(?:for|on|em|de|para)\b)", "", rest, flags=re.IGNORECASE)
+    rest = re.sub(r"^(?:for|on|em|de|para)\s+", "", rest, flags=re.IGNORECASE)
+    return rest.strip() or title
+
+
 def _article_view(a: Article, section_name: str, lang: str, tz: str | None = None) -> dict:
     # Publication times are stored in UTC; the paper prints them in the operator's zone, the
     # same one the schedule runs on.
@@ -90,8 +104,12 @@ def _article_view(a: Article, section_name: str, lang: str, tz: str | None = Non
     author = strip_author(a.author)
     if author and author.strip().lower() in a.provider.name.lower():
         author = None  # "Por Agência Senado | Fonte: Agência Senado" says the same thing twice
+    title = a.title
+    if a.usage_mode == UsageMode.IMAGE_ONLY:
+        title = _comic_headline(a.title, a.provider.feed_title or a.provider.name)
     return {
-        "id": a.id, "title": a.title, "subtitle": a.subtitle, "author": author,
+        "id": a.id, "title": title, "title_full": a.title,
+        "subtitle": a.subtitle, "author": author,
         "date_label": short_date(when.date(), lang) + when.strftime(" · %H:%M"),
         "provider": a.provider.name, "feed_title": a.provider.feed_title,
         "url": a.url, "url_short": _short_url(a.url),
@@ -361,10 +379,28 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
             if path:
                 v["image_path"] = str(path)
 
+    # A story without its photo is still a story; a strip without its artwork is a blank page, so it
+    # waits for the next edition instead of printing.
+    blank = {v["id"] for v in all_views if v["image_only"] and not v.get("image_path")}
+    for v in all_views:
+        if v["id"] in blank:
+            log(tr(f"Tira sem imagem, fora da edição: {v['title']}",
+                   f"Strip left out, its artwork did not arrive: {v['title']}"))
+    if blank:
+        for sec in ordered_sections:
+            sec["articles"] = [a for a in sec["articles"] if a["id"] not in blank]
+        ordered_sections = [sec for sec in ordered_sections if sec["articles"]]
+        if headline and headline["id"] in blank:
+            headline = None
+
     # cover
     lead = headline or (ordered_sections[0]["articles"][0] if ordered_sections else None)
-    secondary = [(a["section_name"], a["title"]) for s_ in ordered_sections for a in s_["articles"][:1]]
-    secondary += [(a["section_name"], a["title"]) for s_ in ordered_sections for a in s_["articles"][1:2]]
+    # "Also in this edition" advertises stories: a strip's headline is only its day, which says
+    # nothing about the strip once it is off its own page.
+    secondary = [(a["section_name"], a["title"]) for s_ in ordered_sections
+                 for a in s_["articles"][:1] if not a.get("image_only")]
+    secondary += [(a["section_name"], a["title"]) for s_ in ordered_sections
+                  for a in s_["articles"][1:2] if not a.get("image_only")]
     extras = ([L["charge"]] if charge else []) + [g["title"] for g in games]
     source_line = None
     if lead:

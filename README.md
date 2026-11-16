@@ -40,10 +40,11 @@ downloads one file a day and reads it offline.
   (`metadata_only`, `excerpt_and_link`, `full_content_allowed`, `image_only`) and Dayfold stores only what that mode allows.
   `image_only` turns an RSS feed into comics: no story text is fetched or kept, the strips print in
   the section the provider declares (`Quadrinhos` is seeded for this, falling back to its category)
-  rather than being matched by keywords, and each one gets a page like the cartoon — the strip's
-  name on top (the feed's channel title, falling back to the provider name), then the title, the
-  artwork, and the entry's alt text as the caption when it says more than the title does (the
-  artwork always carries that description either way).
+  rather than being matched by keywords, and each one gets a page like the cartoon: the strip's name
+  on top (the feed's channel title, falling back to the provider name), the day as the headline (the
+  feed's name and author come off it, since the kicker and the artwork already carry them), then the
+  artwork, with the entry's alt text as its caption when it says more than the title does — the
+  artwork always carries that description either way. The navigation lists a strip by name and day.
 * **Story length caps**: full text stories can be capped by words and/or paragraphs for the
   whole paper, per section or per provider (the most specific wins). A capped story ends at the
   last sentence that fits, with a "The story continues online" note and the link. Caps apply when

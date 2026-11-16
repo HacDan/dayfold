@@ -164,9 +164,12 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
             if not a.get("image_only"):
                 continue
             file = f"comic_{a['id']}.xhtml"
-            news.append({"uid": f"comic-{a['id']}", "file": file, "title": a["title"],
+            # Listed by name and day: the headline is only the day, and the section only says
+            # "Quadrinhos", so the navigation carries the strip's name.
+            label = f"{a['feed_title'] or a['provider']} — {a['title']}"
+            news.append({"uid": f"comic-{a['id']}", "file": file, "title": label,
                          "body": tpl("comic.html.j2").render(L=L, c=a)})
-            rows.append({"title": a["title"], "href": f"{file}#a{a['id']}"})
+            rows.append({"title": label, "href": f"{file}#a{a['id']}"})
         # A section of nothing but strips has no story page, so its heading leads to the first one.
         head = s["file"] if stories or not rows else rows[0]["href"]
         index.append({"name": s["name"], "href": head, "links": rows})

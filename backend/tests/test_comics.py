@@ -128,6 +128,22 @@ def test_the_channel_title_survives_the_isolated_run(monkeypatch):
     assert runner.run_isolated("rss", job["spec"], want_body=False).feed_title == "Strips"
 
 
+def test_rss_resolves_a_relative_artwork_url(monkeypatch):
+    """Feeds may point at the artwork relatively; what reaches the pipeline must be fetchable."""
+    feed = b"""<?xml version="1.0"?><rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+    <channel><title>Strips</title>
+      <item><title>In the text</title><link>https://example.org/comics/1</link>
+        <description><![CDATA[<img src="/art/1.png" alt="A tiger">]]></description></item>
+      <item><title>In media</title><link>https://example.org/comics/2</link>
+        <media:content url="../art/2.png" medium="image"/></item>
+    </channel></rss>"""
+
+    items = _rss(monkeypatch, feed).items
+
+    assert [i.image_url for i in items] == ["https://example.org/art/1.png",
+                                            "https://example.org/art/2.png"]
+
+
 def test_rss_reads_the_channel_title(monkeypatch):
     """The channel title is what the strip is called; a feed without one has nothing to offer."""
     assert _rss(monkeypatch, FEED).feed_title == "Strips"
@@ -171,6 +187,19 @@ def test_image_only_provider_stores_only_entries_with_artwork(data_dir, monkeypa
     assert any("sem imagem" in line for line in lines)
 
 
+def test_a_strip_headlines_the_day_not_its_own_name():
+    """The kicker names the strip and the artwork signs the artist, so the headline keeps the day."""
+    from dayfold.pipeline.generate import _comic_headline
+
+    assert _comic_headline("Family Circus by Bil Keane for Sun, 15 Nov 2026",
+                           "Family Circus") == "Sun, 15 Nov 2026"
+    assert _comic_headline("Family Circus for Sun, 15 Nov 2026", "Family Circus") == "Sun, 15 Nov 2026"
+    assert _comic_headline("Family Circus: Zoo time", "Family Circus") == "Zoo time"
+    # Nothing that is not that prefix is touched, and the name alone is not erased.
+    assert _comic_headline("Telescope, the space tiger", "Family Circus") == "Telescope, the space tiger"
+    assert _comic_headline("Family Circus", "Family Circus") == "Family Circus"
+
+
 def test_comic_prints_on_its_own_page(data_dir, monkeypatch):
     """The strip prints alone, like the cartoon, and its alt text describes the artwork."""
     from edition_helpers import add_article, epub_text
@@ -200,9 +229,10 @@ def test_comic_prints_on_its_own_page(data_dir, monkeypatch):
         add_article(s, "nasa", "Telescope maps the edge of the solar system")  # leads the paper
         tiras = _comic_provider(s, category="quadrinhos", sections=["quadrinhos"],
                                 feed_title="Family Circus")
-        _comic(s, tiras, title="Telescope, the space tiger", n=1)  # the feed carries a caption
+        # Titled the way comic feeds do it: strip name, author, then the day.
+        _comic(s, tiras, title="Family Circus by Bil Keane for Sun, 15 Nov 2026", n=1)
         other = _comic_provider(s, "outra", "quadrinhos", ["quadrinhos"])  # no channel title
-        _comic(s, other, title="A quiet day at home", excerpt=None, n=2)  # and no caption
+        _comic(s, other, title="Outra by Someone for Sun, 15 Nov 2026", excerpt=None, n=2)
         job = GenerationJob()
         s.add(job)
         s.flush()
@@ -220,17 +250,70 @@ def test_comic_prints_on_its_own_page(data_dir, monkeypatch):
     assert text.count('class="comic-page"') == 2
     assert '<p class="kicker">Family Circus</p>' in text  # the strip's own name
     assert '<p class="kicker">Outra</p>' in text  # no channel title: the provider name stands in
-    assert "<h1>Telescope, the space tiger</h1>" in text
+    # The headline prints the day: the kicker already names the strip, the art already signs it.
+    assert text.count("<h1>Sun, 15 Nov 2026</h1>") == 2
+    assert "by Bil Keane" not in text  # not in the headline, and this strip's alt is its caption
     assert '<p class="caption">A boy argues with a tiger about homework.</p>' in text
     assert 'alt="A boy argues with a tiger about homework."' in text  # the caption describes it
-    # Without a caption, the title still describes the artwork and nothing is printed twice.
-    assert 'alt="A quiet day at home"' in text
-    assert 'class="caption">A quiet day at home' not in text
+    # With no caption the feed's full title stays behind the artwork, where it still describes it.
+    assert 'alt="Outra by Someone for Sun, 15 Nov 2026"' in text
+    assert 'class="caption">Outra by Someone' not in text
+    # The navigation names each strip and its day, so a reader can tell them apart.
+    assert "Family Circus — Sun, 15 Nov 2026" in text
+    assert "Outra — Sun, 15 Nov 2026" in text
     # Its own section, not matched by keyword; that section has no story page of its own.
     assert sections == ["espaco", "quadrinhos"]
     assert 'class="article headline"' in text  # the story leads the front page
     # Artwork is fetched even though story photos are off in these settings.
     assert sorted(fetched) == ["https://example.org/comic/1.png", "https://example.org/comic/2.png"]
+
+
+def test_a_strip_without_its_artwork_waits_for_another_edition(data_dir, monkeypatch):
+    """The artwork is the story: a strip that cannot be fetched is left out, not printed blank."""
+    from edition_helpers import add_article, epub_text
+    from sqlalchemy import select
+
+    from dayfold.db import session_scope
+    from dayfold.models import Edition, GenerationJob
+    from dayfold.pipeline import generate as gen
+    from dayfold.settings import set_section
+
+    monkeypatch.setattr(gen, "collect_all", lambda log: None)
+
+    def fake_photo(url: str, dest: Path, max_width: int) -> Path | None:
+        from PIL import Image
+
+        if url.endswith("/2.png"):
+            return None  # this strip's artwork never arrives
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        Image.new("L", (600, 400), 255).save(dest, "JPEG")
+        return Path(dest)
+
+    monkeypatch.setattr(gen, "prepare_photo", fake_photo)
+
+    with session_scope() as s:
+        set_section(s, "newspaper", {"include_charge": False, "include_images": False,
+                                     "include_games": False, "language": "en"})
+        add_article(s, "nasa", "Telescope maps the edge of the solar system")
+        tiras = _comic_provider(s, category="quadrinhos", sections=["quadrinhos"])
+        _comic(s, tiras, title="Telescope, the space tiger", n=1)
+        _comic(s, tiras, title="A quiet day at home", excerpt=None, n=2)
+        job = GenerationJob()
+        s.add(job)
+        s.flush()
+        job_id = job.id
+
+    gen.run_generation_job(job_id)
+
+    with session_scope() as s:
+        edition = s.scalar(select(Edition).order_by(Edition.id.desc()).limit(1))
+        job_log = s.get(GenerationJob, job_id).log
+        text = epub_text(Path(edition.epub_path))
+
+    assert text.count('class="comic-page"') == 1  # the strip that has its artwork
+    assert "Telescope, the space tiger" in text
+    assert "A quiet day at home" not in text  # no title-only page
+    assert any("A quiet day at home" in line for line in job_log)  # and it is not silent
 
 
 def test_comics_section_reaches_installs_seeded_before_it(data_dir):
