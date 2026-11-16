@@ -51,6 +51,13 @@ export type EditionSummary = {
   cover_url: string | null; epub_url: string | null;
 };
 
+export type SearchHit = {
+  edition_id: number; number: number; date: string; section: string;
+  title: string; snippet: string;
+};
+
+export type SearchResults = { hits: SearchHit[]; more: boolean };
+
 export type Typography = { masthead: number; headline: number; title: number; subtitle: number; body: number; line_height: number };
 
 export type Newspaper = {
@@ -73,6 +80,7 @@ export type Settings = {
     charge: { mode: "structured" | "illustrated"; style: string };
     device: { cover_width: number; cover_height: number; image_max_width: number; screensaver_cover: boolean };
     weather: { enabled: boolean; place: string; latitude: number | null; longitude: number | null; units: "celsius" | "fahrenheit" };
+    almanac: { enabled: boolean; on_this_day: boolean };
     distribution: { feed_token: string; keep_editions: number };
     kindle: KindleCfg;
   };

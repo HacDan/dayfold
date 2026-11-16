@@ -10,15 +10,36 @@ from dayfold.settings import WeatherSettings
 
 FORECAST = {
     "latitude": -23.51, "longitude": -46.61, "timezone": "America/Sao_Paulo",
+    "daily_units": {"temperature_2m_max": "°C"},
     "daily": {
-        "time": ["2026-11-15"],
-        "weather_code": [95],
-        "temperature_2m_max": [28.7],
-        "temperature_2m_min": [17.5],
-        "sunrise": ["2026-11-15T05:13"],
-        "sunset": ["2026-11-15T18:28"],
+        "time": ["2026-11-15", "2026-11-16"],
+        "weather_code": [95, 3],
+        "temperature_2m_max": [28.7, 31.2],
+        "temperature_2m_min": [17.5, 19.4],
+        "sunrise": ["2026-11-15T05:13", "2026-11-16T05:12"],
+        "sunset": ["2026-11-15T18:28", "2026-11-16T18:29"],
     },
 }
+
+AIR = {"latitude": -23.5, "longitude": -46.6, "timezone": "America/Sao_Paulo",
+       "current_units": {"time": "iso8601", "us_aqi": "USAQI"},
+       "current": {"time": "2026-11-15T12:00", "us_aqi": 42}}
+
+
+def _serve(monkeypatch, forecast: dict = FORECAST, air: dict | None = AIR) -> list[str]:
+    """Point the network at both endpoints: the forecast, then the air-quality reading."""
+    seen: list[str] = []
+
+    def fake_fetch(url: str, **kw):
+        seen.append(url)
+        if "air-quality" in url:
+            if air is None:
+                raise weather.net.FetchError("offline")
+            return SimpleNamespace(content=json.dumps(air).encode())
+        return SimpleNamespace(content=json.dumps(forecast).encode())
+
+    monkeypatch.setattr(weather.net, "fetch", fake_fetch)
+    return seen
 
 SAO_PAULO = WeatherSettings(enabled=True, place="São Paulo", latitude=-23.55, longitude=-46.63)
 
@@ -32,21 +53,18 @@ def test_condition_labels():
 
 
 def test_today_needs_no_key(monkeypatch):
-    seen: dict[str, str] = {}
-
-    def fake_fetch(url: str, **kw):
-        seen["url"] = url
-        return SimpleNamespace(content=json.dumps(FORECAST).encode())
-
-    monkeypatch.setattr(weather.net, "fetch", fake_fetch)
+    seen = _serve(monkeypatch)
 
     assert weather.today(SAO_PAULO) == {
         "place": "São Paulo", "code": 95, "t_max": 29, "t_min": 18,
-        "sunrise": "05:13", "sunset": "18:28", "unit": "°C",
+        "sunrise": "05:13", "sunset": "18:28",
+        "tomorrow_max": 31, "tomorrow_min": 19, "aqi": 42, "unit": "°C",
     }
-    assert seen["url"].startswith("https://api.open-meteo.com/v1/forecast?")
-    assert "latitude=-23.55" in seen["url"]
-    assert "timezone=auto" in seen["url"]  # the place's own day, not the schedule's clock
+    assert seen[0].startswith("https://api.open-meteo.com/v1/forecast?")
+    assert "latitude=-23.55" in seen[0]
+    assert "timezone=auto" in seen[0]  # the place's own day, not the schedule's clock
+    assert "forecast_days=2" in seen[0]  # today and tomorrow
+    assert seen[1].startswith("https://air-quality-api.open-meteo.com/v1/air-quality?")
 
 
 def test_caption_puts_the_same_two_lines_on_the_cover():
@@ -63,6 +81,29 @@ def test_caption_puts_the_same_two_lines_on_the_cover():
         "Burlington, Vermont · Nublado · Máx. 43°F · Mín. 37°F",
         "Nascer do sol 06:49 · Pôr do sol 16:25"]
 
+    # a third line for planning: tomorrow and the air, when the service gave them
+    outlook = {**view, "tomorrow_max": 39, "tomorrow_min": 28, "aqi": 42}
+    assert weather.caption(outlook, LABELS["en"], "en")[-1] == (
+        "Tomorrow High 39°F · Low 28°F · Air quality 42 (Good)")
+
+
+def test_air_quality_bands():
+    assert weather.aqi_label(0, "pt") == "Boa"
+    assert weather.aqi_label(50, "en") == "Good"
+    assert weather.aqi_label(75, "en") == "Moderate"
+    assert weather.aqi_label(120, "en") == "Unhealthy for sensitive groups"
+    assert weather.aqi_label(175, "en") == "Unhealthy"
+    assert weather.aqi_label(250, "en") == "Very unhealthy"
+    assert weather.aqi_label(400, "en") == "Hazardous"
+
+
+def test_a_missing_air_reading_keeps_the_forecast(monkeypatch):
+    """Air quality is one more line, not the block: losing it must not lose the weather."""
+    _serve(monkeypatch, air=None)
+    snapshot = weather.today(SAO_PAULO)
+    assert snapshot is not None
+    assert snapshot["t_max"] == 29 and snapshot["aqi"] is None
+
 
 def test_today_swaps_between_celsius_and_fahrenheit(monkeypatch):
     """The unit is a setting: it goes out as a request and comes back as the API's own marker."""
@@ -70,6 +111,8 @@ def test_today_swaps_between_celsius_and_fahrenheit(monkeypatch):
 
     def fake_fetch(url: str, **kw):
         seen.append(url)
+        if "air-quality" in url:
+            return SimpleNamespace(content=json.dumps(AIR).encode())
         unit = "°F" if "temperature_unit=fahrenheit" in url else "°C"
         return SimpleNamespace(content=json.dumps(
             {**FORECAST, "daily_units": {"temperature_2m_max": unit}}).encode())
@@ -80,8 +123,9 @@ def test_today_swaps_between_celsius_and_fahrenheit(monkeypatch):
     warm = weather.today(fahrenheit)
     cold = weather.today(SAO_PAULO)
 
-    assert "temperature_unit=fahrenheit" in seen[0]
-    assert "temperature_unit=celsius" in seen[1]
+    forecasts = [u for u in seen if "forecast?" in u]  # the air-quality call comes between them
+    assert "temperature_unit=fahrenheit" in forecasts[0]
+    assert "temperature_unit=celsius" in forecasts[1]
     assert warm["unit"] == "°F" and cold["unit"] == "°C"
     # The service converts; Dayfold only rounds. A second conversion here would be a bug.
     assert warm["t_max"] == cold["t_max"] == 29
@@ -93,10 +137,10 @@ def test_today_swaps_between_celsius_and_fahrenheit(monkeypatch):
 
 def test_half_degrees_round_up(monkeypatch):
     """Half a degree is common in °C; it must not round down on even values only."""
-    payload = {**FORECAST, "daily": {**FORECAST["daily"],
-                                     "temperature_2m_max": [28.5], "temperature_2m_min": [-3.5]}}
-    monkeypatch.setattr(weather.net, "fetch",
-                        lambda url, **kw: SimpleNamespace(content=json.dumps(payload).encode()))
+    _serve(monkeypatch, forecast={**FORECAST, "daily": {**FORECAST["daily"],
+                                                       "time": ["2026-11-15"],
+                                                       "temperature_2m_max": [28.5],
+                                                       "temperature_2m_min": [-3.5]}})
 
     assert weather.today(SAO_PAULO)["t_max"] == 29  # round() would say 28
     assert weather.today(SAO_PAULO)["t_min"] == -3
@@ -145,7 +189,8 @@ def test_the_front_page_prints_weather_and_sun_times(data_dir, monkeypatch):
 
     monkeypatch.setattr(gen, "collect_all", lambda log: None)
     forecast = {"place": "São Paulo", "code": 3, "t_max": 27, "t_min": 17,
-                "sunrise": "05:13", "sunset": "18:29", "unit": "°C"}
+                "sunrise": "05:13", "sunset": "18:29", "unit": "°C",
+                "tomorrow_max": 29, "tomorrow_min": 18, "aqi": 42}
     monkeypatch.setattr(gen.weather, "today", lambda cfg: forecast)
 
     runs = 0
@@ -171,6 +216,7 @@ def test_the_front_page_prints_weather_and_sun_times(data_dir, monkeypatch):
     assert "São Paulo" in text and "Overcast" in text
     assert "High 27°C" in text and "Low 17°C" in text
     assert "Sunrise 05:13" in text and "Sunset 18:29" in text
+    assert "Tomorrow High 29°C · Low 18°C · Air quality 42 (Good)" in text
 
     monkeypatch.setattr(gen.weather, "today", lambda cfg: {**forecast, "t_max": 43, "t_min": 37,
                                                           "unit": "°F"})

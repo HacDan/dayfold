@@ -362,3 +362,10 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
   .rate { width: 100%; }
   .rate button { flex: 1; justify-content: center; padding: 9px 6px; }
 }
+
+/* archive search results */
+.hits { display: grid; gap: 10px; }
+.hit { display: grid; gap: 3px; padding: 12px 14px; background: var(--card);
+  border: 1px solid var(--rule-soft); text-decoration: none; color: var(--ink); }
+.hit:hover { border-color: var(--rule); background: var(--paper-2); }
+.hit strong { font-family: var(--display); font-weight: 700; line-height: 1.25; }

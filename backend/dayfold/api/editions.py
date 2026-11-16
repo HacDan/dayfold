@@ -9,13 +9,22 @@ from xml.sax.saxutils import escape
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
 from ..i18n import tr
 from ..jobs.queue import enqueue_generation
-from ..models import ArticleRating, Edition, EditionStatus, GenerationJob, Provider, Topic
+from ..models import (
+    Article,
+    ArticleRating,
+    Edition,
+    EditionArticle,
+    EditionStatus,
+    GenerationJob,
+    Provider,
+    Topic,
+)
 from ..settings import get_section
 from .auth import require_admin, require_feed_token
 from .serialize import edition_summary, iso, job_out, section_label
@@ -58,6 +67,47 @@ def get_job(job_id: int, session: Session = Depends(get_session)) -> dict:
 @router.get("/editions")
 def list_editions(session: Session = Depends(get_session)) -> list[dict]:
     return [edition_summary(e) for e in session.scalars(select(Edition).order_by(Edition.id.desc()).limit(200))]
+
+
+SEARCH_HITS = 40  # a search is for finding a story, not for reading the whole archive
+
+
+@router.get("/search")
+def search_archive(q: str = "", session: Session = Depends(get_session)) -> dict:
+    """Stories already printed in an edition, by title or body text, and whether more exist."""
+    term = q.strip()
+    if len(term) < 2:
+        return {"hits": [], "more": False}
+    # A literal % or _ is a character to find, not a wildcard.
+    like = "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    rows = session.execute(
+        select(Edition.id, Edition.number, Edition.edition_date, EditionArticle.section,
+               Article.title, Article.body)
+        .join(EditionArticle, EditionArticle.edition_id == Edition.id)
+        .join(Article, Article.id == EditionArticle.article_id)
+        .where(Edition.status == EditionStatus.READY,
+               or_(Article.title.ilike(like, escape="\\"), Article.body.ilike(like, escape="\\")))
+        .order_by(Edition.edition_date.desc(), Edition.id.desc(), EditionArticle.position)
+        .limit(SEARCH_HITS + 1)  # one extra row tells us whether the list was cut short
+    ).all()
+    topics = {t.slug: t.name for t in session.scalars(select(Topic))}
+    return {
+        "hits": [
+            {"edition_id": eid, "number": number, "date": date.isoformat(),
+             "section": section_label(topics, section), "title": title,
+             "snippet": _snippet(body or title, term)}
+            for eid, number, date, section, title, body in rows[:SEARCH_HITS]
+        ],
+        "more": len(rows) > SEARCH_HITS,
+    }
+
+
+def _snippet(text: str, term: str, width: int = 150) -> str:
+    """A window around the match, so the hit reads as a sentence; no match starts at the top."""
+    text = " ".join(text.split())
+    start = max(0, text.lower().find(term.lower()) - width // 3)
+    piece = text[start:start + width].strip()
+    return ("…" if start else "") + piece + ("…" if start + width < len(text) else "")
 
 
 @router.get("/editions/{eid}")

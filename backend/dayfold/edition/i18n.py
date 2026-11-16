@@ -60,6 +60,9 @@ LABELS = {
         "daily": "Edição diária",
         "high": "Máx.", "low": "Mín.", "sunrise": "Nascer do sol", "sunset": "Pôr do sol",
         "weather_credit": "Dados meteorológicos: Open-Meteo (CC BY 4.0).",
+        "tomorrow": "Amanhã", "air_quality": "Qualidade do ar",
+        "moon": "Lua:", "illuminated": "iluminada", "on_this_day": "Neste dia:",
+        "almanac_credit": "Efemérides: Wikipédia (CC BY-SA 4.0).",
         "free_software": "Dayfold é software livre (licença MIT). Tipografia sob SIL Open Font "
                          "License 1.1: Chomsky, UnifrakturMaguntia, UnifrakturCook, Playfair "
                          "Display, Literata e Old Standard TT.",
@@ -109,6 +112,9 @@ LABELS = {
         "daily": "Daily edition",
         "high": "High", "low": "Low", "sunrise": "Sunrise", "sunset": "Sunset",
         "weather_credit": "Weather data: Open-Meteo (CC BY 4.0).",
+        "tomorrow": "Tomorrow", "air_quality": "Air quality",
+        "moon": "Moon:", "illuminated": "illuminated", "on_this_day": "On this day:",
+        "almanac_credit": "Almanac: Wikipedia (CC BY-SA 4.0).",
         "free_software": "Dayfold is free software (MIT license). Typefaces under the SIL Open "
                          "Font License 1.1: Chomsky, UnifrakturMaguntia, UnifrakturCook, Playfair "
                          "Display, Literata and Old Standard TT.",

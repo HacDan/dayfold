@@ -5,8 +5,11 @@
   {% if ed.tagline %}<p class="tagline">{{ ed.tagline }}</p>{% endif %}
 </div>
 <p class="dateline">{{ ed.long_date }}</p>
-{% if weather %}
-<p class="weather">{{ weather.place }} · {{ weather.condition }} · {{ L.high }} {{ weather.t_max }}{{ weather.unit }} · {{ L.low }} {{ weather.t_min }}{{ weather.unit }}<br/>{{ L.sunrise }} {{ weather.sunrise }} · {{ L.sunset }} {{ weather.sunset }}</p>
+{% if weather_lines %}
+<p class="weather">{% for line in weather_lines %}{{ line }}{% if not loop.last %}<br/>{% endif %}{% endfor %}</p>
+{% endif %}
+{% if almanac %}
+<p class="almanac">{{ almanac.moon }}{% if almanac.event %}<br/>{{ almanac.event }}{% endif %}</p>
 {% endif %}
 {% if headline %}{{ m.article(headline, L, headline=True) }}{% endif %}
 <div class="index">

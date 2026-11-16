@@ -74,6 +74,9 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
   const setWeather = (patch: Partial<Settings["values"]["weather"]>) =>
     setV({ ...v, weather: { ...v.weather, ...patch } });
 
+  const setAlmanac = (patch: Partial<Settings["values"]["almanac"]>) =>
+    setV({ ...v, almanac: { ...v.almanac, ...patch } });
+
   const lookupPlace = async () => {
     setLooking(true);
     try {
@@ -232,6 +235,22 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
               </>
             )}
             <button className="btn" onClick={() => save("weather")}>{t("Salvar tempo")}</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>{t("Almanaque na primeira página")}</legend>
+            <p className="small muted">{t("Fase da lua, calculada no servidor, e um acontecimento do dia, da Wikipédia. Sem chave de API.")}</p>
+            <label className="check">
+              <input type="checkbox" checked={v.almanac.enabled} onChange={(e) => setAlmanac({ enabled: e.target.checked })} />{" "}
+              {t("Imprimir o almanaque na primeira página")}
+            </label>
+            <label className="check">
+              <input type="checkbox" disabled={!v.almanac.enabled} checked={v.almanac.on_this_day}
+                onChange={(e) => setAlmanac({ on_this_day: e.target.checked })} />{" "}
+              {t("Incluir “neste dia” (Wikipédia)")}
+            </label>
+            <p className="small muted">{t("Vale para as edições geradas depois de salvar; a edição guarda o almanaque com que foi impressa.")}</p>
+            <button className="btn" onClick={() => save("almanac")}>{t("Salvar almanaque")}</button>
           </fieldset>
 
           <fieldset>

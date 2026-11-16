@@ -18,12 +18,14 @@ import Sections from "./pages/Sections";
 import Games from "./pages/Games";
 import AI from "./pages/AI";
 import Logs from "./pages/Logs";
+import Search from "./pages/Search";
 import Kindle from "./pages/Kindle";
 import Login from "./pages/Login";
 
 const NAV = [
   ["/", "Capa"],
   ["/edicoes", "Edições"],
+  ["/busca", "Busca"],
   ["/provedores", "Provedores"],
   ["/scrapers", "Scrapers"],
   ["/secoes", "Seções"],
@@ -187,6 +189,7 @@ function App() {
           <Route path="/edicoes" element={<Editions />} />
           <Route path="/edicoes/:id" element={<EditionDetail />} />
           <Route path="/edicoes/:id/avaliar" element={<RateEdition />} />
+          <Route path="/busca" element={<Search />} />
           <Route path="/provedores" element={<Providers />} />
           <Route path="/provedores/:id" element={<ProviderDetail />} />
           <Route path="/scrapers" element={<Scrapers />} />

@@ -50,6 +50,12 @@ downloads one file a day and reads it offline.
   [Open-Meteo](https://open-meteo.com), which needs no key or account, and credits it in the
   colophon; no data comes from the sources above. If the service is unreachable the page prints
   without the block instead of losing the edition.
+* **Almanac without keys**: the front page can carry the moon's phase and "on this day". The phase
+  is arithmetic on the date (no service, no key); the event comes from
+  [Wikipedia's feed](https://api.wikimedia.org/), also keyless, shortened to a line and credited in
+  the colophon. Both paper languages are stored when the edition is made, so `retypeset` prints the
+  event in the language you typeset in, like the weather's condition; if Wikipedia is unreachable
+  the moon still prints.
 * **Story length caps**: full text stories can be capped by words and/or paragraphs for the
   whole paper, per section or per provider (the most specific wins). A capped story ends at the
   last sentence that fits, with a "The story continues online" note and the link. Caps apply when
@@ -57,6 +63,10 @@ downloads one file a day and reads it offline.
 * **Curation without AI** by section keywords, recency, deduplication and per source limits.
 * **Rate edition**: mark each story as more of this, neutral or less of this; the next editions
   learn from it (source, section and title words), with or without AI.
+* **Search the archive**: find a story already printed by title or body text, with the edition
+  number, date, section and a snippet around the match; each hit opens its edition. It shows the 40
+  most recent and says when there are more. Only printed stories are searched, so what was collected
+  but never published never shows up.
 * **Optional AI** (OpenAI compatible APIs, Ollama, Anthropic, or a local CLI such as Claude Code or Codex) for:
   editorial selection over pre-filtered candidates, the daily cartoon, and AI assisted scraper generation.
   Everything else keeps working without it.
@@ -150,7 +160,8 @@ cd backend && uv run dayfold retypeset 12   # re-typeset edition 12 with the cur
 
 1. **Newspaper**: name of the newspaper (also the EPUB title), masthead font, type sizes (limited to
    ranges that keep the Kindle layout intact), number of stories, sections, schedule, cartoon and games,
-   closing order (news, cartoon, games). The cover preview renders with unsaved settings.
+   closing order (news, cartoon, games), weather and the front page almanac (moon phase, on this
+   day). The cover preview renders with unsaved settings.
 2. **Sections**: sections and their keywords. Keywords drive the rule based curation and guide the AI.
 3. **Providers**: enable sources, set their usage mode and license notes, test them, add new ones
    manually (feed, generic extraction or CSS selectors) or with assisted creation.
@@ -163,6 +174,7 @@ cd backend && uv run dayfold retypeset 12   # re-typeset edition 12 with the cur
 6. **Games**: enable, order and configure Sudoku, Word of the Day, Word Search and Crossword, with previews.
 7. **Logs**: every generation with its steps and log. **Print today's paper** works from the
    front page or from here.
+8. **Search**: the archive by title or text. Results point at the edition each story ran in.
 
 ## Connecting the e-reader
 

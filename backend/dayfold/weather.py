@@ -17,6 +17,7 @@ from .settings import WeatherSettings
 log = logging.getLogger("dayfold.weather")
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+AIR_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
 # WMO weather codes as Open-Meteo reports them: (pt, en).
@@ -52,6 +53,22 @@ CONDITIONS: dict[int, tuple[str, str]] = {
 }
 
 
+# US AQI bands: (ceiling, pt, en). Open-Meteo reports the US scale.
+AQI_BANDS: list[tuple[int, str, str]] = [
+    (50, "Boa", "Good"),
+    (100, "Moderada", "Moderate"),
+    (150, "Prejudicial a grupos sensíveis", "Unhealthy for sensitive groups"),
+    (200, "Prejudicial", "Unhealthy"),
+    (300, "Muito prejudicial", "Very unhealthy"),
+    (10**9, "Perigosa", "Hazardous"),
+]
+
+
+def aqi_label(value: int, lang: str = "pt") -> str:
+    ceiling, pt, en = next(band for band in AQI_BANDS if value <= band[0])  # the last band catches all
+    return pt if lang == "pt" else en
+
+
 def condition_label(code: int | None, lang: str = "pt") -> str:
     pair = CONDITIONS.get(code if code is not None else -1)
     return "—" if pair is None else pair[0] if lang == "pt" else pair[1]
@@ -70,12 +87,13 @@ def today(cfg: WeatherSettings) -> dict | None:
         # The place's own day: sunrise in Burlington must not be read on São Paulo's clock just
         # because that is where the schedule runs.
         "timezone": "auto",
-        "forecast_days": 1,
+        "forecast_days": 2,  # today and tomorrow
         "temperature_unit": "fahrenheit" if cfg.units == "fahrenheit" else "celsius",
     }
     try:
         data = json.loads(net.fetch(f"{FORECAST_URL}?{urlencode(params)}").content)
         daily = data["daily"]
+        tomorrow = len(daily["time"]) > 1
         return {
             "place": cfg.place or data.get("timezone", "").split("/")[-1].replace("_", " "),
             "code": int(daily["weather_code"][0]),
@@ -83,6 +101,9 @@ def today(cfg: WeatherSettings) -> dict | None:
             "t_min": _round(daily["temperature_2m_min"][0]),
             "sunrise": _clock(daily["sunrise"][0]),
             "sunset": _clock(daily["sunset"][0]),
+            "tomorrow_max": _round(daily["temperature_2m_max"][1]) if tomorrow else None,
+            "tomorrow_min": _round(daily["temperature_2m_min"][1]) if tomorrow else None,
+            "aqi": _air_quality(cfg),
             # The API states the unit it used: trust that over the request, so the page can never
             # print Fahrenheit numbers with a Celsius label (or the reverse).
             "unit": data.get("daily_units", {}).get("temperature_2m_max")
@@ -93,13 +114,33 @@ def today(cfg: WeatherSettings) -> dict | None:
         return None
 
 
-def caption(w: dict, labels: dict) -> list[str]:
-    """The front page's two lines, in the same words, for the cover image."""
-    hi, lo = labels["high"], labels["low"]
-    return [
-        f"{w['place']} · {w['condition']} · {hi} {w['t_max']}{w['unit']} · {lo} {w['t_min']}{w['unit']}",
+def caption(w: dict, labels: dict, lang: str = "pt") -> list[str]:
+    """The front page's lines, in the same words, so the page and the cover cannot drift apart."""
+    hi, lo, unit = labels["high"], labels["low"], w.get("unit", "")
+    lines = [
+        f"{w['place']} · {w['condition']} · {hi} {w['t_max']}{unit} · {lo} {w['t_min']}{unit}",
         f"{labels['sunrise']} {w['sunrise']} · {labels['sunset']} {w['sunset']}",
     ]
+    outlook = []
+    if w.get("tomorrow_max") is not None:
+        outlook.append(f"{labels['tomorrow']} {hi} {w['tomorrow_max']}{unit} · {lo} {w['tomorrow_min']}{unit}")
+    if w.get("aqi") is not None:
+        outlook.append(f"{labels['air_quality']} {w['aqi']} ({aqi_label(w['aqi'], lang)})")
+    if outlook:
+        lines.append(" · ".join(outlook))
+    return lines
+
+
+def _air_quality(cfg: WeatherSettings) -> int | None:
+    """US AQI for the hour, or ``None``: a missing reading is no reason to drop the forecast."""
+    params = {"latitude": cfg.latitude, "longitude": cfg.longitude, "current": "us_aqi",
+              "timezone": "auto"}
+    try:
+        data = json.loads(net.fetch(f"{AIR_URL}?{urlencode(params)}").content)
+        return int(data["current"]["us_aqi"])
+    except Exception as exc:  # noqa: BLE001  the forecast prints without it
+        log.warning("air quality for %s unavailable: %s", cfg.place or "?", exc)
+        return None
 
 
 def lookup_place(name: str, lang: str = "pt") -> dict | None:

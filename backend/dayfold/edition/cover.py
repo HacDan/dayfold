@@ -148,7 +148,7 @@ def render_cover(data: CoverData, dest: Path, width: int = REF_W, height: int = 
     for line in hlines:
         _center(d, y, line, hf, W)
         y += lh
-    y += 10
+    y += 24  # the headline's descenders reach into its line box; keep the source clear of them
 
     if data.deck:
         ff, flines = _fit_block(d, data.deck, "Literata-Italic.ttf", inner - 80, 33, 26, 3)

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from sqlalchemy import func, select
 
-from .. import clock, weather
+from .. import almanac, clock, weather
 from ..config import config
 from ..db import session_scope
 from ..edition.cover import CoverData, render_cover
@@ -140,6 +140,7 @@ def run_generation_job(job_id: int) -> None:
             cur = get_section(s, "curation")
             charge_cfg = get_section(s, "charge")
             weather_cfg = get_section(s, "weather")
+            almanac_cfg = get_section(s, "almanac")
             picks, curated_by = curate(s, news, cur, log)
             if not picks:
                 raise RuntimeError(tr("nenhuma matéria disponível para a edição (verifique provedores e filtros)",
@@ -150,10 +151,11 @@ def run_generation_job(job_id: int) -> None:
         # The forecast is one network call: make it with no write transaction open, and print
         # without it if the service is down.
         forecast = weather.today(weather_cfg) if weather_cfg.enabled else None
+        daybook = almanac.today(ed_date, almanac_cfg)
         with session_scope() as s:
             edition = Edition(number=number, edition_date=ed_date, title=news.title,
                               status=EditionStatus.BUILDING, curated_by=curated_by, job_id=job_id,
-                              weather=forecast)
+                              weather=forecast, almanac=daybook)
             s.add(edition)
             s.flush()
             edition_id = edition.id
@@ -422,6 +424,8 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
     # The stored snapshot keeps the numbers; the condition is a label, so it is localised now.
     weather_view = (None if not ed.weather else
                     {**ed.weather, "condition": weather.condition_label(ed.weather.get("code"), lang)})
+    weather_lines = weather.caption(weather_view, L, lang) if weather_view else []
+    almanac_view = _almanac_view(ed.almanac, lang, L)
     cover_data = CoverData(
         title=news.title, masthead_font=news.masthead_font, tagline=localized_tagline(news.tagline, lang),
         long_date=long_date(ed_date, lang), number_label=f"{L['number']} {number}",
@@ -432,7 +436,7 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         also_label=L["also"], secondary=secondary[:6],
         lead_text=" ".join(lead["paragraphs"][:4]) if lead and lead["paragraphs"] else (lead or {}).get("excerpt"),
         footer=" · ".join(extras),
-        weather=weather.caption(weather_view, L) if weather_view else None,
+        weather=weather_lines or None,
     )
     if hasattr(log, "step"):
         log.step("cover", 0.85)
@@ -448,7 +452,7 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         iso_date=ed_date.isoformat(), number_label=f"{L['number']} {number}",
         year_label=f"{L['year']} {roman(year_n)}", masthead_font=news.masthead_font,
         typography=news.typography.model_dump(), cover_path=cover_path, headline=headline,
-        weather=weather_view,
+        weather_lines=weather_lines, almanac=almanac_view,
         sections=ordered_sections, games=[dict(g) for g in games], charge=charge,
         closing_order=news.closing_order, sources=sources, curated_by=curated_by,
         generated_at=generated_stamp(clock.now(tz), lang),
@@ -499,6 +503,32 @@ class _PrintLog:
 
 def retypeset(edition_id: int) -> Path:
     return typeset(edition_id, _PrintLog())
+
+
+def _almanac_view(snapshot: dict | None, lang: str, labels: dict) -> dict | None:
+    """The almanac as the page prints it: the moon always, the day's event when there is one."""
+    if not snapshot:
+        return None
+    today = snapshot.get("moon") or {}
+    phase, illuminated = today.get("phase"), today.get("illuminated", 0)
+    event = _almanac_event(snapshot.get("event"), lang)
+    return {
+        "moon": f"{labels['moon']} {almanac.moon_label(phase, lang)} · {illuminated}% {labels['illuminated']}",
+        "event": f"{labels['on_this_day']} {event['year']} · {event['text']}" if event else None,
+    }
+
+
+def _almanac_event(event: dict | None, lang: str) -> dict | None:
+    """The event in the paper's language, like the weather's condition label.
+
+    Newer snapshots keep one per paper language; versions printed before that kept a single text,
+    which is still the text to print.
+    """
+    if not event:
+        return None
+    if "text" in event:
+        return event
+    return event.get(lang) or next(iter(event.values()), None)
 
 
 def _prune() -> None:

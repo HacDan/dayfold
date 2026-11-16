@@ -180,6 +180,13 @@ class WeatherSettings(BaseModel):
     units: Literal["celsius", "fahrenheit"] = "celsius"
 
 
+class AlmanacSettings(BaseModel):
+    """Moon phase and "on this day" under the weather: arithmetic plus Wikipedia, no key."""
+
+    enabled: bool = False
+    on_this_day: bool = True
+
+
 class DistributionSettings(BaseModel):
     feed_token: str = Field(default_factory=lambda: secrets.token_urlsafe(18))
     keep_editions: int = Field(30, ge=1, le=365)
@@ -224,6 +231,7 @@ SECTIONS: dict[str, type[BaseModel]] = {
     "charge": ChargeSettings,
     "device": DeviceSettings,
     "weather": WeatherSettings,
+    "almanac": AlmanacSettings,
     "distribution": DistributionSettings,
     "kindle": KindleSettings,
 }
