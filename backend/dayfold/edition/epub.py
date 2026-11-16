@@ -90,9 +90,9 @@ def build_epub(doc: EditionDoc, dest: Path) -> Path:
     book.add_metadata("DC", "description", f"{doc.title} | {doc.long_date} | {doc.number_label}")
     book.add_metadata(None, "meta", "", {"name": "dayfold:edition", "content": doc.identifier})
     book.set_cover("images/cover.png", Path(doc.cover_path).read_bytes(), create_page=True)
-    cover_page = book.get_item_with_id("cover")
-    if cover_page is not None:
-        cover_page.is_linear = True  # the reader starts at the front page cover
+    # The cover page is the book's cover (library, sleep screen, and a page you can go back to), but
+    # not where reading starts: the reader opens on the front page, whose first story is the lead.
+    # Only one front-page-looking page is in the reading flow; the cover is cover art.
 
     masthead_file = MASTHEAD_FONTS[doc.masthead_font]["file"]
     for name in {*TEXT_FONTS, masthead_file}:

@@ -41,6 +41,13 @@ def test_cover_and_epub(tmp_path: Path):
         assert "dayfold://game/0" in z.read("EPUB/game_0.xhtml").decode()
         assert "crossword_3.png" in z.read("EPUB/game_3.xhtml").decode()
 
+        # the cover page exists but is not where reading starts: the front page is (its lead story)
+        opf = z.read("EPUB/content.opf").decode()
+        itemrefs = re.findall(r"<itemref[^>]*/>", opf)
+        assert 'idref="cover"' in itemrefs[0] and 'linear="no"' in itemrefs[0]
+        assert 'idref="front"' in itemrefs[1] and "linear" not in itemrefs[1]
+        assert "EPUB/cover.xhtml" in names and 'properties="cover-image"' in opf
+
     # native Kindle variant: no KOReader links, answers only after the warning page
     from dataclasses import replace
 
