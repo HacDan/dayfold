@@ -1,10 +1,11 @@
 <div class="comic-page" id="a{{ c.id }}">
 <div class="section-head">
-  <p class="kicker">{{ c.provider }}</p>
+  <p class="kicker">{{ c.feed_title or c.provider }}</p>
   <h1>{{ c.title }}</h1>
 </div>
 <div class="charge">
-  {% if c.image %}<img src="{{ c.image }}" alt="{{ c.excerpt or '' }}"/>{% endif %}
+  {# no caption: the title still describes the artwork #}
+  {% if c.image %}<img src="{{ c.image }}" alt="{{ c.excerpt or c.title }}"/>{% endif %}
   {% if c.excerpt %}<p class="caption">{{ c.excerpt }}</p>{% endif %}
   <p class="credit">{{ L.source }}: <a href="{{ c.url }}">{{ c.url_short }}</a></p>
 </div>

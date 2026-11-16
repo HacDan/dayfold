@@ -42,12 +42,10 @@ def _strip_title(body: str | None, title: str) -> str | None:
 
 
 def _restates(text: str, title: str) -> bool:
-    """True when text says no more than the title does ("... on Sun" vs "... for Sun")."""
-    def words(s: str) -> set[str]:
-        return set(re.findall(r"[a-z0-9]{2,}", s.casefold()))
-
-    a, b = words(text), words(title)
-    return bool(a and b) and len(a & b) / len(a | b) >= 0.8
+    """True when text says no more than the title already does ("... for Sun" vs "... on Sun")."""
+    a = set(re.findall(r"[a-z0-9]{2,}", text.casefold()))
+    b = set(re.findall(r"[a-z0-9]{2,}", title.casefold()))
+    return bool(a and b) and len(a & b) / len(a | b) >= 0.8  # two wordings of one sentence
 
 
 def apply_usage(item: ScrapedItem, mode: str, excerpt_words: int) -> dict:
@@ -72,9 +70,8 @@ def apply_usage(item: ScrapedItem, mode: str, excerpt_words: int) -> dict:
         # A comic strip: the artwork is what gets printed, the feed's text is its alt text, and
         # there is no story to cap. The image stays, unlike excerpts, because it is the content.
         alt = clean_text(item.image_alt) or clean_text(source_text)
-        if alt and item.title and _restates(alt, item.title):
-            alt = None  # the feed's alt text only restates the title we already print
-        data["excerpt"] = alt[:500] if alt else None
+        # An alt text that only restates the title is not worth printing a second time.
+        data["excerpt"] = alt[:500] if alt and not _restates(alt, item.title) else None
         data["subtitle"] = None
     elif mode == UsageMode.EXCERPT_AND_LINK:
         data["excerpt"] = first_words(source_text, excerpt_words)
@@ -117,6 +114,8 @@ def _collect_provider(pid: int, log: Callable[[str], None], excerpt_words: int) 
         p.last_run_ok = outcome.ok
         p.last_run_message = outcome.error or (outcome.log[-1] if outcome.log else None)
         p.last_run_count = len(outcome.items)
+        if outcome.feed_title:
+            p.feed_title = outcome.feed_title[:120]  # a broken feed does not erase the last name
         if not outcome.ok:
             log(tr(f"{name}: falhou ({outcome.error}).", f"{name}: failed ({outcome.error})."))
             return 0
@@ -128,18 +127,17 @@ def _collect_provider(pid: int, log: Callable[[str], None], excerpt_words: int) 
             data = apply_usage(item, mode, excerpt_words)
             existing = s.scalar(select(Article).where(Article.url_hash == h))
             if existing:
-                if existing.usage_mode != mode or (data["language"] and data["language"] != existing.language):
-                    # The provider's usage mode (or language) changed after this story was stored.
-                    # What may be printed, and the text printed, follow the mode, so re-derive them
-                    # rather than leaving a strip stored as a story with its feed boilerplate.
-                    for k, val in data.items():
+                # A provider's mode or language can change after its stories were stored, and the
+                # shape of what may be printed follows the mode: re-derive those rows instead of
+                # leaving a strip stored as a story with its feed boilerplate.
+                stale = existing.usage_mode != mode or bool(
+                    data["language"] and data["language"] != existing.language)
+                for k, val in data.items():
+                    if stale or (val and not getattr(existing, k)):
                         setattr(existing, k, val)
+                if stale:
                     existing.usage_mode = mode
                     refreshed += 1
-                else:
-                    for k, val in data.items():
-                        if val and not getattr(existing, k):
-                            setattr(existing, k, val)
                 existing.category = category
                 continue
             s.add(Article(

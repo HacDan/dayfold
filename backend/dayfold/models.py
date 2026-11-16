@@ -124,6 +124,9 @@ class Provider(Base):
     license_name: Mapped[str] = mapped_column(String(120), default="Unknown")
     license_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
     license_note: Mapped[str] = mapped_column(Text, default="")
+    # The feed's channel title, learned on each run: a strip's real name, where the provider name
+    # is whatever the install called it.
+    feed_title: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     max_items: Mapped[int] = mapped_column(Integer, default=15)
     # Length cap for full text stories (None = no limit); see edition.length.

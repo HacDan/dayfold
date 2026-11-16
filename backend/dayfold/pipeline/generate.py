@@ -93,7 +93,8 @@ def _article_view(a: Article, section_name: str, lang: str, tz: str | None = Non
     return {
         "id": a.id, "title": a.title, "subtitle": a.subtitle, "author": author,
         "date_label": short_date(when.date(), lang) + when.strftime(" · %H:%M"),
-        "provider": a.provider.name, "url": a.url, "url_short": _short_url(a.url),
+        "provider": a.provider.name, "feed_title": a.provider.feed_title,
+        "url": a.url, "url_short": _short_url(a.url),
         "paragraphs": _paragraphs(a.body), "excerpt": a.excerpt, "section_name": section_name,
         "image_url": a.image_url, "language": a.language,
         "image_only": a.usage_mode == UsageMode.IMAGE_ONLY,

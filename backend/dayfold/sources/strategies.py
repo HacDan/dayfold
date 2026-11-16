@@ -92,6 +92,7 @@ def scrape_rss(spec: dict, *, max_items: int, language: str | None, want_body: b
         raise net.FetchError(tr(f"feed inválido: {parsed.bozo_exception}",
                                 f"invalid feed: {parsed.bozo_exception}"))
     feed_lang = (parsed.feed.get("language") or language or "")[:2].lower() or None
+    feed_title = clean_text(parsed.feed.get("title"))
     log.append(tr(f"Feed com {len(parsed.entries)} itens ({feed_url}).",
                   f"Feed with {len(parsed.entries)} items ({feed_url})."))
     fetch_full = want_body and spec.get("fetch_full", True)
@@ -142,7 +143,7 @@ def scrape_rss(spec: dict, *, max_items: int, language: str | None, want_body: b
                 item.subtitle = item.excerpt
             items.append(item)
     log.append(tr(f"{len(items)} matérias normalizadas.", f"{len(items)} stories normalised."))
-    return ScrapeResult(items=items, log=log)
+    return ScrapeResult(items=items, log=log, feed_title=feed_title)
 
 
 # ---------------------------------------------------------------- generic

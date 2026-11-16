@@ -24,6 +24,7 @@ class RunOutcome:
     items: list[ScrapedItem] = field(default_factory=list)
     log: list[str] = field(default_factory=list)
     error: str | None = None
+    feed_title: str | None = None
 
 
 def _limits() -> None:  # pragma: no cover - runs in the child
@@ -59,7 +60,8 @@ def run_isolated(strategy: str, spec: dict, *, max_items: int = 15, language: st
     if not data.get("ok"):
         return RunOutcome(ok=False, error=data.get("error"), log=[data.get("trace", "")])
     items = [ScrapedItem(**i) for i in data.get("items", [])]
-    return RunOutcome(ok=True, items=items, log=data.get("log", []))
+    return RunOutcome(ok=True, items=items, log=data.get("log", []),
+                      feed_title=data.get("feed_title"))
 
 
 def validate(outcome: RunOutcome, *, min_items: int = 2, need_body: bool = False) -> dict:

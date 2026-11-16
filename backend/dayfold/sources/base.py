@@ -31,9 +31,11 @@ class ScrapedItem:
 class ScrapeResult:
     items: list[ScrapedItem]
     log: list[str]
+    feed_title: str | None = None  # the channel's own name, when the feed gives one
 
     def to_dict(self) -> dict:
-        return {"items": [i.to_dict() for i in self.items], "log": self.log}
+        return {"items": [i.to_dict() for i in self.items], "log": self.log,
+                "feed_title": self.feed_title}
 
 
 WS = re.compile(r"[ \t\r\f\v]+")

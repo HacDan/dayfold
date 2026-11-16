@@ -176,7 +176,7 @@ def candidates(session: Session, cur: CurationSettings, log: Callable[[str], Non
 
 
 def _lead_with_text(picks: list[Pick], cands: list[Candidate],
-                    key: Callable[[Pick], float]) -> None:
+                    key: Callable[[Pick], float | tuple[int, float]]) -> None:
     """A comic strip never leads the paper while there is text to lead with.
 
     Both selection paths share this: the rules may score a comic highest, the AI may name one as
