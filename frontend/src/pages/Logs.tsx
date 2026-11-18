@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { t } from "../i18n";
+import { t, triggerLabel } from "../i18n";
 import { Link } from "react-router-dom";
 import { get, fmtDateTime, type Job } from "../api";
 import { Empty, Loading, Press, SectionTitle, Stamp, useLoad } from "../components/ui";
@@ -24,7 +24,7 @@ export default function Logs() {
               <Fragment key={j.id}>
                 <tr>
                   <td>{j.id}</td>
-                  <td className="small">{j.trigger === "schedule" ? t("agendada") : t(j.trigger)}</td>
+                  <td className="small">{triggerLabel(j.trigger)}</td>
                   <td><Stamp status={j.status} /></td>
                   <td style={{ minWidth: 140 }}>{j.status === "RUNNING" ? <Press value={j.progress} /> : <span className="small muted">{j.step ?? "-"}</span>}</td>
                   <td className="small">{fmtDateTime(j.started_at)}</td>

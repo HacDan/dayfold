@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from .. import weather
+from .. import clock, weather
 from ..ai.client import AIClient, test_provider, usage
 from ..db import get_session
 from ..games.generators import seeded
@@ -81,10 +81,12 @@ def overview(session: Session = Depends(get_session)) -> dict:
     active_ai = session.scalar(select(AIProvider).where(AIProvider.is_active.is_(True)))
     recent = list(session.scalars(select(Edition).order_by(Edition.id.desc()).limit(6)))
     nxt = scheduler.next_run()
+    now = clock.now(sched.timezone)
     return {
-        "today": date.today().isoformat(),
+        "today": now.date().isoformat(),
         "newspaper": news.model_dump(),
         "latest_edition": edition_summary(latest) if latest else None,
+        "edition_is_today": bool(latest and latest.edition_date == now.date()),
         "latest_ratings": rating_progress(session, latest) if latest else None,
         "last_job": job_out(last_job) if last_job else None,
         "next_run": nxt.isoformat() if nxt else None,

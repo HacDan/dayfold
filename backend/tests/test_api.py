@@ -91,3 +91,25 @@ def test_send_to_kindle_mail(monkeypatch, tmp_path):
 
     with pytest.raises(kindle_mail.KindleMailError):
         kindle_mail.send_epub(KindleSettings(), epub, "x")
+
+
+def test_overview_knows_when_the_latest_edition_is_not_todays(data_dir):
+    from datetime import timedelta
+
+    from dayfold import clock
+    from dayfold.app import app
+    from dayfold.db import session_scope
+    from dayfold.models import Edition, EditionStatus
+
+    today = clock.now().date()
+    with TestClient(app) as c:
+        assert c.get("/api/overview").json()["edition_is_today"] is False
+        with session_scope() as s:
+            s.add(Edition(number=1, edition_date=today - timedelta(days=1), title="Dayfold",
+                          status=EditionStatus.READY))
+        assert c.get("/api/overview").json()["edition_is_today"] is False
+        with session_scope() as s:
+            s.add(Edition(number=2, edition_date=today, title="Dayfold", status=EditionStatus.READY))
+        body = c.get("/api/overview").json()
+        assert body["edition_is_today"] is True
+        assert body["latest_edition"]["date"] == today.isoformat()

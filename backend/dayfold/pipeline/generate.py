@@ -123,8 +123,44 @@ def today_in_tz() -> date:
     return clock.now().date()
 
 
+def discard_failed_attempt(job_id: int) -> None:
+    """Remove what a failed attempt left: the edition row and its directory.
+
+    The edition is created before typesetting, so a failure past that point leaves a FAILED paper
+    for the day. A retry starts from nothing instead of printing a second one next to it. Anything
+    past BUILDING (READY, or ARCHIVED once it was pruned) is a real paper and stays.
+    """
+    with session_scope() as s:
+        job = s.get(GenerationJob, job_id)
+        edition = s.get(Edition, job.edition_id) if job and job.edition_id else None
+        if edition is None or edition.status not in (EditionStatus.BUILDING, EditionStatus.FAILED):
+            return
+        out_dir = edition_dir(edition.edition_date, edition.number)
+        shared = s.scalar(select(Edition.id).where(
+            Edition.edition_date == edition.edition_date, Edition.number == edition.number,
+            Edition.id != edition.id).limit(1))
+        job.edition_id = None
+        s.delete(edition)
+    if not shared:  # a phantom from before this fix can share its directory with the paper after it
+        shutil.rmtree(out_dir, ignore_errors=True)
+
+
+def _failed(job_id: int, edition_id: int | None, exc: Exception) -> None:
+    """Record the failure. Only an edition still being built is marked failed: once typeset it is
+    a printed paper, and a second attempt must not discard it."""
+    with session_scope() as s:
+        job = s.get(GenerationJob, job_id)
+        job.status = JobStatus.FAILED
+        job.error = f"{type(exc).__name__}: {exc}"
+        job.finished_at = utcnow()
+        edition = s.get(Edition, edition_id) if edition_id else None
+        if edition and edition.status == EditionStatus.BUILDING:
+            edition.status = EditionStatus.FAILED
+
+
 def run_generation_job(job_id: int) -> None:
     log = JobLog(job_id)
+    discard_failed_attempt(job_id)
     with session_scope() as s:
         job = s.get(GenerationJob, job_id)
         job.status = JobStatus.RUNNING
@@ -232,14 +268,7 @@ def run_generation_job(job_id: int) -> None:
         _auto_send_kindle(edition_id, epub_path, log)
         _prune()
     except Exception as exc:
-        with session_scope() as s:
-            job = s.get(GenerationJob, job_id)
-            job.status = JobStatus.FAILED
-            job.error = f"{type(exc).__name__}: {exc}"
-            job.finished_at = utcnow()
-            if edition_id:
-                ed = s.get(Edition, edition_id)
-                ed.status = EditionStatus.FAILED
+        _failed(job_id, edition_id, exc)
         log(tr(f"Falhou: {exc}", f"Failed: {exc}"))
         raise
 

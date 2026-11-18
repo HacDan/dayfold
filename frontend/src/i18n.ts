@@ -41,3 +41,9 @@ export function t(text: string, vars?: Record<string, string | number>): string 
   if (vars) for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(String(v));
   return out;
 }
+
+/** Named labels for the generation triggers: the daily schedule and the startup catch-up. A manual
+    run, or a trigger new enough not to have a label, keeps its own name. */
+const TRIGGER_LABEL: Record<string, string> = { schedule: "agendada", "catch-up": "recuperação" };
+
+export const triggerLabel = (trigger: string) => t(TRIGGER_LABEL[trigger] ?? trigger);

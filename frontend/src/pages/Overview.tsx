@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { locale, t } from "../i18n";
+import { locale, t, triggerLabel } from "../i18n";
 import { get, post, fmtDateTime, type Job, type Overview as OverviewT } from "../api";
 import { Loading, Press, Stamp, useAction, useLoad } from "../components/ui";
 import { PressImage } from "../components/ui";
@@ -40,7 +40,7 @@ export default function Overview() {
     <div>
       <div className="lead-grid">
         <article>
-          <p className="kicker">{t("Edição de hoje")}</p>
+          <p className="kicker">{ed && !data.edition_is_today ? t("Última edição") : t("Edição de hoje")}</p>
           {ed ? (
             <>
               <h2 style={{ fontSize: "2.4rem" }}><Link to={`/edicoes/${ed.id}`} style={{ textDecoration: "none" }}>{ed.headline ?? ed.title}</Link></h2>
@@ -75,7 +75,7 @@ export default function Overview() {
           <GenerateButton job={job} onStarted={reload} />
           {job && !["RUNNING", "QUEUED"].includes(job.status) && (
             <p className="small muted" style={{ marginTop: 10 }}>
-              {t("Última geração:")}{" "}<Stamp status={job.status} /> {fmtDateTime(job.finished_at)} ({job.trigger === "schedule" ? t("agendada") : t("manual")})
+              {t("Última geração:")}{" "}<Stamp status={job.status} /> {fmtDateTime(job.finished_at)} ({triggerLabel(job.trigger)})
               {job.error && <> · <span style={{ color: "var(--bad)" }}>{job.error}</span></>}
               {" "}· <Link to="/registros">{t("registros")}</Link>
             </p>

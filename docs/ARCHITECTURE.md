@@ -33,8 +33,8 @@ e-reader only reads an offline file.
 | Area | Decision | Why |
 | --- | --- | --- |
 | Backend | Python 3.12+, FastAPI, SQLAlchemy 2, SQLite (WAL) | Best ecosystem for feeds and extraction; one file database fits a home server. |
-| Jobs | Jobs table in SQLite + one worker thread | Survives restarts, no Redis. Jobs left `RUNNING` on boot are marked `FAILED`. |
-| Scheduling | APScheduler `CronTrigger` rebuilt whenever settings change | Configurable time and timezone from the dashboard. |
+| Jobs | Jobs table in SQLite + one worker thread | Survives restarts, no Redis. Jobs left `RUNNING` on boot are marked `FAILED`, and the edition an interrupted generation was building is discarded. A failed generation is tried once more; scrapers are not. |
+| Scheduling | APScheduler `CronTrigger` rebuilt whenever settings change | Configurable time and timezone from the dashboard. A run missed while the machine was off is made up at startup (`catch_up()`), unless today's paper is already printed. |
 | Extraction | feedparser + Trafilatura; Playwright only if installed and requested | Most institutional sources publish feeds; a browser is heavy and optional. |
 | Custom scrapers | **Declarative selector specs (JSON)**, not generated code | AI output is data that the engine validates and runs in a subprocess with a timeout. No arbitrary code execution. |
 | AI | Adapters: OpenAI compatible (OpenAI, Ollama, OpenRouter, LM Studio), Anthropic, CLI (`claude -p`, `codex exec`, any command reading stdin) | AI is optional; every AI call returns JSON validated by Pydantic. |
@@ -66,7 +66,7 @@ e-reader only reads an offline file.
 
 ## Generation flow
 
-1. `generation_jobs` row created (cron or "Gerar jornal agora").
+1. `generation_jobs` row created (cron, startup catch-up or "Gerar jornal agora").
 2. **Collect**: every active provider runs its `READY` scraper version in an isolated
    subprocess (timeout, size limits). Results are normalized into `articles`.
 3. **Respect usage mode**: `metadata_only` stores title and metadata, `excerpt_and_link`
@@ -86,6 +86,10 @@ e-reader only reads an offline file.
 9. **Typeset**: cover PNG, EPUB with cover, sections, articles, charge, games and
    solutions, plus `games.json` for the KOReader plugin.
 10. Edition becomes `READY` and is exposed at `/feed/latest.epub` and in OPDS.
+
+One paper per day: a rerun (manual, cron or catch-up) first discards what an earlier failed or
+interrupted attempt left in `BUILDING` or `FAILED`, and a failure after the paper is typeset is
+not retried, so a day never ends up with a phantom edition next to its paper.
 
 ## Scraper lifecycle
 

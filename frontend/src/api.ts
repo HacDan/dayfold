@@ -136,7 +136,7 @@ export type AIProvider = {
 export type Game = { id: number; kind: "sudoku" | "wordle" | "wordsearch" | "crossword"; name: string; enabled: boolean; position: number; config: Record<string, string | number> };
 
 export type Overview = {
-  today: string; newspaper: Newspaper; latest_edition: EditionSummary | null;
+  today: string; newspaper: Newspaper; latest_edition: EditionSummary | null; edition_is_today: boolean;
   latest_ratings: { rated: number; total: number } | null; last_job: Job | null; next_run: string | null;
   schedule: { enabled: boolean; time: string; timezone: string };
   providers: { total: number; active: number; failing: number }; scrapers: { pending: number; failed_jobs: number };

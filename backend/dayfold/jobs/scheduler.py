@@ -7,8 +7,11 @@ from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from sqlalchemy import select
 
+from .. import clock
 from ..db import session_scope
+from ..models import Edition, EditionStatus
 from ..settings import ScheduleSettings, get_section
 from .queue import enqueue_generation
 
@@ -42,6 +45,29 @@ def next_run() -> datetime | None:
     return job.next_run_time if job else None
 
 
+def catch_up() -> int | None:
+    """Make today's paper when the scheduled run was missed: the machine was off or asleep then.
+
+    Called once at startup. Nothing is due before the scheduled time, and a READY edition dated
+    today already counts as printed, so an evening restart changes nothing.
+    """
+    with session_scope() as s:
+        sched: ScheduleSettings = get_section(s, "schedule")  # type: ignore[assignment]
+        if not sched.enabled:
+            return None
+        now = clock.now(sched.timezone)
+        hour, minute = map(int, sched.time.split(":"))
+        if (now.hour, now.minute) < (hour, minute):
+            return None
+        printed = s.scalar(select(Edition.id).where(Edition.status == EditionStatus.READY,
+                                                    Edition.edition_date == now.date()).limit(1))
+    if printed:
+        return None
+    job_id = enqueue_generation("catch-up")
+    log.info("catch-up: edição de %s na fila (job %s)", now.date(), job_id)
+    return job_id
+
+
 def start_scheduler() -> None:
     global _scheduler
     if _scheduler is not None:
@@ -49,6 +75,7 @@ def start_scheduler() -> None:
     _scheduler = BackgroundScheduler()
     _scheduler.start()
     reschedule()
+    catch_up()
 
 
 def stop_scheduler() -> None:

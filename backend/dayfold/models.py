@@ -302,7 +302,7 @@ class GameInstance(Base):
 class GenerationJob(Base):
     __tablename__ = "generation_jobs"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    trigger: Mapped[str] = mapped_column(String(20), default="manual")  # manual | schedule
+    trigger: Mapped[str] = mapped_column(String(20), default="manual")  # manual | schedule | catch-up
     status: Mapped[str] = mapped_column(String(12), default=JobStatus.QUEUED)
     step: Mapped[str | None] = mapped_column(String(40), nullable=True)
     progress: Mapped[float] = mapped_column(Float, default=0)

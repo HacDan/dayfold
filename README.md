@@ -22,8 +22,9 @@ downloads one file a day and reads it offline.
 
 > The pages above are renders of edition No. 23 at the Kindle Paperwhite's 1236×1648, taken from the
 > same EPUB the device downloads. The library shot below is a capture from a Kindle Paperwhite running
-> KOReader and the Dayfold plugin: with KOmpanion, each edition appears in the stock library with its
-> cover as the thumbnail:
+> KOReader and the Dayfold plugin, made on an earlier edition, so its thumbnail is that edition's cover
+> rather than the render above: with KOmpanion, each edition appears in the stock library with its
+> cover as the thumbnail.
 
 <p align="center"><img src="docs/screenshots/kindle-library.png" alt="Dayfold edition in the Kindle library" width="180"></p>
 
@@ -112,7 +113,8 @@ On the Kindle:
 | ![](docs/screenshots/kindle-sudoku-game.png) | ![](docs/screenshots/kindle-wordle-game.png) | ![](docs/screenshots/kindle-wordsearch-game.png) | ![](docs/screenshots/kindle-end-of-edition.png) |
 
 The cover and the page strip are renders at 1236×1648; the remaining screens are captures from a
-Kindle Paperwhite running KOReader.
+Kindle Paperwhite running KOReader. `make docs-renders` rebuilds those two from the newest edition
+the instance is serving (`INSTANCE=…`, and `DAYFOLD_PASSWORD=…` if the dashboard has a password).
 
 ## Quick start
 
@@ -238,6 +240,7 @@ frontend/     React + TypeScript dashboard (served by the backend in production)
 koreader/     dayfold.koplugin for KOReader (sync, end of edition flow, interactive games)
 kindle/       install scripts for a jailbroken Kindle over SSH
 deploy/       systemd unit, Dockerfile, docker-compose
+scripts/      docs tooling, e.g. the README page renders
 docs/         architecture, Kindle guide, licensing, screenshots
 ```
 

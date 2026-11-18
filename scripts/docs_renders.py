@@ -1,8 +1,10 @@
 """Regenerate the README's page renders from one edition EPUB.
 
+    cd backend && uv run python ../scripts/docs_renders.py --from http://localhost:8422
     cd backend && uv run python ../scripts/docs_renders.py path/to/dayfold-2026-11-16.epub
 
-Writes into docs/screenshots/:
+The EPUB is downloaded from a running Dayfold (its newest ready edition) or read from a file; a
+password-protected dashboard needs DAYFOLD_PASSWORD. Writes into docs/screenshots/:
 
 * kindle-cover.png: the edition's own cover image, at the Kindle Paperwhite size of 1236x1648;
 * kindle-reading-flow.png: the five-page strip, holding the cover, the first section, the first
@@ -18,12 +20,14 @@ from __future__ import annotations
 import argparse
 import base64
 import io
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.request
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree
@@ -31,6 +35,7 @@ from xml.etree import ElementTree
 from PIL import Image, ImageDraw, ImageFont
 
 DEVICE = (1236, 1648)
+TIMEOUT = 10  # seconds, so a black-holed INSTANCE fails instead of hanging
 PANEL = (300, 400)
 GAP, CAPTION = 20, 52
 # The pages the strip shows, in reading order, and the caption each one gets.
@@ -47,6 +52,30 @@ def find_chrome() -> str:
     if Path(mac).exists():
         return mac
     sys.exit("doc renders: no Chrome found, set CHROME=/path/to/chrome")
+
+
+def fetch_epub(instance: str, dest: Path) -> Path:
+    """Download the newest ready edition from a running Dayfold, logging in when it asks."""
+    instance = instance.rstrip("/")
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+    try:
+        if json.load(opener.open(f"{instance}/api/auth/status", timeout=TIMEOUT))["required"]:
+            password = os.environ.get("DAYFOLD_PASSWORD")
+            if not password:
+                sys.exit(f"doc renders: {instance} needs its dashboard password, set DAYFOLD_PASSWORD")
+            opener.open(urllib.request.Request(
+                f"{instance}/api/auth/login", data=json.dumps({"password": password}).encode(),
+                headers={"content-type": "application/json"}), timeout=TIMEOUT)
+        editions = json.load(opener.open(f"{instance}/api/editions", timeout=TIMEOUT))
+        newest = next((e for e in editions if e.get("status") == "READY" and e.get("epub_url")), None)
+        if not newest:
+            sys.exit(f"doc renders: {instance} has no edition with an EPUB yet")
+        with opener.open(f"{instance}{newest['epub_url']}", timeout=TIMEOUT) as response:
+            dest.write_bytes(response.read())
+    except urllib.error.URLError as error:
+        sys.exit(f"doc renders: {instance}: {error}")
+    print(f"using edition No. {newest['number']} ({newest['date']}) from {instance}")
+    return dest
 
 
 def spine_pages(z: zipfile.ZipFile) -> list[str]:
@@ -134,26 +163,32 @@ def strip(panels: list[tuple[Path, str]], font: ImageFont.FreeTypeFont, dest: Pa
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("epub", type=Path, help="edition EPUB, as served to the Kindle")
+    parser.add_argument("epub", type=Path, nargs="?", help="a local edition EPUB instead of --from")
+    parser.add_argument("--from", dest="instance", metavar="URL",
+                        help="running Dayfold to download its newest edition from")
     parser.add_argument("--out", type=Path, help="where the PNGs go (default: docs/screenshots)")
     args = parser.parse_args()
+    if not args.epub and not args.instance:
+        parser.error("pass an EPUB path or --from http://localhost:8422")
 
     chrome = find_chrome()
     out = args.out or Path(__file__).resolve().parents[1] / "docs" / "screenshots"
     out.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="dayfold-renders-") as tmp, zipfile.ZipFile(args.epub) as z:
+    with tempfile.TemporaryDirectory(prefix="dayfold-renders-") as tmp:
         workdir = Path(tmp)
-        cover = out / "kindle-cover.png"
-        Image.open(z.open("EPUB/images/cover.png")).convert("RGB").save(cover)
-        css = stylesheet(z)
-        panels = [(cover, "Capa")]
-        for page, label in strip_pages(z):
-            html = workdir / f"{Path(page).stem}.html"
-            html.write_text(page_html(z, page, css))
-            shot = workdir / f"{Path(page).stem}.png"
-            render(chrome, workdir / "chrome", html, shot)
-            panels.append((shot, label))
-        strip(panels, caption_font(z), out / "kindle-reading-flow.png")
+        epub = args.epub or fetch_epub(args.instance, workdir / "latest.epub")
+        with zipfile.ZipFile(epub) as z:
+            cover = out / "kindle-cover.png"
+            Image.open(z.open("EPUB/images/cover.png")).convert("RGB").save(cover)
+            css = stylesheet(z)
+            panels = [(cover, "Capa")]
+            for page, label in strip_pages(z):
+                html = workdir / f"{Path(page).stem}.html"
+                html.write_text(page_html(z, page, css))
+                shot = workdir / f"{Path(page).stem}.png"
+                render(chrome, workdir / "chrome", html, shot)
+                panels.append((shot, label))
+            strip(panels, caption_font(z), out / "kindle-reading-flow.png")
 
     print(f"{out / 'kindle-cover.png'} ({DEVICE[0]}x{DEVICE[1]})")
     print(f"{out / 'kindle-reading-flow.png'} ({len(panels)} pages: {', '.join(label for _, label in panels)})")
