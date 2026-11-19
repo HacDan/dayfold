@@ -118,8 +118,17 @@ class NewspaperSettings(BaseModel):
 
 class ScheduleSettings(BaseModel):
     enabled: bool = True
+    # Weekdays the paper prints on, Monday first (``date.weekday()``): 0 = Monday, 6 = Sunday.
+    days: list[int] = [0, 1, 2, 3, 4, 5, 6]
     time: str = "09:00"
     timezone: str = "America/Sao_Paulo"
+
+    @field_validator("days")
+    @classmethod
+    def _days(cls, v: list[int]) -> list[int]:
+        if not v or any(d not in range(7) for d in v):
+            raise ValueError("days must name weekdays 0-6 (Monday first)")
+        return sorted(set(v))
 
     @field_validator("time")
     @classmethod

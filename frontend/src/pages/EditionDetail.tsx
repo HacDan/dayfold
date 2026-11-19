@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { locale, t } from "../i18n";
-import { del, get, post, fmtDateTime, USAGE_LABEL, type EditionSummary, type Job } from "../api";
+import { del, get, post, fmtDateTime, USAGE_LABEL, type EditionSummary, type Job, type Settings } from "../api";
 import { GamePreview } from "../components/games";
 import { Loading, SectionTitle, Stamp, useAction, useLoad } from "../components/ui";
 import { PressImage } from "../components/ui";
@@ -21,7 +21,9 @@ export default function EditionDetail() {
   const nav = useNavigate();
   const { run, busy } = useAction();
   const { data, reload } = useLoad(() => get<Detail>(`/api/editions/${id}`), [id]);
+  const { data: cfg } = useLoad(() => get<Settings>("/api/settings"));
   if (!data) return <Loading />;
+  const nativeKindle = cfg?.values.kindle.mode === "native";
   const sections = new Map<string, Detail["articles"]>();
   for (const a of data.articles) {
     const key = a.is_headline ? t("Manchete") : a.section_name;
@@ -32,6 +34,9 @@ export default function EditionDetail() {
     <div>
       <SectionTitle kicker={`${t("Edição nº {n}", { n: data.number })} · ${new Date(data.date + "T12:00").toLocaleDateString(locale(), { dateStyle: "full" })}`} title={data.headline ?? data.title}>
         {data.epub_url && <a className="btn primary" href={data.epub_url}>{t("Baixar EPUB")}</a>}
+        {nativeKindle && data.epub_url && (
+          <button className="btn" disabled={busy} onClick={() => run(() => post("/api/kindle/send", { edition_id: data.id }), t("Edição enviada ao Kindle"))}>{t("Enviar ao Kindle")}</button>
+        )}
         {data.status === "READY" && <Link className="btn" to={`/edicoes/${data.id}/avaliar`}>{t("Avaliar edição")}</Link>}
         <button className="btn" disabled={busy} onClick={() => run(() => post(`/api/editions/${data.id}/charge`), t("Nova charge desenhada")).then((r) => r && reload())}>{busy ? t("Desenhando…") : t("Refazer charge")}</button>
         <button className="btn" onClick={() => run(() => post(`/api/editions/${data.id}/retypeset`), t("Edição recomposta com as configurações atuais")).then((r) => r && reload())}>{t("Recompor")}</button>

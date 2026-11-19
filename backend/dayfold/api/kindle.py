@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
-from ..delivery.kindle_mail import KindleMailError, send_and_record
+from ..delivery.kindle_mail import KindleMailError, check_configured, send_and_record
 from ..edition.i18n import book_title
 from ..i18n import tr
 from ..models import Edition, EditionStatus
@@ -33,12 +33,13 @@ def _latest(session: Session) -> Edition:
     return e
 
 
-def native_epub(session: Session, e: Edition) -> Path:
+def native_epub(session: Session, e: Edition, *, rebuild: bool = True) -> Path:
     """The native Kindle EPUB for an edition (with or without puzzles, per the settings).
-    Editions typeset before this feature get their variants on first use."""
+    Editions typeset before this feature get their variants on first use, unless ``rebuild`` is
+    off: a download may recompose the edition, sending it must not (see ``send``)."""
     games = get_section(session, "kindle").native_games
     path = kindle_epub_path(e.epub_path, games)
-    if not path.exists():
+    if rebuild and not path.exists():
         retypeset(e.id)
     return path
 
@@ -54,9 +55,21 @@ class SendIn(BaseModel):
 @router.post("/send")
 def send(body: SendIn, session: Session = Depends(get_session)) -> dict:
     e = session.get(Edition, body.edition_id) if body.edition_id else _latest(session)
-    if not e or not e.epub_path:
+    if not e:
         raise HTTPException(404, tr("edição não encontrada", "edition not found"))
-    path = native_epub(session, e)
+    if not e.epub_path:
+        raise HTTPException(400, tr("edição sem EPUB para enviar", "edition has no EPUB to send"))
+    # Before native_epub(): it can re-typeset an edition whose Kindle variant predates the
+    # feature, and a missing mail setup must not rebuild the paper on its way to an error.
+    try:
+        check_configured(get_section(session, "kindle"))
+    except KindleMailError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    path = native_epub(session, e, rebuild=False)
+    if not path.exists():  # printed before the Kindle variants existed: recomposing is the user's call
+        raise HTTPException(400, tr("esta edição foi impressa antes da versão Kindle: use “Recompor” e envie de novo",
+                                    "this edition was printed before the Kindle version: "
+                                    "use “Re-typeset” and send again"))
     try:
         return {"message": send_and_record(session, path, _subject(session, e))}
     except KindleMailError as exc:

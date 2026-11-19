@@ -177,7 +177,7 @@ cd backend && uv run dayfold retypeset 12   # re-typeset edition 12 with the cur
 5. **AI**: add a provider, test it, activate it. Presets for Claude Code CLI, Codex CLI,
    Anthropic, OpenAI, Ollama and OpenRouter. For illustrated cartoons, set an image model (API) or an
    image command (CLI agent that can draw, e.g. `codex exec --skip-git-repo-check -s workspace-write --ephemeral -`).
-   Each edition page has **Redo cartoon** to draw a new cartoon and **Re-typeset** to rebuild the cover and EPUB with the current settings.
+   Each edition page has **Redo cartoon** to draw a new cartoon, **Re-typeset** to rebuild the cover and EPUB with the current settings, and, on the native Kindle setup, **Send to Kindle** to deliver that edition.
 6. **Games**: enable, order and configure Sudoku, Word of the Day, Word Search and Crossword, with previews.
 7. **Logs**: every generation with its steps and log. **Print today's paper** works from the
    front page or from here.

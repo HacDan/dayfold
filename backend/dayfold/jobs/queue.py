@@ -63,13 +63,16 @@ def enqueue_generation(trigger: str = "manual") -> int:
             .join(Edition, Edition.id == GenerationJob.edition_id)
             .where(Edition.status.in_([EditionStatus.BUILDING, EditionStatus.FAILED]))
         ))
+    # Sweep before queuing: a polling worker must not pick the new job up while the old
+    # edition is still being cleared.
+    for old_job in stale:
+        discard_failed_attempt(old_job)
+    with session_scope() as s:
         job = GenerationJob(trigger=trigger,
                             log=[tr(f"Geração solicitada ({trigger}).", f"Generation requested ({trigger}).")])
         s.add(job)
         s.flush()
         job_id = job.id
-    for old_job in stale:
-        discard_failed_attempt(old_job)
     _wake.set()
     return job_id
 

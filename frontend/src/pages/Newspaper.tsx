@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { t } from "../i18n";
+import { locale, t } from "../i18n";
 import { get, put, type Newspaper as NewspaperT, type Settings, type Typography } from "../api";
 import { Field, Loading, OptionalNumber, SectionTitle, useAction, useLoad } from "../components/ui";
 
@@ -9,6 +9,8 @@ const TYPE_LABEL: Record<keyof Typography, string> = {
 };
 const MAST_WEIGHT: Record<string, number> = { "old-standard": 700, playfair: 900 };
 const ORDER_LABEL = { news: "Notícias", charge: "Charge", games: "Jogos" };
+/** Short weekday names in the dashboard's language; 1 Jan 2024 was a Monday. */
+const weekdayShort = (d: number) => new Date(2024, 0, 1 + d).toLocaleDateString(locale(), { weekday: "short" });
 const TIMEZONES = ["America/Sao_Paulo", "America/Manaus", "America/Recife", "America/Fortaleza", "America/Belem",
   "America/Cuiaba", "America/Rio_Branco", "America/Noronha", "Europe/Lisbon", "America/New_York", "UTC"];
 
@@ -187,7 +189,21 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
           <hr className="rule thick" />
           <fieldset>
             <legend>{t("Agendamento")}</legend>
-            <label className="check"><input type="checkbox" checked={v.schedule.enabled} onChange={(e) => setV({ ...v, schedule: { ...v.schedule, enabled: e.target.checked } })} />{" "}{t("Gerar automaticamente todos os dias")}</label>
+            <label className="check"><input type="checkbox" checked={v.schedule.enabled} onChange={(e) => setV({ ...v, schedule: { ...v.schedule, enabled: e.target.checked } })} />{" "}{t("Gerar automaticamente")}</label>
+            <p className="kicker" style={{ marginTop: 10 }}>{t("Dias da semana")}</p>
+            <div className="row" role="group" aria-label={t("Dias da semana")}>
+              {[0, 1, 2, 3, 4, 5, 6].map((d) => {
+                const on = v.schedule.days.includes(d);
+                return (
+                  <button key={d} type="button" className={`btn small${on ? " primary" : ""}`} aria-pressed={on}
+                    disabled={on && v.schedule.days.length === 1}
+                    onClick={() => setV({ ...v, schedule: { ...v.schedule, days: on
+                      ? v.schedule.days.filter((x) => x !== d)
+                      : [...v.schedule.days, d].sort((a, b) => a - b) } })}>{weekdayShort(d)}</button>
+                );
+              })}
+            </div>
+            <p className="hint">{t("O jornal sai só nos dias marcados.")}</p>
             <div className="grid cols-2" style={{ gap: 14 }}>
               <Field label={t("Horário")}><input type="time" value={v.schedule.time} onChange={(e) => setV({ ...v, schedule: { ...v.schedule, time: e.target.value } })} /></Field>
               <Field label={t("Fuso horário")}>

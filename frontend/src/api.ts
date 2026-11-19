@@ -75,7 +75,7 @@ export type KindleCfg = {
 export type Settings = {
   values: {
     newspaper: Newspaper;
-    schedule: { enabled: boolean; time: string; timezone: string };
+    schedule: { enabled: boolean; days: number[]; time: string; timezone: string };
     curation: { use_ai: boolean; max_age_hours: number; languages: string[]; blocked_keywords: string[]; ai_candidates: number; per_provider_limit: number; use_feedback: boolean; feedback_weight: number };
     charge: { mode: "structured" | "illustrated"; style: string };
     device: { cover_width: number; cover_height: number; image_max_width: number; screensaver_cover: boolean };
@@ -138,7 +138,7 @@ export type Game = { id: number; kind: "sudoku" | "wordle" | "wordsearch" | "cro
 export type Overview = {
   today: string; newspaper: Newspaper; latest_edition: EditionSummary | null; edition_is_today: boolean;
   latest_ratings: { rated: number; total: number } | null; last_job: Job | null; next_run: string | null;
-  schedule: { enabled: boolean; time: string; timezone: string };
+  schedule: { enabled: boolean; days: number[]; time: string; timezone: string };
   providers: { total: number; active: number; failing: number }; scrapers: { pending: number; failed_jobs: number };
   ai: { active: boolean; name: string | null; kind: string | null; session_usage: { calls: number; prompt_chars: number; completion_chars: number } };
   games: { kind: string; name: string; enabled: boolean }[]; charge: { enabled: boolean; available: boolean };

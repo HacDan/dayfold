@@ -13,14 +13,18 @@ from sqlalchemy import select
 TZ = "America/New_York"
 
 
-def _scheduled(monkeypatch, when: datetime, *, time: str = "09:00") -> None:
+def _scheduled(monkeypatch, when: datetime, *, time: str = "09:00",
+               days: list[int] | None = None) -> None:
     """Fix the operator's clock and the schedule the test acts on."""
     from dayfold.db import session_scope
     from dayfold.jobs import scheduler
     from dayfold.settings import set_section
 
+    body = {"enabled": True, "time": time, "timezone": TZ}
+    if days is not None:
+        body["days"] = days
     with session_scope() as s:
-        set_section(s, "schedule", {"enabled": True, "time": time, "timezone": TZ})
+        set_section(s, "schedule", body)
     monkeypatch.setattr(scheduler.clock, "now", lambda tz=None: when)
 
 
@@ -72,6 +76,32 @@ def test_catch_up_does_not_count_yesterdays_paper(data_dir, monkeypatch):
     _paper(date(2026, 11, 16))
 
     assert scheduler.catch_up()
+
+
+def test_catch_up_skips_a_day_the_schedule_does_not_print(data_dir, monkeypatch):
+    from dayfold.jobs import scheduler
+
+    # 2026-11-18 is a Wednesday; the paper prints on Tuesdays only.
+    _scheduled(monkeypatch, datetime(2026, 11, 18, 12, 0, tzinfo=ZoneInfo(TZ)), days=[1])
+
+    assert scheduler.catch_up() is None
+
+
+def test_catch_up_prints_on_a_scheduled_weekday(data_dir, monkeypatch):
+    from dayfold.jobs import scheduler
+
+    _scheduled(monkeypatch, datetime(2026, 11, 18, 12, 0, tzinfo=ZoneInfo(TZ)), days=[2, 4])
+
+    assert scheduler.catch_up()
+
+
+def test_the_cron_trigger_names_the_chosen_weekdays():
+    from dayfold.jobs import scheduler
+    from dayfold.settings import ScheduleSettings
+
+    trigger = scheduler._trigger(ScheduleSettings(days=[4, 0, 2], time="07:30"))
+    field = next(f for f in trigger.fields if f.name == "day_of_week")
+    assert [str(e) for e in field.expressions] == ["mon", "wed", "fri"]
 
 
 def test_catch_up_respects_a_disabled_schedule(data_dir, monkeypatch):

@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi.testclient import TestClient
 
 
@@ -48,6 +50,112 @@ def test_kindle_settings_hide_the_app_password(data_dir):
         assert k["gmail_app_password"] == "" and k["gmail_app_password_set"] and k["auto_send"]
         assert c.put("/api/settings/kindle", json={"kindle_email": "x"}).status_code == 422
         assert c.post("/api/kindle/send", json={}).status_code == 404  # no edition yet
+
+
+def test_schedule_days_are_saved_sorted_and_validated(data_dir):
+    from dayfold.app import app
+
+    with TestClient(app) as c:
+        r = c.put("/api/settings/schedule", json={"days": [4, 0, 0]})
+        assert r.status_code == 200, r.text
+        assert r.json()["days"] == [0, 4]
+        assert c.put("/api/settings/schedule", json={"days": []}).status_code == 422
+        assert c.put("/api/settings/schedule", json={"days": [7]}).status_code == 422
+
+
+def test_send_a_chosen_edition_to_the_kindle(data_dir, monkeypatch):
+    """An archived edition can go to the Kindle, not only the latest one."""
+    from dayfold.api import kindle as api
+    from dayfold.app import app
+    from dayfold.db import session_scope
+    from dayfold.models import Edition, EditionStatus
+    from dayfold.settings import set_section
+
+    sent: list[str] = []
+    monkeypatch.setattr(api, "send_and_record", lambda s, path, subject: sent.append(path.name) or "ok")
+
+    ids: dict[int, int] = {}
+    with session_scope() as s:
+        set_section(s, "kindle", {"kindle_email": "eu_1@kindle.com", "gmail_address": "eu@gmail.com",
+                                  "gmail_app_password": "abcd efgh ijkl mnop"})
+    for number, day in ((1, "2026-11-16"), (2, "2026-11-17")):
+        folder = data_dir / "editions" / f"{day}-000{number}"
+        folder.mkdir(parents=True)
+        reader = folder / f"paper-{number}.epub"
+        reader.write_bytes(b"PK")
+        (folder / f"paper-{number}.kindle-games.epub").write_bytes(b"PK native")
+        with session_scope() as s:
+            e = Edition(number=number, edition_date=date.fromisoformat(day), title="Dayfold",
+                        status=EditionStatus.READY, epub_path=str(reader))
+            s.add(e)
+            s.flush()
+            ids[number] = e.id
+
+    with TestClient(app) as c:
+        r = c.post("/api/kindle/send", json={"edition_id": ids[1]})
+    assert r.status_code == 200, r.text
+    assert sent == ["paper-1.kindle-games.epub"]  # the chosen edition, not the latest
+
+
+def test_send_refuses_an_edition_that_predates_the_kindle_version(data_dir, monkeypatch):
+    """Sending must not recompose an archived paper behind the user's back: it asks for Recompor."""
+    from dayfold.api import kindle as api
+    from dayfold.app import app
+    from dayfold.db import session_scope
+    from dayfold.models import Edition, EditionStatus
+    from dayfold.settings import set_section
+
+    folder = data_dir / "editions" / "2026-11-16-0001"
+    folder.mkdir(parents=True)
+    reader = folder / "paper.epub"
+    reader.write_bytes(b"PK")
+    rebuilt: list[int] = []
+    sent: list[str] = []
+    monkeypatch.setattr(api, "retypeset", rebuilt.append)
+    monkeypatch.setattr(api, "send_and_record", lambda s, path, subject: sent.append(path.name) or "ok")
+
+    with session_scope() as s:
+        set_section(s, "kindle", {"kindle_email": "eu_1@kindle.com", "gmail_address": "eu@gmail.com",
+                                  "gmail_app_password": "abcd efgh ijkl mnop"})
+        e = Edition(number=1, edition_date=date(2026, 11, 16), title="Dayfold",
+                    status=EditionStatus.READY, epub_path=str(reader))
+        s.add(e)
+        s.flush()
+        eid = e.id
+
+    with TestClient(app) as c:
+        r = c.post("/api/kindle/send", json={"edition_id": eid})
+    assert r.status_code == 400, r.text
+    assert "Recompor" in r.json()["detail"]
+    assert rebuilt == [] and sent == []
+
+
+def test_an_unconfigured_mailer_does_not_retypeset_the_edition(data_dir, monkeypatch):
+    """Sending an edition from before the Kindle variant existed must fail before rebuilding it."""
+    from dayfold.api import kindle as api
+    from dayfold.app import app
+    from dayfold.db import session_scope
+    from dayfold.models import Edition, EditionStatus
+
+    folder = data_dir / "editions" / "2026-11-16-0001"
+    folder.mkdir(parents=True)
+    reader = folder / "paper.epub"
+    reader.write_bytes(b"PK")
+    rebuilt: list[int] = []
+    monkeypatch.setattr(api, "retypeset", rebuilt.append)
+
+    with session_scope() as s:
+        e = Edition(number=1, edition_date=date(2026, 11, 16), title="Dayfold",
+                    status=EditionStatus.READY, epub_path=str(reader))
+        s.add(e)
+        s.flush()
+        eid = e.id
+
+    with TestClient(app) as c:
+        r = c.post("/api/kindle/send", json={"edition_id": eid})
+    assert r.status_code == 400, r.text
+    assert "configure" in r.json()["detail"]
+    assert rebuilt == []
 
 
 def test_send_to_kindle_mail(monkeypatch, tmp_path):

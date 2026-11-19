@@ -29,7 +29,8 @@ def missing_fields(cfg: KindleSettings) -> list[str]:
     return [k for k in ("kindle_email", "gmail_address", "gmail_app_password") if not getattr(cfg, k)]
 
 
-def send_epub(cfg: KindleSettings, epub: Path, subject: str) -> None:
+def check_configured(cfg: KindleSettings) -> None:
+    """Refuse before any work is done (a re-typeset included) when the mailer is not set up."""
     missing = missing_fields(cfg)
     if missing:
         labels = {"kindle_email": ("e-mail do Kindle", "Kindle e-mail"),
@@ -37,6 +38,10 @@ def send_epub(cfg: KindleSettings, epub: Path, subject: str) -> None:
                   "gmail_app_password": ("senha de app", "app password")}
         raise KindleMailError(tr("configure antes: " + ", ".join(labels[k][0] for k in missing),
                                  "configure first: " + ", ".join(labels[k][1] for k in missing)))
+
+
+def send_epub(cfg: KindleSettings, epub: Path, subject: str) -> None:
+    check_configured(cfg)
     if not epub.exists():
         raise KindleMailError(tr(f"arquivo não encontrado: {epub.name}", f"file not found: {epub.name}"))
     if epub.stat().st_size > MAX_BYTES:

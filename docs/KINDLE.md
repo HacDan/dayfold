@@ -117,7 +117,8 @@ page at the very end.
 2. At Amazon, **Content & Devices** › **Preferences** › **Personal Document Settings**: add the
    Gmail address to the approved e-mail list and copy the device's `@kindle.com` address.
 3. Fill in both addresses and the app password on the dashboard, save, and tick
-   **Send every new edition automatically**. "Send the latest edition now" sends on demand.
+   **Send every new edition automatically**. "Send the latest edition now" sends on demand, and
+   each edition's page has **Send to Kindle** for an issue from the archive.
 
 The app password is stored in the Dayfold database and never sent back to the browser. A failed
 delivery is logged in the generation job and shown on the Kindle page; it does not fail the

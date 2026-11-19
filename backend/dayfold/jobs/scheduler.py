@@ -18,11 +18,18 @@ from .queue import enqueue_generation
 log = logging.getLogger("dayfold.scheduler")
 _scheduler: BackgroundScheduler | None = None
 JOB_ID = "daily-edition"
+WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
 
 def _fire() -> None:
     log.info("geração agendada disparada")
     enqueue_generation("schedule")
+
+
+def _trigger(sched: ScheduleSettings) -> CronTrigger:
+    hh, mm = map(int, sched.time.split(":"))
+    return CronTrigger(day_of_week=",".join(WEEKDAYS[d] for d in sched.days),
+                       hour=hh, minute=mm, timezone=sched.timezone)
 
 
 def reschedule() -> None:
@@ -33,9 +40,7 @@ def reschedule() -> None:
     if _scheduler.get_job(JOB_ID):
         _scheduler.remove_job(JOB_ID)
     if sched.enabled:
-        hh, mm = map(int, sched.time.split(":"))
-        _scheduler.add_job(_fire, CronTrigger(hour=hh, minute=mm, timezone=sched.timezone),
-                           id=JOB_ID, misfire_grace_time=3600, coalesce=True)
+        _scheduler.add_job(_fire, _trigger(sched), id=JOB_ID, misfire_grace_time=3600, coalesce=True)
 
 
 def next_run() -> datetime | None:
@@ -48,14 +53,17 @@ def next_run() -> datetime | None:
 def catch_up() -> int | None:
     """Make today's paper when the scheduled run was missed: the machine was off or asleep then.
 
-    Called once at startup. Nothing is due before the scheduled time, and a READY edition dated
-    today already counts as printed, so an evening restart changes nothing.
+    Called once at startup. A day the schedule does not print has nothing to make up, nothing is
+    due before the scheduled time, and a READY edition dated today already counts as printed, so
+    an evening restart changes nothing.
     """
     with session_scope() as s:
         sched: ScheduleSettings = get_section(s, "schedule")  # type: ignore[assignment]
         if not sched.enabled:
             return None
         now = clock.now(sched.timezone)
+        if now.weekday() not in sched.days:
+            return None
         hour, minute = map(int, sched.time.split(":"))
         if (now.hour, now.minute) < (hour, minute):
             return None
