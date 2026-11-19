@@ -134,7 +134,7 @@ pre { background: var(--paper-2); padding: .8em 1em; overflow: auto; border-left
 .btn.danger { color: var(--bad); border-color: var(--bad); }
 .btn.small { padding: 5px 10px; font-size: .72rem; }
 .btn.link { border: 0; padding: 0; text-decoration: underline; text-transform: none; letter-spacing: 0; font-weight: 400; font-family: var(--text); font-size: .9rem; }
-.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
 .btn.big { font-size: .95rem; padding: 14px 22px; }
 
 label.field { display: block; margin: 0 0 14px; }
@@ -259,7 +259,7 @@ table.ledger .name { font-family: var(--display); font-weight: 700; font-size: 1
 
 /* Pressable things give a little under the finger. */
 .btn { transition: transform 160ms var(--ease-out), background-color 150ms ease, color 150ms ease; }
-.btn:active:not(:disabled) { transform: scale(0.97); transition-duration: 100ms, 150ms, 150ms; } /* press snaps in, release eases out */
+.btn:active:not(:disabled):not([aria-disabled="true"]) { transform: scale(0.97); transition-duration: 100ms, 150ms, 150ms; } /* press snaps in, release eases out */
 
 /* Rubber stamp lands when a status changes (not on first render). */
 .stamp[data-changed="true"] { animation: stamp-land 200ms var(--ease-out); }

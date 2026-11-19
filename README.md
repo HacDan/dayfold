@@ -59,6 +59,14 @@ downloads one file a day and reads it offline.
   the colophon. Both paper languages are stored when the edition is made, so `retypeset` prints the
   event in the language you typeset in, like the weather's condition; if Wikipedia is unreachable
   the moon still prints.
+* **A paper per reader**: each person in the household is a reader with their own optional
+  calendar, their own front page and their own secret device address. The stories, puzzles and
+  cartoon are collected and curated once, then each reader gets the same paper with their own
+  agenda on the cover. A reader's calendar is a read-only iCal address (Google Calendar's "secret
+  address in iCal format", or any calendar that publishes iCal), with no OAuth app and no API key:
+  all-day entries first, then the day's first appointments, with the rest summed up. Recurring
+  events are expanded, cancelled ones are dropped, and each address is stored server side, masked
+  on read and redacted from logs.
 * **Story length caps**: full text stories can be capped by words and/or paragraphs for the
   whole paper, per section or per provider (the most specific wins). A capped story ends at the
   last sentence that fits, with a "The story continues online" note and the link. Caps apply when
@@ -91,7 +99,8 @@ downloads one file a day and reads it offline.
   in KOReader and, with the Dayfold agent, in the stock Kindle interface.
 * **Kindle agent** (optional): new editions are downloaded on wake and every 30 minutes while awake
   (Wi-Fi already on) and show up as the first book in the library, no KOReader needed.
-* **Distribution**: dashboard download, token protected feed (`/feed/latest.epub`), OPDS catalog.
+* **Distribution**: dashboard download, a token protected feed per reader (`/feed/latest.epub`),
+  OPDS catalog, and a separate EPUB and cover file per reader.
 * Built for a home server: one Python process, SQLite, a persistent job queue and a daily schedule.
 
 ## Screenshots
@@ -230,7 +239,8 @@ over USB, the sleep screen cover and troubleshooting, is in [docs/KINDLE.md](doc
 * **Cartoons** look like real illustrations only in illustrated mode, which needs an image capable
   AI (Codex CLI with image generation, or an image API) and takes one to two minutes. The fallback
   structured mode is a simple line drawing with a limited set of poses and props.
-* Single user. The dashboard has one optional password, and feeds use a single token.
+* One dashboard operator. The dashboard has one optional password; each household reader has
+  their own feed token, but there are no per-person logins or roles yet.
 
 ## Architecture
 

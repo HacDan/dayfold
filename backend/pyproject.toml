@@ -19,6 +19,8 @@ dependencies = [
     "jinja2>=3.1",
     "apscheduler>=3.10,<4",
     "itsdangerous>=2.2",
+    "icalendar>=6",
+    "recurring-ical-events>=3",
 ]
 
 [project.optional-dependencies]

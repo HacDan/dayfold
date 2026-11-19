@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { get, post, put, type KindleCfg, type Settings } from "../api";
+import { get, post, put, type KindleCfg, type Reader, type Settings } from "../api";
 import { t } from "../i18n";
 import { Field, Loading, SectionTitle, useAction, useLoad } from "../components/ui";
 
@@ -119,16 +119,33 @@ function NativeSetup({ cfg, token, origin, onSaved }: { cfg: KindleCfg; token: s
 export default function Kindle() {
   const { run } = useAction();
   const { data, reload } = useLoad(() => get<Settings>("/api/settings"));
-  if (!data) return <Loading />;
-  const token = data.values.distribution.feed_token;
+  const { data: readers, reload: reloadReaders } = useLoad(() => get<Reader[]>("/api/readers"));
+  const [readerId, setReaderId] = useState<number | null>(null);
+  if (!data || !readers?.length) return <Loading />;
+  const reader = readers.find((r) => r.id === readerId) ?? readers[0];
+  const token = reader.token;
   const cfg = data.values.kindle;
   const origin = window.location.origin;
   const setMode = (mode: KindleCfg["mode"]) => run(() => put("/api/settings/kindle", { mode })).then(reload);
+  const rotate = () => confirm(t("Gerar um novo token? Os aparelhos configurados precisarão do novo valor."))
+    && run(() => post(`/api/readers/${reader.id}/rotate-token`), t("Novo token gerado")).then(reloadReaders);
   return (
     <div>
       <SectionTitle kicker={t("Distribuição")} title={t("Kindle e e-readers")}>
-        <button className="btn danger" onClick={() => confirm(t("Gerar um novo token? Os aparelhos configurados precisarão do novo valor.")) && run(() => post("/api/settings/distribution/rotate-token"), t("Novo token gerado")).then(reload)}>{t("Trocar token")}</button>
+        <button className="btn danger" onClick={rotate}>{t("Trocar token")}</button>
       </SectionTitle>
+      <div className="clip ruled" style={{ marginBottom: 22 }}>
+        <div className="grid cols-2" style={{ gap: 14 }}>
+          <Field label={t("Leitor")} hint={t("Cada leitor tem o próprio endereço e a própria agenda na capa.")}>
+            <select value={reader.id} onChange={(e) => setReaderId(Number(e.target.value))}>
+              {readers.map((r) => <option key={r.id} value={r.id}>{r.name || t("Sem nome")}</option>)}
+            </select>
+          </Field>
+        </div>
+        {readers.length > 1 && cfg.mode === "native" && (
+          <p className="small muted" style={{ margin: 0 }}>{t("O envio automático manda o jornal do primeiro leitor para o endereço configurado; os demais baixam pelo próprio endereço acima.")}</p>
+        )}
+      </div>
       <div className="clip ruled" style={{ marginBottom: 22 }}>
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div>

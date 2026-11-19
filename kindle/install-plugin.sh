@@ -7,8 +7,9 @@ KINDLE=${KINDLE:-kindle}
 SERVER=${SERVER:?defina SERVER, ex.: http://192.168.0.10:8422}
 SERVER=${SERVER%/}
 if [ -z "${TOKEN:-}" ]; then
-  TOKEN=$(curl -fsS "$SERVER/api/settings" | python3 -c 'import sys,json;print(json.load(sys.stdin)["values"]["distribution"]["feed_token"])') || {
-    echo "Não consegui ler o token (dashboard com senha?). Rode com TOKEN=..." >&2; exit 1; }
+  # The first reader's token; set TOKEN=... for another reader or a password protected dashboard.
+  TOKEN=$(curl -fsS "$SERVER/api/readers" | python3 -c 'import sys,json;print(json.load(sys.stdin)[0]["token"])') || {
+    echo "Não consegui ler o token do primeiro leitor (dashboard com senha?). Rode com TOKEN=..." >&2; exit 1; }
 fi
 DEST=/mnt/us/koreader/plugins/dayfold.koplugin
 ssh "$KINDLE" "test -d /mnt/us/koreader/plugins" || { echo "KOReader não encontrado no Kindle. Rode: make kindle-koreader" >&2; exit 1; }

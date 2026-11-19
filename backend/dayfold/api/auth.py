@@ -7,11 +7,13 @@ import hmac
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import config
 from ..db import get_session
 from ..i18n import tr
+from ..models import Reader
 from ..settings import get_section
 
 COOKIE = "dayfold_session"
@@ -42,8 +44,7 @@ def require_admin(request: Request) -> None:
         raise HTTPException(401, tr("login necessário", "login required"))
 
 
-def require_feed_token(request: Request, session: Session = Depends(get_session)) -> None:
-    expected = get_section(session, "distribution").feed_token
+def _supplied_token(request: Request) -> str | None:
     supplied = request.query_params.get("token") or request.headers.get("x-dayfold-token")
     if not supplied and request.headers.get("authorization", "").lower().startswith("basic "):
         import base64
@@ -53,10 +54,24 @@ def require_feed_token(request: Request, session: Session = Depends(get_session)
             supplied = raw.split(":", 1)[1]
         except Exception:  # noqa: BLE001
             supplied = None
-    if supplied and hmac.compare_digest(supplied, expected):
-        return
-    if is_authenticated(request) and config.password:
-        return  # logged in dashboard users can download too
+    return supplied
+
+
+def require_reader(request: Request, session: Session = Depends(get_session)) -> Reader:
+    """The reader whose secret token is in the address.
+
+    Each reader's device address carries their own token, so a Kindle downloads the paper made for
+    its person. A logged in dashboard user without a token gets the first reader's, which is what
+    the dashboard's own download links use."""
+    supplied = _supplied_token(request)
+    if supplied:
+        for reader in session.scalars(select(Reader).order_by(Reader.id)):
+            if hmac.compare_digest(supplied, reader.token):
+                return reader
+    if config.password and is_authenticated(request):
+        first = session.scalar(select(Reader).order_by(Reader.position, Reader.id).limit(1))
+        if first is not None:
+            return first
     raise HTTPException(401, tr("token inválido", "invalid token"),
                         headers={"WWW-Authenticate": 'Basic realm="Dayfold"'})
 

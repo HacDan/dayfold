@@ -19,6 +19,8 @@ REF_W, REF_H = 1236, 1648
 INK = 0
 GRAY = 85
 PAPER = 255
+MARGIN = 64  # the page's outer margin, in reference pixels
+AGENDA_MAX_SIZE, AGENDA_MIN_SIZE = 22, 15  # an agenda line shrinks between these to fit
 
 
 def cover_masthead_scale(em: float) -> float:
@@ -49,12 +51,24 @@ class CoverData:
     lead_text: str | None = None
     weather: list[str] | None = None  # the day's weather and sun lines
     almanac: list[str] | None = None  # the moon and the day's event, under the weather
+    agenda: list[str] | None = None  # the reader's own day: appointments, all-day entries
+    agenda_label: str = ""
     masthead_scale: float = 1.0  # the Newspaper masthead size, relative to the default
     footer: str = ""
 
 
 def _font(name: str, size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(str(FONTS_DIR / name), max(8, int(size)))
+
+
+def agenda_line_fits(text: str) -> bool:
+    """Whether the agenda prints ``text`` on its one line, at the smallest size it uses.
+
+    The cover fits an agenda line by shrinking it and, past that, ellipsizes it. Measuring the same
+    way lets whatever builds the line keep it inside the width the cover can print.
+    """
+    font = _font("OldStandard-Regular.ttf", AGENDA_MIN_SIZE)
+    return font.getlength(text.upper()) <= REF_W - 2 * MARGIN
 
 
 def _wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, width: int) -> list[str]:
@@ -106,7 +120,7 @@ def render_cover(data: CoverData, dest: Path, width: int = REF_W, height: int = 
     img = Image.new("L", (REF_W, REF_H), PAPER)
     d = ImageDraw.Draw(img)
     W, H = REF_W, REF_H
-    M = 64  # outer margin
+    M = MARGIN
     inner = W - 2 * M
 
     # top strip
@@ -162,6 +176,19 @@ def render_cover(data: CoverData, dest: Path, width: int = REF_W, height: int = 
             for line in alines:
                 _center(d, y, line, af, W, fill=GRAY - 10)
                 y += int(af.size * 1.25)
+        d.rectangle([M, y - 4, W - M, y - 3], fill=170)
+        y += 22
+
+    # the reader's own day, under the almanac: the personal part of the front page
+    if data.agenda:
+        lf = _font("OldStandard-Bold.ttf", 19)
+        _center(d, y, data.agenda_label.upper(), lf, W, fill=GRAY)
+        y += 30
+        for text in data.agenda:
+            ef, elines = _fit_block(d, text.upper(), "OldStandard-Regular.ttf", inner,
+                                    AGENDA_MAX_SIZE, AGENDA_MIN_SIZE, 1)
+            _center(d, y, elines[0], ef, W, fill=GRAY - 10)
+            y += 30
         d.rectangle([M, y - 4, W - M, y - 3], fill=170)
         y += 22
 

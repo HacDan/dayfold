@@ -256,7 +256,8 @@ def test_new_install_prints_an_english_edition(data_dir, monkeypatch):
     assert "Brazil" in text
     for pt in ("Edição", "Passatempos", "Fim da edição", "Fontes desta edição", "Palavras Cruzadas"):
         assert pt not in text, pt
-    games = json.loads(epub.with_name(epub.name.replace(".epub", ".games.json")).read_text())
+    # The games file is shared by the whole edition, one directory above the reader's copy.
+    games = json.loads(next(epub.parent.parent.glob("*.games.json")).read_text())
     assert games["language"] == "en"
     for g in games["games"]:
         if "language" in g["puzzle"]:
@@ -269,7 +270,7 @@ def test_portuguese_edition_keeps_portuguese(data_dir, monkeypatch):
     text = epub_text(epub)
     assert covers[-1].tagline == "Notícias do dia, dobradas para ler com calma."  # on the cover
     assert "Espaço" in text and "Passatempos" in text
-    games = json.loads(epub.with_name(epub.name.replace(".epub", ".games.json")).read_text())
+    games = json.loads(next(epub.parent.parent.glob("*.games.json")).read_text())
     assert all(g["puzzle"].get("language", "pt") == "pt" for g in games["games"])
 
 

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { locale, t } from "../i18n";
-import { get, put, type Newspaper as NewspaperT, type Settings, type Typography } from "../api";
+import { del, get, post, put, type Newspaper as NewspaperT, type Reader, type Settings, type Typography } from "../api";
 import { Field, Loading, OptionalNumber, SectionTitle, useAction, useLoad } from "../components/ui";
+
+type FeedCheck = { ok: boolean; events: number | null; calendar?: string | null; reason?: string };
 
 const TYPE_LABEL: Record<keyof Typography, string> = {
   masthead: "Nome do jornal (masthead)", title: "Título das matérias",
@@ -37,6 +39,81 @@ function TypePreview({ news, family }: { news: NewspaperT; family: string }) {
   );
 }
 
+function ReaderCard({ reader, canDelete, onChanged }: { reader: Reader; canDelete: boolean; onChanged: () => void }) {
+  const { run, busy } = useAction();
+  const [form, setForm] = useState({ name: reader.name, ics_url: "", include_agenda: reader.include_agenda });
+  const [check, setCheck] = useState<FeedCheck | null>(null);
+  const [testing, setTesting] = useState(false);
+  // Reset only when another reader is shown, so saving one card never discards another's edits.
+  useEffect(() => setForm({ name: reader.name, ics_url: "", include_agenda: reader.include_agenda }), [reader.id]);
+  // the test reads the stored address, so any text in the field is an address not saved yet
+  const pending = form.ics_url.trim() !== "";
+
+  const save = async () => {
+    const saved = await run(() => put<Reader>(`/api/readers/${reader.id}`, form), t("Leitor salvo"));
+    if (saved) { setForm({ ...form, ics_url: "" }); setCheck(null); onChanged(); }
+  };
+  const test = async () => {
+    setTesting(true);
+    setCheck(null);
+    try {
+      setCheck(await post<FeedCheck>(`/api/readers/${reader.id}/test`));
+    } catch {
+      setCheck({ ok: false, events: null });
+    } finally {
+      setTesting(false);
+    }
+  };
+  const remove = async () => {
+    if (confirm(t("Remover este leitor? As edições dele serão apagadas.")))
+      if (await run(() => del(`/api/readers/${reader.id}`), t("Leitor removido"))) onChanged();
+  };
+  const message = check && (check.ok
+    ? check.events === 0 ? t("Nenhum evento hoje.")
+      : check.events === 1 ? t("1 evento hoje.")
+      : t("{n} eventos hoje.", { n: check.events ?? 0 })
+    : check.reason === "no_address" ? t("Salve um endereço iCal primeiro.")
+      : t("Não foi possível ler o endereço."));
+
+  return (
+    <div className="clip ruled" style={{ padding: 14, marginBottom: 12 }}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <strong>{reader.name || t("Sem nome")}</strong>
+        <button type="button" className="btn small danger" disabled={busy || !canDelete} onClick={remove}>{t("Remover")}</button>
+      </div>
+      <div className="grid cols-2" style={{ gap: 14 }}>
+        <Field label={t("Nome")} hint={t("Aparece junto ao título da agenda na capa.")}>
+          <input type="text" maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label={t("Endereço iCal (secreto)")} hint={reader.ics_url_set
+          ? (pending ? t("Salve para substituir o endereço salvo.") : t("Endereço salvo. Deixe em branco para manter."))
+          : t("Endereço secreto do Google Agenda, ou de qualquer calendário que publique iCal.")}>
+          <input type="password" autoComplete="new-password" placeholder={reader.ics_url_set ? "••••••••••••••••" : "https://calendar.google.com/calendar/ical/…"} value={form.ics_url} onChange={(e) => { setCheck(null); setForm({ ...form, ics_url: e.target.value }); }} />
+        </Field>
+      </div>
+      <label className="check">
+        <input type="checkbox" checked={form.include_agenda} onChange={(e) => setForm({ ...form, include_agenda: e.target.checked })} />{" "}
+        {t("Imprimir a agenda dele na primeira página")}
+      </label>
+      <div className="row">
+        <button type="button" className="btn" disabled={busy} onClick={save}>{t("Salvar leitor")}</button>
+        {/* aria-disabled, not disabled: the button stays focusable so a screen reader
+            announces "Save the address to test it" instead of skipping it in the tab order */}
+        <button type="button" className="btn" onClick={pending ? undefined : test} disabled={testing}
+          aria-disabled={pending || undefined}
+          aria-describedby={pending ? `reader-${reader.id}-note` : undefined}>
+          {testing ? t("Lendo o endereço…") : t("Testar endereço salvo")}
+        </button>
+      </div>
+      {pending
+        ? <p id={`reader-${reader.id}-note`} className="small muted">{t("Salve o endereço para testá-lo.")}</p>
+        : message && <p className="small muted" role="status">
+          {check?.calendar ? `${check.calendar}: ${message}` : message}
+        </p>}
+    </div>
+  );
+}
+
 export default function Newspaper({ onTitle }: { onTitle: (t: string) => void }) {
   const { run, busy } = useAction();
   const { data, reload } = useLoad(() => get<Settings>("/api/settings"));
@@ -44,6 +121,7 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
   const [looking, setLooking] = useState(false);
+  const { data: readers, reload: reloadReaders } = useLoad(() => get<Reader[]>("/api/readers"));
   useEffect(() => { if (data) setV(structuredClone(data.values)); }, [data]);
   useEffect(() => {
     window.addEventListener("dayfold:settings", reload);
@@ -62,6 +140,11 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
       if (section === "newspaper") onTitle(news.title);
       reload();
     }
+  };
+
+  const addReader = async () => {
+    const added = await run(() => post<Reader>("/api/readers", { name: "" }), t("Leitor adicionado"));
+    if (added) reloadReaders();
   };
 
   const previewCover = async () => {
@@ -268,6 +351,15 @@ export default function Newspaper({ onTitle }: { onTitle: (t: string) => void })
             </label>
             <p className="small muted">{t("Vale para as edições geradas depois de salvar; a edição guarda o almanaque com que foi impressa.")}</p>
             <button className="btn" onClick={() => save("almanac")}>{t("Salvar almanaque")}</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>{t("Leitores da casa")}</legend>
+            <p className="small muted">{t("Cada leitor recebe o mesmo jornal com a própria agenda na primeira página e o próprio endereço de download. Somente leitura, a partir do endereço iCal secreto de cada calendário.")}</p>
+            {(readers ?? []).map((r) => (
+              <ReaderCard key={r.id} reader={r} canDelete={(readers?.length ?? 0) > 1} onChanged={reloadReaders} />
+            ))}
+            <button type="button" className="btn" onClick={addReader}>{t("Adicionar leitor")}</button>
           </fieldset>
 
           <fieldset>

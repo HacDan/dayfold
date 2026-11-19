@@ -38,8 +38,9 @@ make kindle-koreader                                   # installs KOReader throu
 make kindle-install SERVER=http://192.168.0.10:8422    # plugin + config + today's edition
 ```
 
-`kindle-install` reads the feed token from the dashboard API. If the dashboard has a password,
-pass it explicitly: `TOKEN=... make kindle-install SERVER=...`.
+`kindle-install` reads the first reader's token from the dashboard API. If the dashboard has a
+password, or the Kindle belongs to another reader, pass the token explicitly:
+`TOKEN=... make kindle-install SERVER=...`.
 
 ### Install by hand (USB)
 
@@ -47,8 +48,9 @@ pass it explicitly: `TOKEN=... make kindle-install SERVER=...`.
    `koreader-kindlehf-*.zip` from the KOReader releases).
 2. Copy `koreader/plugins/dayfold.koplugin` to `koreader/plugins/` on the device.
 3. Copy `dayfold_config.sample.lua` to `dayfold_config.lua` in the same folder and fill in the
-   server address and the feed token (dashboard › **Kindle**). You can also set them on the
-   device: KOReader menu › **Tools** (wrench) › **Dayfold** › **Configurar servidor**.
+   server address and that reader's token (dashboard › **Kindle**, choose the reader first). You
+   can also set them on the device: KOReader menu › **Tools** (wrench) › **Dayfold** ›
+   **Configurar servidor**.
 4. Restart KOReader. Editions are saved to `<home folder>/Dayfold`
    (`/mnt/us/documents/Dayfold` on a Kindle) and only the last 7 are kept.
 
@@ -67,8 +69,9 @@ registers an EPUB extractor and launcher in `/var/local/appreg.db` (backed up fi
 ## 2. OPDS catalog
 
 KOReader: **Search** › **OPDS catalog** › **+** and paste the address shown on the dashboard
-Kindle page, for example `http://192.168.0.10:8422/opds?token=...`. Every recent edition appears
-with its cover. Games work as printed puzzles; the interactive versions need the plugin.
+Kindle page for that reader, for example `http://192.168.0.10:8422/opds?token=...`. Every recent
+edition appears with that reader's cover. Games work as printed puzzles; the interactive versions
+need the plugin.
 
 ## 3. Direct download
 

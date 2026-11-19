@@ -8,7 +8,6 @@ the font size on the device.
 from __future__ import annotations
 
 import re
-import secrets
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -195,7 +194,6 @@ class AlmanacSettings(BaseModel):
 
 
 class DistributionSettings(BaseModel):
-    feed_token: str = Field(default_factory=lambda: secrets.token_urlsafe(18))
     keep_editions: int = Field(30, ge=1, le=365)
 
 

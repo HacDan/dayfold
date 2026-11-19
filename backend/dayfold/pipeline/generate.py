@@ -11,10 +11,10 @@ from pathlib import Path
 
 from sqlalchemy import func, select
 
-from .. import almanac, clock, weather
+from .. import agenda, almanac, clock, weather
 from ..config import config
 from ..db import session_scope
-from ..edition.cover import CoverData, cover_masthead_scale, render_cover
+from ..edition.cover import CoverData, agenda_line_fits, cover_masthead_scale, render_cover
 from ..edition.epub import EditionDoc, build_epub
 from ..edition.i18n import (
     LABELS,
@@ -41,6 +41,8 @@ from ..models import (
     GenerationJob,
     JobStatus,
     Provider,
+    Reader,
+    ReaderEdition,
     Topic,
     UsageMode,
     utcnow,
@@ -177,6 +179,10 @@ def run_generation_job(job_id: int) -> None:
             charge_cfg = get_section(s, "charge")
             weather_cfg = get_section(s, "weather")
             almanac_cfg = get_section(s, "almanac")
+            schedule_tz = get_section(s, "schedule").timezone
+            # One paper per person: the same stories, each with the reader's own front page.
+            readers = [(r.id, r.name, r.ics_url if r.include_agenda else "") for r in
+                       s.scalars(select(Reader).order_by(Reader.position, Reader.id))]
             picks, curated_by = curate(s, news, cur, log)
             if not picks:
                 raise RuntimeError(tr("nenhuma matéria disponível para a edição (verifique provedores e filtros)",
@@ -188,6 +194,8 @@ def run_generation_job(job_id: int) -> None:
         # without it if the service is down.
         forecast = weather.today(weather_cfg) if weather_cfg.enabled else None
         daybook = almanac.today(ed_date, almanac_cfg)
+        # One network call per reader's calendar, made with no write transaction open.
+        agendas = {rid: agenda.today(url, schedule_tz, ed_date) for rid, _, url in readers}
         with session_scope() as s:
             edition = Edition(number=number, edition_date=ed_date, title=news.title,
                               status=EditionStatus.BUILDING, curated_by=curated_by, job_id=job_id,
@@ -195,6 +203,8 @@ def run_generation_job(job_id: int) -> None:
             s.add(edition)
             s.flush()
             edition_id = edition.id
+            for rid, _, _ in readers:
+                s.add(ReaderEdition(edition_id=edition.id, reader_id=rid, agenda=agendas[rid] or None))
             for i, p in enumerate(picks):
                 s.add(EditionArticle(edition_id=edition.id, article_id=p.article_id, section=p.section,
                                      position=i, priority=p.priority, is_headline=p.is_headline,
@@ -214,6 +224,15 @@ def run_generation_job(job_id: int) -> None:
         elif weather_cfg.enabled:
             log(tr("Previsão do tempo indisponível para a edição.",
                    "Weather forecast unavailable for this edition."))
+        for rid, reader_name, _ in readers:
+            events = agendas[rid]
+            who = f" ({reader_name})" if reader_name.strip() else ""
+            if events:
+                log(tr(f"Agenda de hoje{who}: {len(events)} evento(s).",
+                       f"Today's agenda{who}: {len(events)} event(s)."))
+            elif events is None:  # only a configured but unreadable feed gets here
+                log(tr(f"Agenda indisponível para a edição{who}.",
+                       f"Agenda unavailable for this edition{who}."))
         lang = news.language
         with session_scope() as s:
             rows = [(a.title, a.language) for a in s.scalars(
@@ -410,6 +429,8 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
             games = test_games
         charge = ({"image_path": ed.charge.image_path, "caption": ed.charge.caption}
                   if ed.charge and ed.charge.image_path and Path(ed.charge.image_path).exists() else None)
+        copies = [(c.reader_id, c.reader.name, c.agenda) for c in sorted(
+            ed.copies, key=lambda c: (c.reader.position, c.reader.id))]
     out_dir = edition_dir(ed_date, number)
     (out_dir / "img").mkdir(parents=True, exist_ok=True)
     ordered_sections = sorted(sections.values(), key=lambda x: x["position"])
@@ -459,6 +480,11 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
         almanac_lines = [almanac_view["moon"]]  # the moon always prints
         if almanac_view["event"]:
             almanac_lines.append(almanac_view["event"])
+    # Each reader gets the same paper with their own front page: only the cover differs, so the
+    # cover and the EPUB are built once per reader from the one edition.
+    blocks = [(reader_id, _agenda_view(snapshot, L) or None,
+               f"{L['agenda']} · {name.strip()}" if name.strip() else L["agenda"])
+              for reader_id, name, snapshot in copies] or [(None, None, L["agenda"])]
     cover_data = CoverData(
         title=news.title, masthead_font=news.masthead_font,
         masthead_scale=cover_masthead_scale(news.typography.masthead),
@@ -475,40 +501,65 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
     )
     if hasattr(log, "step"):
         log.step("cover", 0.85)
+    # One file name per edition, so a second edition on the same day is a new book on the device
+    # (and lands on top of the library) instead of overwriting the first one.
+    identifier = f"dayfold-{ed_date.isoformat()}-{number}"
+    base = edition_basename(ed_date, number)
     cover_name = "cover-test.png" if test_games is not None else "cover.png"
-    cover_path = render_cover(cover_data, out_dir / cover_name, device.cover_width, device.cover_height)
+
+    def edition_doc(cover: Path) -> EditionDoc:
+        return EditionDoc(
+            identifier=identifier, lang=lang, title=news.title,
+            tagline=localized_tagline(news.tagline, lang),
+            long_date=long_date(ed_date, lang), short_date=short_date(ed_date, lang),
+            iso_date=ed_date.isoformat(), number_label=f"{L['number']} {number}",
+            year_label=f"{L['year']} {roman(year_n)}", masthead_font=news.masthead_font,
+            typography=news.typography.model_dump(), cover_path=cover,
+            has_weather=bool(weather_lines), almanac=almanac_view,
+            sections=ordered_sections, games=[dict(g) for g in games], charge=charge,
+            closing_order=news.closing_order, sources=sources, curated_by=curated_by,
+            generated_at=generated_stamp(clock.now(tz), lang),
+        )
+
+    if test_games is not None:
+        blocks = blocks[:1]  # the device test is one file, from the first reader's paper
+    elif any(reader_id for reader_id, _, _ in blocks):
+        # Files from before readers existed lived at the root of the edition's directory.
+        for old in out_dir.glob("dayfold-*.epub"):
+            old.unlink()
+    built: list[tuple[int | None, Path, Path]] = []
+    for reader_id, agenda_lines, agenda_label in blocks:
+        # One subdirectory per reader: same date and number, a different front page.
+        cdir = out_dir if reader_id is None else out_dir / f"r-{reader_id}"
+        cdir.mkdir(parents=True, exist_ok=True)
+        for old in cdir.glob("dayfold-*.epub"):
+            old.unlink()
+        data = replace(cover_data, agenda=agenda_lines, agenda_label=agenda_label)
+        cover_path = render_cover(data, cdir / cover_name, device.cover_width, device.cover_height)
+        doc = edition_doc(cover_path)
+        if test_games is not None:
+            test_doc = replace(doc, native=True, test_checklist=True,
+                               identifier=identifier + "-kindle-test", games=[dict(g) for g in games])
+            built.append((reader_id, cover_path,
+                          build_epub(test_doc, cdir / f"{base}.kindle-test.epub")))
+            continue
+        epub_path = build_epub(doc, cdir / f"{base}.epub")
+        # Native Kindle variants. Without puzzles the cover must not announce them either.
+        build_epub(replace(doc, native=True, games=[dict(g) for g in games]),
+                   kindle_epub_path(epub_path, True))
+        plain_cover = cover_path
+        if games:
+            plain_cover = render_cover(replace(data, footer=" · ".join([L["charge"]] if charge else [])),
+                                       cdir / "cover-kindle.png", device.cover_width, device.cover_height)
+        build_epub(replace(doc, native=True, games=[], cover_path=plain_cover),
+                   kindle_epub_path(epub_path, False))
+        built.append((reader_id, cover_path, epub_path))
+    if test_games is not None:
+        return built[0][2]  # leaves the edition untouched
 
     if hasattr(log, "step"):
         log.step("epub", 0.92)
-    identifier = f"dayfold-{ed_date.isoformat()}-{number}"
-    doc = EditionDoc(
-        identifier=identifier, lang=lang, title=news.title, tagline=localized_tagline(news.tagline, lang),
-        long_date=long_date(ed_date, lang), short_date=short_date(ed_date, lang),
-        iso_date=ed_date.isoformat(), number_label=f"{L['number']} {number}",
-        year_label=f"{L['year']} {roman(year_n)}", masthead_font=news.masthead_font,
-        typography=news.typography.model_dump(), cover_path=cover_path,
-        has_weather=bool(weather_lines), almanac=almanac_view,
-        sections=ordered_sections, games=[dict(g) for g in games], charge=charge,
-        closing_order=news.closing_order, sources=sources, curated_by=curated_by,
-        generated_at=generated_stamp(clock.now(tz), lang),
-    )
-    # One file name per edition, so a second edition on the same day is a new book on the device
-    # (and lands on top of the library) instead of overwriting the first one.
-    base = edition_basename(ed_date, number)
-    if test_games is not None:
-        test_doc = replace(doc, native=True, test_checklist=True, identifier=identifier + "-kindle-test",
-                           games=[dict(g) for g in games])
-        return build_epub(test_doc, out_dir / f"{base}.kindle-test.epub")
-    for old in [*out_dir.glob("dayfold-*.epub"), *out_dir.glob("dayfold-*.games.json")]:
-        old.unlink()
-    epub_path = build_epub(doc, out_dir / f"{base}.epub")
-    # Native Kindle variants. Without puzzles the cover must not announce them either.
-    build_epub(replace(doc, native=True, games=[dict(g) for g in games]), kindle_epub_path(epub_path, True))
-    plain_cover = cover_path
-    if games:
-        plain_cover = render_cover(replace(cover_data, footer=" · ".join([L["charge"]] if charge else [])),
-                                   out_dir / "cover-kindle.png", device.cover_width, device.cover_height)
-    build_epub(replace(doc, native=True, games=[], cover_path=plain_cover), kindle_epub_path(epub_path, False))
+    epub_path, cover_path = built[0][2], built[0][1]
     games_path = out_dir / f"{base}.games.json"
     games_path.write_text(json.dumps({
         "edition": identifier, "date": ed_date.isoformat(), "title": news.title, "language": lang,
@@ -517,6 +568,12 @@ def typeset(edition_id: int, log, test_games: list[dict] | None = None) -> Path:
     }, ensure_ascii=False))
     with session_scope() as s:
         edition = s.get(Edition, edition_id)
+        for reader_id, copy_cover, copy_epub in built:
+            if reader_id is None:
+                continue
+            copy = s.scalar(select(ReaderEdition).where(
+                ReaderEdition.edition_id == edition_id, ReaderEdition.reader_id == reader_id))
+            copy.cover_path, copy.epub_path = str(copy_cover), str(copy_epub)
         edition.status = EditionStatus.READY
         edition.title = news.title
         edition.headline = lead["title"] if lead else None
@@ -566,6 +623,77 @@ def _almanac_event(event: dict | None, lang: str) -> dict | None:
     return event.get(lang) or next(iter(event.values()), None)
 
 
+AGENDA_LINES = 2  # timed events that fit on the cover; the rest is summed up in the last one
+AGENDA_ALL_DAY = 3  # all-day entries on the cover's single all-day line; the rest is counted
+
+
+def _all_day_line(all_day: list[str], labels: dict) -> str:
+    """The cover's one all-day line: the names that print, then how many others there are.
+
+    The names are cut to the width the cover prints at its smallest size, so a long name can never
+    make the cover ellipsize the count away: a name that does not fit is counted instead.
+    """
+    def line(shown: list[str]) -> str:
+        hidden = len(all_day) - len(shown)
+        parts = [*shown] + ([labels["more"].format(n=hidden)] if hidden else [])
+        return f"{labels['all_day']}: " + " · ".join(parts)
+
+    shown = all_day[:AGENDA_ALL_DAY]
+    while len(shown) > 1 and not agenda_line_fits(line(shown)):
+        shown.pop()  # a name too wide to print is counted instead
+    if not agenda_line_fits(line(shown)):
+        name = shown[0]  # one name is all that is left and it is still too wide
+        while name and not agenda_line_fits(line([name + "…"])):
+            name = name[:-1].rstrip()
+        shown = [name + "…"] if name else []
+    return line(shown)
+
+
+def _timed_line(event: dict, labels: dict, more: int) -> str:
+    """One appointment: its time, title and, when there is room, where it happens.
+
+    The last appointment also carries how many others the day holds, and that count is what the
+    line keeps when the cover shrinks it past its smallest size: the venue goes first, then the
+    end of the title. A line that quietly loses its "and N more" reads like a whole day.
+    """
+    at = event["start"][11:16]
+    title = event["title"] or labels["untitled"]
+    where = event.get("location") or ""
+    tail = f" · {labels['more'].format(n=more)}" if more else ""
+    line = f"{at} {title}" + (f" · {where}" if where else "") + tail
+    if not tail or agenda_line_fits(line):
+        return line  # no count to protect, or it already fits: the cover handles the rest
+    if agenda_line_fits(f"{at} {title}{tail}"):
+        return f"{at} {title}{tail}"
+    while title and not agenda_line_fits(f"{at} {title}…{tail}"):
+        title = title[:-1].rstrip()
+    return f"{at} {title}…{tail}"
+
+
+def _agenda_view(snapshot: list[dict] | None, labels: dict) -> list[str]:
+    """The front page's agenda: all-day entries, then the first appointments of the day.
+
+    Both lists are capped, and each prints its own "more" count, so a busy day is summarised
+    rather than silently truncated by the cover's line fitting.
+    """
+    if not snapshot:
+        return []
+
+    def name(e: dict) -> str:
+        return e["title"] or labels["untitled"]
+
+    lines: list[str] = []
+    all_day = [name(e) for e in snapshot if e["all_day"]]
+    if all_day:
+        lines.append(_all_day_line(all_day, labels))
+    timed = [e for e in snapshot if not e["all_day"]]
+    shown = timed[:AGENDA_LINES]
+    more = len(timed) - len(shown)
+    for i, e in enumerate(shown):
+        lines.append(_timed_line(e, labels, more if i == len(shown) - 1 else 0))
+    return lines
+
+
 def _prune() -> None:
     with session_scope() as s:
         keep = get_section(s, "distribution").keep_editions
@@ -573,6 +701,7 @@ def _prune() -> None:
                              .order_by(Edition.edition_date.desc(), Edition.id.desc()).offset(keep)))
         for ed in old:
             if ed.epub_path:
-                shutil.rmtree(Path(ed.epub_path).parent, ignore_errors=True)
+                # The EPUB lives in a reader's subfolder: the edition's own directory goes.
+                shutil.rmtree(edition_dir(ed.edition_date, ed.number), ignore_errors=True)
             ed.epub_path = ed.cover_path = ed.games_path = None
             ed.status = "ARCHIVED"

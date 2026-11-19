@@ -23,10 +23,12 @@ from ..models import (
     EditionStatus,
     GenerationJob,
     Provider,
+    Reader,
+    ReaderEdition,
     Topic,
 )
 from ..settings import get_section
-from .auth import require_admin, require_feed_token
+from .auth import require_admin, require_reader
 from .serialize import edition_summary, iso, job_out, section_label
 
 router = APIRouter(prefix="/api", tags=["editions"], dependencies=[Depends(require_admin)])
@@ -269,9 +271,12 @@ def feedback_summary(session: Session = Depends(get_session)) -> dict:
 
 @router.delete("/editions/{eid}")
 def delete_edition(eid: int, session: Session = Depends(get_session)) -> dict:
+    from ..pipeline.generate import edition_dir
+
     e = _edition(session, eid)
     if e.epub_path:
-        shutil.rmtree(Path(e.epub_path).parent, ignore_errors=True)
+        # Every reader's copy lives in its own subfolder: the edition's own directory goes.
+        shutil.rmtree(edition_dir(e.edition_date, e.number), ignore_errors=True)
     session.delete(e)
     return {"ok": True}
 
@@ -287,11 +292,28 @@ def _latest(session: Session) -> Edition:
     return e
 
 
-@feed.get("/feed/latest.json", dependencies=[Depends(require_feed_token)])
-def feed_latest(session: Session = Depends(get_session)) -> dict:
+def reader_paper(session: Session, e: Edition, reader: Reader) -> tuple[str | None, str | None]:
+    """That reader's own EPUB and cover.
+
+    An edition printed before readers existed has only its own files, which are not anybody's
+    personal paper, so they are served as they are. Once an edition has copies, a reader who
+    joined later gets nothing from it: another person's front page is not a fallback."""
+    copy = session.scalar(select(ReaderEdition).where(
+        ReaderEdition.edition_id == e.id, ReaderEdition.reader_id == reader.id))
+    if copy and copy.epub_path:
+        return copy.epub_path, copy.cover_path
+    if session.scalar(select(ReaderEdition.id).where(ReaderEdition.edition_id == e.id).limit(1)):
+        return None, None
+    return e.epub_path, e.cover_path
+
+
+@feed.get("/feed/latest.json")
+def feed_latest(reader: Reader = Depends(require_reader),
+                session: Session = Depends(get_session)) -> dict:
     e = _latest(session)
-    base = Path(e.epub_path).stem if e.epub_path else f"dayfold-{e.edition_date.isoformat()}"
-    epub = Path(e.epub_path) if e.epub_path else None
+    epub_source, _ = reader_paper(session, e, reader)
+    base = Path(epub_source).stem if epub_source else f"dayfold-{e.edition_date.isoformat()}"
+    epub = Path(epub_source) if epub_source else None
     stat = epub.stat() if epub and epub.exists() else None
     return {
         "id": f"dayfold-{e.edition_date.isoformat()}-{e.number}", "number": e.number,
@@ -306,36 +328,44 @@ def feed_latest(session: Session = Depends(get_session)) -> dict:
     }
 
 
-@feed.get("/feed/latest.epub", dependencies=[Depends(require_feed_token)])
-def feed_epub(session: Session = Depends(get_session)) -> FileResponse:
-    e = _latest(session)
-    return _file(e.epub_path, "application/epub+zip", Path(e.epub_path or "x.epub").name)
+@feed.get("/feed/latest.epub")
+def feed_epub(reader: Reader = Depends(require_reader),
+              session: Session = Depends(get_session)) -> FileResponse:
+    epub, _ = reader_paper(session, _latest(session), reader)
+    return _file(epub, "application/epub+zip", Path(epub or "x.epub").name)
 
 
-@feed.get("/feed/latest.games.json", dependencies=[Depends(require_feed_token)])
-def feed_games(session: Session = Depends(get_session)) -> FileResponse:
+@feed.get("/feed/latest.games.json")
+def feed_games(reader: Reader = Depends(require_reader),
+               session: Session = Depends(get_session)) -> FileResponse:
     return _file(_latest(session).games_path, "application/json")
 
 
-@feed.get("/feed/latest.cover.png", dependencies=[Depends(require_feed_token)])
-def feed_cover(session: Session = Depends(get_session)) -> FileResponse:
-    return _file(_latest(session).cover_path, "image/png")
+@feed.get("/feed/latest.cover.png")
+def feed_cover(reader: Reader = Depends(require_reader),
+               session: Session = Depends(get_session)) -> FileResponse:
+    _, cover = reader_paper(session, _latest(session), reader)
+    return _file(cover, "image/png")
 
 
-@feed.get("/feed/editions/{eid}.epub", dependencies=[Depends(require_feed_token)])
-def feed_edition(eid: int, session: Session = Depends(get_session)) -> FileResponse:
-    e = _edition(session, eid)
-    return _file(e.epub_path, "application/epub+zip", Path(e.epub_path or "x.epub").name)
+@feed.get("/feed/editions/{eid}.epub")
+def feed_edition(eid: int, reader: Reader = Depends(require_reader),
+                 session: Session = Depends(get_session)) -> FileResponse:
+    epub, _ = reader_paper(session, _edition(session, eid), reader)
+    return _file(epub, "application/epub+zip", Path(epub or "x.epub").name)
 
 
-@feed.get("/feed/editions/{eid}.cover.png", dependencies=[Depends(require_feed_token)])
-def feed_edition_cover(eid: int, session: Session = Depends(get_session)) -> FileResponse:
-    return _file(_edition(session, eid).cover_path, "image/png")
+@feed.get("/feed/editions/{eid}.cover.png")
+def feed_edition_cover(eid: int, reader: Reader = Depends(require_reader),
+                       session: Session = Depends(get_session)) -> FileResponse:
+    _, cover = reader_paper(session, _edition(session, eid), reader)
+    return _file(cover, "image/png")
 
 
-@feed.get("/opds", dependencies=[Depends(require_feed_token)])
-def opds(request: Request, session: Session = Depends(get_session)) -> Response:
-    """OPDS 1.2 acquisition feed (KOReader: Search > OPDS catalog)."""
+@feed.get("/opds")
+def opds(request: Request, reader: Reader = Depends(require_reader),
+         session: Session = Depends(get_session)) -> Response:
+    """OPDS 1.2 acquisition feed (KOReader: Search > OPDS catalog), with that reader's papers."""
     token = request.query_params.get("token", "")
     q = f"?token={escape(token)}" if token else ""
     editions = list(session.scalars(select(Edition).where(Edition.status == EditionStatus.READY)
@@ -343,10 +373,11 @@ def opds(request: Request, session: Session = Depends(get_session)) -> Response:
     updated = iso(editions[0].created_at) if editions else "2026-01-01T00:00:00Z"
     entries = []
     for e in editions:
+        epub, cover = reader_paper(session, e, reader)
         entries.append(f"""
   <entry>
     <title>{escape(e.title)} | {e.edition_date.isoformat()} | Nº {e.number}</title>
-    <id>urn:dayfold:{e.edition_date.isoformat()}:{e.number}</id>
+    <id>urn:dayfold:{e.edition_date.isoformat()}:{e.number}:{reader.id}</id>
     <updated>{iso(e.created_at)}</updated>
     <author><name>{escape(e.title)}</name></author>
     <summary>{escape(e.headline or '')}</summary>
@@ -354,10 +385,11 @@ def opds(request: Request, session: Session = Depends(get_session)) -> Response:
     <link rel="http://opds-spec.org/image" type="image/png" href="/feed/editions/{e.id}.cover.png{q}"/>
     <link rel="http://opds-spec.org/image/thumbnail" type="image/png" href="/feed/editions/{e.id}.cover.png{q}"/>
   </entry>""")
+    title = f"Dayfold · {reader.name.strip()}" if reader.name.strip() else "Dayfold"
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog">
-  <id>urn:dayfold:catalog</id>
-  <title>Dayfold</title>
+  <id>urn:dayfold:catalog:{reader.id}</id>
+  <title>{escape(title)}</title>
   <updated>{updated}</updated>
   <link rel="self" type="application/atom+xml;profile=opds-catalog;kind=acquisition" href="/opds{q}"/>
   <link rel="start" type="application/atom+xml;profile=opds-catalog;kind=acquisition" href="/opds{q}"/>{''.join(entries)}

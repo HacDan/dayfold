@@ -155,14 +155,6 @@ def write_settings(section: str, body: dict, session: Session = Depends(get_sess
     return _masked(section, value.model_dump())
 
 
-@router.post("/settings/distribution/rotate-token")
-def rotate_token(session: Session = Depends(get_session)) -> dict:
-    import secrets
-
-    value = set_section(session, "distribution", {"feed_token": secrets.token_urlsafe(18)})
-    return value.model_dump()
-
-
 # ---------------------------------------------------------------- topics
 
 

@@ -14,10 +14,11 @@ from ..db import get_session
 from ..delivery.kindle_mail import KindleMailError, check_configured, send_and_record
 from ..edition.i18n import book_title
 from ..i18n import tr
-from ..models import Edition, EditionStatus
+from ..models import Edition, EditionStatus, Reader
 from ..pipeline.generate import kindle_epub_path, kindle_test_epub, retypeset
 from ..settings import get_section
-from .auth import require_admin, require_feed_token
+from .auth import require_admin, require_reader
+from .editions import reader_paper
 
 router = APIRouter(prefix="/api/kindle", tags=["kindle"], dependencies=[Depends(require_admin)])
 feed = APIRouter(tags=["feed"])
@@ -33,12 +34,19 @@ def _latest(session: Session) -> Edition:
     return e
 
 
-def native_epub(session: Session, e: Edition, *, rebuild: bool = True) -> Path:
+def native_epub(session: Session, e: Edition, reader: Reader | None = None, *,
+                rebuild: bool = True) -> Path:
     """The native Kindle EPUB for an edition (with or without puzzles, per the settings).
     Editions typeset before this feature get their variants on first use, unless ``rebuild`` is
     off: a download may recompose the edition, sending it must not (see ``send``)."""
+    if reader is not None:
+        epub_path = reader_paper(session, e, reader)[0]
+        if epub_path is None:
+            raise HTTPException(404, tr("este leitor não tem esta edição", "this reader has no copy of this edition"))
+    else:
+        epub_path = e.epub_path
     games = get_section(session, "kindle").native_games
-    path = kindle_epub_path(e.epub_path, games)
+    path = kindle_epub_path(epub_path, games)
     if rebuild and not path.exists():
         retypeset(e.id)
     return path
@@ -109,7 +117,8 @@ def download_latest(session: Session = Depends(get_session)) -> FileResponse:
     return FileResponse(path, media_type=EPUB, filename=path.name)
 
 
-@feed.get("/feed/latest.kindle.epub", dependencies=[Depends(require_feed_token)])
-def feed_latest_native(session: Session = Depends(get_session)) -> FileResponse:
-    path = native_epub(session, _latest(session))
+@feed.get("/feed/latest.kindle.epub")
+def feed_latest_native(reader: Reader = Depends(require_reader),
+                       session: Session = Depends(get_session)) -> FileResponse:
+    path = native_epub(session, _latest(session), reader)
     return FileResponse(path, media_type=EPUB, filename=path.name)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import enum
+import secrets
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -211,6 +212,51 @@ class Article(Base):
     provider: Mapped[Provider] = relationship()
 
 
+class Reader(Base):
+    """One person in the household: their own calendar and their own copy of each edition.
+
+    ``token`` is the secret in that person's device address, so each e-reader downloads its own
+    paper and nobody else's. The address itself never leaves the server; neither does the token,
+    except to the dashboard that manages it.
+    """
+
+    __tablename__ = "readers"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(60), default="")
+    token: Mapped[str] = mapped_column(
+        String(80), unique=True, default=lambda: secrets.token_urlsafe(18))
+    ics_url: Mapped[str] = mapped_column(String(600), default="")  # a bearer secret
+    # Whether the day's events print on this reader's front page; the paper is printed either way.
+    include_agenda: Mapped[bool] = mapped_column(Boolean, default=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    copies: Mapped[list[ReaderEdition]] = relationship(
+        back_populates="reader", cascade="all, delete-orphan")
+
+
+class ReaderEdition(Base):
+    """One reader's copy of an edition: their agenda snapshot, cover and EPUB.
+
+    Stories, puzzles and the cartoon are shared with the day's edition, so a household of four
+    readers still collects and curates the news once.
+    """
+
+    __tablename__ = "reader_editions"
+    __table_args__ = (UniqueConstraint("edition_id", "reader_id"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    edition_id: Mapped[int] = mapped_column(ForeignKey("editions.id", ondelete="CASCADE"))
+    reader_id: Mapped[int] = mapped_column(ForeignKey("readers.id", ondelete="CASCADE"))
+    # The day's events, snapshotted so a re-typeset keeps the front page it printed.
+    agenda: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    cover_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    epub_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    edition: Mapped[Edition] = relationship(back_populates="copies")
+    reader: Mapped[Reader] = relationship(back_populates="copies")
+
+
 class Edition(Base):
     __tablename__ = "editions"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -239,6 +285,9 @@ class Edition(Base):
     )
     charge: Mapped[ChargeAsset | None] = relationship(
         back_populates="edition", cascade="all, delete-orphan", uselist=False
+    )
+    copies: Mapped[list[ReaderEdition]] = relationship(
+        back_populates="edition", cascade="all, delete-orphan"
     )
 
 

@@ -81,7 +81,7 @@ export type Settings = {
     device: { cover_width: number; cover_height: number; image_max_width: number; screensaver_cover: boolean };
     weather: { enabled: boolean; place: string; latitude: number | null; longitude: number | null; units: "celsius" | "fahrenheit" };
     almanac: { enabled: boolean; on_this_day: boolean };
-    distribution: { feed_token: string; keep_editions: number };
+    distribution: { keep_editions: number };
     kindle: KindleCfg;
   };
   meta: {
@@ -89,6 +89,13 @@ export type Settings = {
     type_ranges: Record<keyof Typography, { min: number; default: number; max: number }>;
     ai_available: boolean;
   };
+};
+
+/** A household reader: their own calendar and their own copy of each edition. The token is the
+    secret in that person's device address; the iCal address itself never leaves the server. */
+export type Reader = {
+  id: number; name: string; ics_url_set: boolean; include_agenda: boolean;
+  position: number; token: string;
 };
 
 export type Version = {

@@ -43,7 +43,9 @@ e-reader only reads an offline file.
 | Dashboard | React + TypeScript + Vite, hand written editorial CSS | No UI kit: the product must look like a newspaper, not a SaaS. |
 | Kindle | KOReader + `dayfold.koplugin` | The stock Kindle reader does not open EPUB. KOReader does, and the plugin adds sync and interactive games. |
 | Kindle without jailbreak | Send to Kindle by e-mail (`delivery/kindle_mail.py`, Gmail SMTP) | Amazon converts the EPUB. A native variant (`*.kindle.epub`, `*.kindle-games.epub`) drops the KOReader links and keeps answers after an "Answers ahead" page. |
-| Auth | Optional dashboard password (signed cookie) + feed token for devices | Simple for a LAN, safe enough behind Tailscale. |
+| Agenda | One read-only iCal feed per reader (`agenda.py`), each snapshotted with their copy of the edition | No OAuth app or API key; Google, Apple, Outlook and Nextcloud all publish a secret iCal address. The day's events print on that reader's front page, so a re-typeset keeps them. Each address is a bearer secret: stored server side, masked on read and redacted from logs. |
+| Readers | A `readers` row per person; one `editions` row per day with a `reader_editions` copy each | News is collected and curated once; only the front page is personal. Each copy has its own cover, EPUB and secret device token. |
+| Auth | Optional dashboard password (signed cookie) + one feed token per reader for devices | Simple for a LAN, safe enough behind Tailscale. A reader's token downloads that reader's copy only. |
 
 ## Data model
 
@@ -56,7 +58,9 @@ e-reader only reads an offline file.
 | `scraper_versions` | Versioned scraper specs per provider with status `PENDING / GENERATING / TESTING / READY / FAILED / DISABLED`, test report and logs. |
 | `scraper_jobs` | Creation or regeneration requests (with the extra prompt) and their state. |
 | `articles` | Collected items: title, subtitle, author, date, provider, URL, image, body, excerpt, hash, language. |
+| `readers` | One person in the household: name, secret feed token, iCal address, agenda flag. |
 | `editions` | One generated issue: number, date, title, status, files, stats. |
+| `reader_editions` | One reader's copy of an edition: agenda snapshot, cover and EPUB. Everything else is shared with the edition. |
 | `edition_articles` | Which articles went into an edition, their section, order and priority. |
 | `article_ratings` | Reader ratings from "Rate edition" (-1, 0, 1), with provider, section and title copied so they outlive the edition. |
 | `games` | Game catalog (`sudoku`, `wordle`, `wordsearch`, `crossword`), enabled flag, order and per game config. |
@@ -83,9 +87,10 @@ e-reader only reads an offline file.
 7. **Games** are generated with a seed derived from the edition date.
 8. **Charge** (only when AI is configured): the model writes a cartoon script from the
    top headlines, the renderer draws it; image mode calls an image API instead.
-9. **Typeset**: cover PNG, EPUB with cover, sections, articles, charge, games and
-   solutions, plus `games.json` for the KOReader plugin.
-10. Edition becomes `READY` and is exposed at `/feed/latest.epub` and in OPDS.
+9. **Typeset**: per reader, a cover PNG (with that person's agenda) and an EPUB with cover,
+   sections, articles, charge, games and solutions; `games.json` once for the edition.
+10. Edition becomes `READY`; each reader's copy is exposed at `/feed/latest.epub?token=...` and
+    in OPDS, with that reader's token.
 
 One paper per day: a rerun (manual, cron or catch-up) first discards what an earlier failed or
 interrupted attempt left in `BUILDING` or `FAILED`, and a failure after the paper is typeset is
